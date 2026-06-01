@@ -50,7 +50,7 @@ export default function Dashboard() {
                 <tr key={s.id}>
                   <td>{s.vehicle_name}</td>
                   <td>{s.agents?.full_name || '-'}</td>
-                  <td><span className="badge">{s.agents?.agencies?.name || '-'}</span></td>
+                  <td>{JSON.stringify(s.agents)}</td>
                   <td>{euro(Number(s.margin_amount || 0))}</td>
                 </tr>
               ))}
