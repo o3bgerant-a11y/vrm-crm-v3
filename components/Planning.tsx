@@ -108,6 +108,27 @@ export default function Planning() {
     loadEvents();
   }, [weekStart, weekEnd]);
 
+  function previousWeek() {
+    const newDate = addDays(new Date(selectedDate), -7);
+    setSelectedDate(formatDateForInput(newDate));
+    setSelectedYear(newDate.getFullYear());
+    setSelectedMonth(newDate.getMonth());
+  }
+
+  function nextWeek() {
+    const newDate = addDays(new Date(selectedDate), 7);
+    setSelectedDate(formatDateForInput(newDate));
+    setSelectedYear(newDate.getFullYear());
+    setSelectedMonth(newDate.getMonth());
+  }
+
+  function goToday() {
+    const newDate = new Date();
+    setSelectedDate(formatDateForInput(newDate));
+    setSelectedYear(newDate.getFullYear());
+    setSelectedMonth(newDate.getMonth());
+  }
+
   function changeMonth(month: number) {
     setSelectedMonth(month);
     const newDate = new Date(selectedYear, month, 1);
@@ -125,6 +146,13 @@ export default function Planning() {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
           <h3>📅 Planning Benoît</h3>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+            <button onClick={previousWeek}>⬅️ Semaine précédente</button>
+            <button onClick={goToday}>📍 Aujourd'hui</button>
+            <button onClick={nextWeek}>Semaine suivante ➡️</button>
+          </div>
+
           <p className="muted">
             Semaine {weekNumber} — du {weekStart.toLocaleDateString('fr-FR')} au {addDays(weekStart, 6).toLocaleDateString('fr-FR')}
           </p>
@@ -146,7 +174,12 @@ export default function Planning() {
           <input
             type="date"
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={(e) => {
+              const newDate = new Date(e.target.value);
+              setSelectedDate(e.target.value);
+              setSelectedYear(newDate.getFullYear());
+              setSelectedMonth(newDate.getMonth());
+            }}
           />
         </div>
       </div>
