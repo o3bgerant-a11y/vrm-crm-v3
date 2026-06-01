@@ -1,2 +1,64 @@
-const days=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];const hours=['8h','9h','10h','11h','12h','14h','15h','16h','17h'];
-export default function Planning(){return <div className="card"><h3>Planning Benoît — vue semaine</h3><p className="muted mobile-note">Sur iPhone, ce module doit apparaître en premier dans la version finale.</p><div className="calendar"><div className="calcell calhead">Heure</div>{days.map(d=><div className="calcell calhead" key={d}>{d}</div>)}{hours.map(h=><><div className="calcell hour" key={h}>{h}</div>{days.map((d,i)=><div className="calcell" key={h+d}>{h==='9h'&&i===0&&<div className="event blois">Blois — point agents</div>}{h==='11h'&&i===1&&<div className="event tours">Tours — RDV vendeur</div>}{h==='14h'&&i===3&&<div className="event bourges">Bourges — visite agence</div>}{h==='16h'&&i===4&&<div className="event perso">Personnel</div>}</div>)}</>)}</div></div>}
+const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+const hours = ['8h', '9h', '10h', '11h', '12h', '14h', '15h', '16h', '17h'];
+
+export default function Planning() {
+  return (
+    <div className="card">
+      <h3>📅 Planning Benoît</h3>
+
+      <p className="muted">
+        Vue semaine - Blois, Tours, Bourges et personnel
+      </p>
+
+      <div className="calendar">
+
+        <div className="calcell calhead">Heure</div>
+
+        {days.map((d) => (
+          <div className="calcell calhead" key={d}>
+            {d}
+          </div>
+        ))}
+
+        {hours.map((h) => (
+          <>
+            <div className="calcell hour" key={h}>
+              {h}
+            </div>
+
+            {days.map((d, i) => (
+              <div className="calcell" key={h + d}>
+
+                {h === '9h' && i === 0 && (
+                  <div className="event blois">
+                    🟢 Blois - Point agents
+                  </div>
+                )}
+
+                {h === '11h' && i === 1 && (
+                  <div className="event tours">
+                    🔵 Tours - RDV vendeur
+                  </div>
+                )}
+
+                {h === '14h' && i === 3 && (
+                  <div className="event bourges">
+                    🟠 Bourges - Visite agence
+                  </div>
+                )}
+
+                {h === '16h' && i === 4 && (
+                  <div className="event perso">
+                    🔴 Personnel
+                  </div>
+                )}
+
+              </div>
+            ))}
+          </>
+        ))}
+
+      </div>
+    </div>
+  );
+}
