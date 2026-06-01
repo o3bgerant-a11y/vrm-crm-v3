@@ -89,6 +89,18 @@ function agencyColor(agencyId: number | null) {
   return 'red';
 }
 
+function getDurationMinutes(event: PlanningEvent) {
+  const start = new Date(event.start_date).getTime();
+  const end = new Date(event.end_date).getTime();
+  return Math.max(15, Math.round((end - start) / 60000));
+}
+
+function getEventHeight(event: PlanningEvent) {
+  const minutes = getDurationMinutes(event);
+  const hourHeight = 76;
+  return Math.max(44, Math.round((minutes / 60) * hourHeight));
+}
+
 export default function Planning() {
   const today = new Date();
 
@@ -420,7 +432,10 @@ export default function Planning() {
                       className={`event ${getEventClass(event)}`}
                       key={event.id}
                       onClick={() => openEditEventForm(event)}
-                      style={{ cursor: 'pointer' }}
+                      style={{
+                        cursor: 'pointer',
+                        minHeight: `${getEventHeight(event)}px`
+                      }}
                       title="Cliquer pour modifier ou supprimer"
                     >
                       <strong>{event.title}</strong>
