@@ -55,24 +55,34 @@ function getWeekNumber(date: Date) {
 }
 
 function formatDateForInput(date: Date) {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-function formatTimeForInput(date: string) {
-  const d = new Date(date);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+function getDatePart(value: string) {
+  return value.slice(0, 10);
 }
 
-function getHourLabel(date: string) {
-  const d = new Date(date);
-  return `${d.getHours()}h`;
+function getTimePart(value: string) {
+  return value.slice(11, 16);
+}
+
+function getHourLabel(value: string) {
+  return `${Number(value.slice(11, 13))}h`;
+}
+
+function getLocalDate(value: string) {
+  const datePart = getDatePart(value);
+  const [year, month, day] = datePart.split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function getDayIndex(date: string, weekStart: Date) {
-  const d = new Date(date);
-  const cleanDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const d = getLocalDate(date);
   const cleanStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
-  return Math.floor((cleanDate.getTime() - cleanStart.getTime()) / 86400000);
+  return Math.floor((d.getTime() - cleanStart.getTime()) / 86400000);
 }
 
 function getEventClass(event: PlanningEvent) {
@@ -89,10 +99,15 @@ function agencyColor(agencyId: number | null) {
   return 'red';
 }
 
+function timeToMinutes(time: string) {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
 function getDurationMinutes(event: PlanningEvent) {
-  const start = new Date(event.start_date).getTime();
-  const end = new Date(event.end_date).getTime();
-  return Math.max(15, Math.round((end - start) / 60000));
+  const start = timeToMinutes(getTimePart(event.start_date));
+  const end = timeToMinutes(getTimePart(event.end_date));
+  return Math.max(15, end - start);
 }
 
 function getEventHeight(event: PlanningEvent) {
@@ -130,11 +145,14 @@ export default function Planning() {
   async function loadEvents() {
     setLoading(true);
 
+    const start = `${formatDateForInput(weekStart)} 00:00:00`;
+    const end = `${formatDateForInput(weekEnd)} 00:00:00`;
+
     const { data, error } = await supabase
       .from('planning_events')
       .select('*')
-      .gte('start_date', weekStart.toISOString())
-      .lt('start_date', weekEnd.toISOString())
+      .gte('start_date', start)
+      .lt('start_date', end)
       .order('start_date', { ascending: true });
 
     if (error) {
@@ -170,9 +188,9 @@ export default function Planning() {
     setEditingEvent(event);
     setFormTitle(event.title);
     setFormDescription(event.description || '');
-    setFormDate(formatDateForInput(new Date(event.start_date)));
-    setFormStartTime(formatTimeForInput(event.start_date));
-    setFormEndTime(formatTimeForInput(event.end_date));
+    setFormDate(getDatePart(event.start_date));
+    setFormStartTime(getTimePart(event.start_date));
+    setFormEndTime(getTimePart(event.end_date));
     setFormAgencyId(event.agency_id);
     setShowForm(true);
   }
@@ -440,7 +458,7 @@ export default function Planning() {
                     >
                       <strong>{event.title}</strong>
                       <div style={{ fontSize: 11, opacity: 0.85 }}>
-                        {formatTimeForInput(event.start_date)} - {formatTimeForInput(event.end_date)}
+                        {getTimePart(event.start_date)} - {getTimePart(event.end_date)}
                       </div>
                       {event.description && (
                         <div style={{ fontSize: 12, opacity: 0.9 }}>
