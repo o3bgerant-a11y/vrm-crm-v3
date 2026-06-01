@@ -15,7 +15,7 @@ const hours = [
 ];
 
 type PlanningEvent = {
-  id: number;
+  id: string;
   title: string;
   description: string | null;
   start_date: string;
@@ -70,75 +70,131 @@ function getEventClass(event: PlanningEvent) {
   return 'perso';
 }
 
+function agencyColor(agencyId: number | null) {
+  if (agencyId === 1) return 'green';
+  if (agencyId === 2) return 'blue';
+  if (agencyId === 3) return 'orange';
+  return 'red';
+}
+
 export default function Planning() {
   const today = new Date();
 
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState(formatDateForInput(today));
+
   const [events, setEvents] = useState<PlanningEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newDate, setNewDate] = useState(formatDateForInput(today));
+  const [newStartTime, setNewStartTime] = useState('09:00');
+  const [newEndTime, setNewEndTime] = useState('10:00');
+  const [newAgencyId, setNewAgencyId] = useState<number | null>(1);
 
   const weekStart = useMemo(() => getMonday(new Date(selectedDate)), [selectedDate]);
   const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
   const weekDays = useMemo(() => dayNames.map((_, i) => addDays(weekStart, i)), [weekStart]);
   const weekNumber = getWeekNumber(weekStart);
 
-  useEffect(() => {
-    async function loadEvents() {
-      setLoading(true);
+  async function loadEvents() {
+    setLoading(true);
 
-      const { data, error } = await supabase
-        .from('planning_events')
-        .select('*')
-        .gte('start_date', weekStart.toISOString())
-        .lt('start_date', weekEnd.toISOString())
-        .order('start_date', { ascending: true });
+    const { data, error } = await supabase
+      .from('planning_events')
+      .select('*')
+      .gte('start_date', weekStart.toISOString())
+      .lt('start_date', weekEnd.toISOString())
+      .order('start_date', { ascending: true });
 
-      if (error) {
-        console.error('Erreur planning:', error);
-        setEvents([]);
-      } else {
-        setEvents(data || []);
-      }
-
-      setLoading(false);
+    if (error) {
+      console.error('Erreur planning:', error);
+      setEvents([]);
+    } else {
+      setEvents(data || []);
     }
 
+    setLoading(false);
+  }
+
+  useEffect(() => {
     loadEvents();
   }, [weekStart, weekEnd]);
 
   function previousWeek() {
-    const newDate = addDays(new Date(selectedDate), -7);
-    setSelectedDate(formatDateForInput(newDate));
-    setSelectedYear(newDate.getFullYear());
-    setSelectedMonth(newDate.getMonth());
+    const newDateValue = addDays(new Date(selectedDate), -7);
+    setSelectedDate(formatDateForInput(newDateValue));
+    setSelectedYear(newDateValue.getFullYear());
+    setSelectedMonth(newDateValue.getMonth());
   }
 
   function nextWeek() {
-    const newDate = addDays(new Date(selectedDate), 7);
-    setSelectedDate(formatDateForInput(newDate));
-    setSelectedYear(newDate.getFullYear());
-    setSelectedMonth(newDate.getMonth());
+    const newDateValue = addDays(new Date(selectedDate), 7);
+    setSelectedDate(formatDateForInput(newDateValue));
+    setSelectedYear(newDateValue.getFullYear());
+    setSelectedMonth(newDateValue.getMonth());
   }
 
   function goToday() {
-    const newDate = new Date();
-    setSelectedDate(formatDateForInput(newDate));
-    setSelectedYear(newDate.getFullYear());
-    setSelectedMonth(newDate.getMonth());
+    const newDateValue = new Date();
+    setSelectedDate(formatDateForInput(newDateValue));
+    setSelectedYear(newDateValue.getFullYear());
+    setSelectedMonth(newDateValue.getMonth());
   }
 
   function changeMonth(month: number) {
     setSelectedMonth(month);
-    const newDate = new Date(selectedYear, month, 1);
-    setSelectedDate(formatDateForInput(newDate));
+    const newDateValue = new Date(selectedYear, month, 1);
+    setSelectedDate(formatDateForInput(newDateValue));
   }
 
   function changeYear(year: number) {
     setSelectedYear(year);
-    const newDate = new Date(year, selectedMonth, 1);
-    setSelectedDate(formatDateForInput(newDate));
+    const newDateValue = new Date(year, selectedMonth, 1);
+    setSelectedDate(formatDateForInput(newDateValue));
+  }
+
+  async function addEvent() {
+    if (!newTitle.trim()) {
+      alert('Il faut mettre un titre au rendez-vous.');
+      return;
+    }
+
+    setSaving(true);
+
+    const startDate = `${newDate} ${newStartTime}:00`;
+    const endDate = `${newDate} ${newEndTime}:00`;
+
+    const { error } = await supabase.from('planning_events').insert({
+      title: newTitle,
+      description: newDescription || null,
+      start_date: startDate,
+      end_date: endDate,
+      agency_id: newAgencyId,
+      color: agencyColor(newAgencyId),
+    });
+
+    if (error) {
+      console.error('Erreur ajout événement:', error);
+      alert("Erreur pendant l'ajout du rendez-vous.");
+    } else {
+      setNewTitle('');
+      setNewDescription('');
+      setShowForm(false);
+      setSelectedDate(newDate);
+
+      const d = new Date(newDate);
+      setSelectedYear(d.getFullYear());
+      setSelectedMonth(d.getMonth());
+
+      await loadEvents();
+    }
+
+    setSaving(false);
   }
 
   return (
@@ -151,6 +207,7 @@ export default function Planning() {
             <button onClick={previousWeek}>⬅️ Semaine précédente</button>
             <button onClick={goToday}>📍 Aujourd'hui</button>
             <button onClick={nextWeek}>Semaine suivante ➡️</button>
+            <button onClick={() => setShowForm(!showForm)}>➕ Nouveau rendez-vous</button>
           </div>
 
           <p className="muted">
@@ -175,14 +232,74 @@ export default function Planning() {
             type="date"
             value={selectedDate}
             onChange={(e) => {
-              const newDate = new Date(e.target.value);
+              const d = new Date(e.target.value);
               setSelectedDate(e.target.value);
-              setSelectedYear(newDate.getFullYear());
-              setSelectedMonth(newDate.getMonth());
+              setSelectedYear(d.getFullYear());
+              setSelectedMonth(d.getMonth());
             }}
           />
         </div>
       </div>
+
+      {showForm && (
+        <div className="card" style={{ marginTop: 12, marginBottom: 12 }}>
+          <h4>➕ Ajouter un rendez-vous</h4>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <input
+              placeholder="Titre du rendez-vous"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+            />
+
+            <textarea
+              placeholder="Description"
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+            />
+
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+            />
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                type="time"
+                value={newStartTime}
+                onChange={(e) => setNewStartTime(e.target.value)}
+              />
+
+              <input
+                type="time"
+                value={newEndTime}
+                onChange={(e) => setNewEndTime(e.target.value)}
+              />
+
+              <select
+                value={newAgencyId ?? ''}
+                onChange={(e) => setNewAgencyId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="1">Blois</option>
+                <option value="2">Tours</option>
+                <option value="3">Bourges</option>
+                <option value="">Personnel</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={addEvent} disabled={saving}>
+                {saving ? 'Enregistrement...' : '✅ Enregistrer'}
+              </button>
+
+              <button onClick={() => setShowForm(false)}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading && <p className="muted">Chargement du planning...</p>}
 
