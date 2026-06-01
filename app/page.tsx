@@ -32,38 +32,24 @@ export default function Home() {
             <p>CRM V3 Vroom Market — Blois, Tours, Bourges</p>
           </div>
 
-          {active !== 'planning' && (
-            <div className="filters">
-              <select><option>2026</option></select>
-              <select><option>Mai</option></select>
-              <select><option>S22</option></select>
-              <select>
-                <option>Toutes les agences</option>
-                <option>Blois</option>
-                <option>Tours</option>
-                <option>Bourges</option>
-              </select>
-              <select>
-                <option>Tous les agents</option>
-                <option>Maveryk</option>
-              </select>
-            </div>
-          )}
+          <div className="filters">
+            <select><option>2026</option></select>
+            <select><option>Mai</option></select>
+            <select><option>S22</option></select>
+            <select>
+              <option>Toutes les agences</option>
+              <option>Blois</option>
+              <option>Tours</option>
+              <option>Bourges</option>
+            </select>
+            <select>
+              <option>Tous les agents</option>
+              <option>Maveryk</option>
+            </select>
+          </div>
         </div>
 
-        {active === 'dashboard' && (
-          <div className="mobile-home">
-            <Planning />
-            <Dashboard />
-          </div>
-        )}
-
-        {active === 'dashboard' && (
-          <div className="desktop-home">
-            <Dashboard />
-          </div>
-        )}
-
+        {active === 'dashboard' && <Dashboard />}
         {active === 'planning' && <Planning />}
         {active === 'agences' && <Agences />}
         {active === 'agents' && <Agents />}
@@ -73,33 +59,6 @@ export default function Home() {
         {active === 'documents' && <Documents />}
         {active === 'stats' && <Stats />}
       </main>
-
-      <nav className="mobile-nav">
-        <button className={active === 'dashboard' ? 'active' : ''} onClick={() => setActive('dashboard')}>
-          <span>🏠</span>
-          Accueil
-        </button>
-
-        <button className={active === 'planning' ? 'active' : ''} onClick={() => setActive('planning')}>
-          <span>📅</span>
-          Planning
-        </button>
-
-        <button className={active === 'ventes' ? 'active' : ''} onClick={() => setActive('ventes')}>
-          <span>🚗</span>
-          Ventes
-        </button>
-
-        <button className={active === 'agents' ? 'active' : ''} onClick={() => setActive('agents')}>
-          <span>👥</span>
-          Agents
-        </button>
-
-        <button className={active === 'stats' ? 'active' : ''} onClick={() => setActive('stats')}>
-          <span>📊</span>
-          Stats
-        </button>
-      </nav>
     </div>
   );
 }
