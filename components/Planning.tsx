@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -13,6 +13,13 @@ const hours = [
   '7h', '8h', '9h', '10h', '11h', '12h',
   '13h', '14h', '15h', '16h', '17h', '18h', '19h'
 ];
+
+const timeSlots = Array.from({ length: 53 }, (_, i) => {
+  const totalMinutes = 7 * 60 + i * 15;
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+});
 
 type PlanningEvent = {
   id: string;
@@ -51,6 +58,11 @@ function formatDateForInput(date: Date) {
   return date.toISOString().split('T')[0];
 }
 
+function formatTimeForInput(date: string) {
+  const d = new Date(date);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 function getHourLabel(date: string) {
   const d = new Date(date);
   return `${d.getHours()}h`;
@@ -86,15 +98,17 @@ export default function Planning() {
 
   const [events, setEvents] = useState<PlanningEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [newDate, setNewDate] = useState(formatDateForInput(today));
-  const [newStartTime, setNewStartTime] = useState('09:00');
-  const [newEndTime, setNewEndTime] = useState('10:00');
-  const [newAgencyId, setNewAgencyId] = useState<number | null>(1);
+  const [showForm, setShowForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<PlanningEvent | null>(null);
+
+  const [formTitle, setFormTitle] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formDate, setFormDate] = useState(formatDateForInput(today));
+  const [formStartTime, setFormStartTime] = useState('09:00');
+  const [formEndTime, setFormEndTime] = useState('10:00');
+  const [formAgencyId, setFormAgencyId] = useState<number | null>(1);
 
   const weekStart = useMemo(() => getMonday(new Date(selectedDate)), [selectedDate]);
   const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
@@ -124,6 +138,32 @@ export default function Planning() {
   useEffect(() => {
     loadEvents();
   }, [weekStart, weekEnd]);
+
+  function resetForm() {
+    setEditingEvent(null);
+    setFormTitle('');
+    setFormDescription('');
+    setFormDate(selectedDate);
+    setFormStartTime('09:00');
+    setFormEndTime('10:00');
+    setFormAgencyId(1);
+  }
+
+  function openNewEventForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEditEventForm(event: PlanningEvent) {
+    setEditingEvent(event);
+    setFormTitle(event.title);
+    setFormDescription(event.description || '');
+    setFormDate(formatDateForInput(new Date(event.start_date)));
+    setFormStartTime(formatTimeForInput(event.start_date));
+    setFormEndTime(formatTimeForInput(event.end_date));
+    setFormAgencyId(event.agency_id);
+    setShowForm(true);
+  }
 
   function previousWeek() {
     const newDateValue = addDays(new Date(selectedDate), -7);
@@ -158,39 +198,72 @@ export default function Planning() {
     setSelectedDate(formatDateForInput(newDateValue));
   }
 
-  async function addEvent() {
-    if (!newTitle.trim()) {
+  async function saveEvent() {
+    if (!formTitle.trim()) {
       alert('Il faut mettre un titre au rendez-vous.');
+      return;
+    }
+
+    if (formEndTime <= formStartTime) {
+      alert("L'heure de fin doit être après l'heure de début.");
       return;
     }
 
     setSaving(true);
 
-    const startDate = `${newDate} ${newStartTime}:00`;
-    const endDate = `${newDate} ${newEndTime}:00`;
+    const startDate = `${formDate} ${formStartTime}:00`;
+    const endDate = `${formDate} ${formEndTime}:00`;
 
-    const { error } = await supabase.from('planning_events').insert({
-      title: newTitle,
-      description: newDescription || null,
+    const payload = {
+      title: formTitle,
+      description: formDescription || null,
       start_date: startDate,
       end_date: endDate,
-      agency_id: newAgencyId,
-      color: agencyColor(newAgencyId),
-    });
+      agency_id: formAgencyId,
+      color: agencyColor(formAgencyId),
+    };
+
+    const { error } = editingEvent
+      ? await supabase.from('planning_events').update(payload).eq('id', editingEvent.id)
+      : await supabase.from('planning_events').insert(payload);
 
     if (error) {
-      console.error('Erreur ajout événement:', error);
-      alert("Erreur pendant l'ajout du rendez-vous.");
+      console.error('Erreur sauvegarde événement:', error);
+      alert("Erreur pendant l'enregistrement du rendez-vous.");
     } else {
-      setNewTitle('');
-      setNewDescription('');
       setShowForm(false);
-      setSelectedDate(newDate);
+      setEditingEvent(null);
+      setSelectedDate(formDate);
 
-      const d = new Date(newDate);
+      const d = new Date(formDate);
       setSelectedYear(d.getFullYear());
       setSelectedMonth(d.getMonth());
 
+      await loadEvents();
+    }
+
+    setSaving(false);
+  }
+
+  async function deleteEvent() {
+    if (!editingEvent) return;
+
+    const ok = confirm(`Supprimer le rendez-vous "${editingEvent.title}" ?`);
+    if (!ok) return;
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from('planning_events')
+      .delete()
+      .eq('id', editingEvent.id);
+
+    if (error) {
+      console.error('Erreur suppression événement:', error);
+      alert('Erreur pendant la suppression du rendez-vous.');
+    } else {
+      setShowForm(false);
+      setEditingEvent(null);
       await loadEvents();
     }
 
@@ -207,7 +280,7 @@ export default function Planning() {
             <button onClick={previousWeek}>⬅️ Semaine précédente</button>
             <button onClick={goToday}>📍 Aujourd'hui</button>
             <button onClick={nextWeek}>Semaine suivante ➡️</button>
-            <button onClick={() => setShowForm(!showForm)}>➕ Nouveau rendez-vous</button>
+            <button onClick={openNewEventForm}>➕ Nouveau rendez-vous</button>
           </div>
 
           <p className="muted">
@@ -243,43 +316,43 @@ export default function Planning() {
 
       {showForm && (
         <div className="card" style={{ marginTop: 12, marginBottom: 12 }}>
-          <h4>➕ Ajouter un rendez-vous</h4>
+          <h4>{editingEvent ? '✏️ Modifier le rendez-vous' : '➕ Ajouter un rendez-vous'}</h4>
 
           <div style={{ display: 'grid', gap: 10 }}>
             <input
               placeholder="Titre du rendez-vous"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
+              value={formTitle}
+              onChange={(e) => setFormTitle(e.target.value)}
             />
 
             <textarea
               placeholder="Description"
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
+              value={formDescription}
+              onChange={(e) => setFormDescription(e.target.value)}
             />
 
             <input
               type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
+              value={formDate}
+              onChange={(e) => setFormDate(e.target.value)}
             />
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <input
-                type="time"
-                value={newStartTime}
-                onChange={(e) => setNewStartTime(e.target.value)}
-              />
+              <select value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)}>
+                {timeSlots.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
 
-              <input
-                type="time"
-                value={newEndTime}
-                onChange={(e) => setNewEndTime(e.target.value)}
-              />
+              <select value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)}>
+                {timeSlots.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
 
               <select
-                value={newAgencyId ?? ''}
-                onChange={(e) => setNewAgencyId(e.target.value ? Number(e.target.value) : null)}
+                value={formAgencyId ?? ''}
+                onChange={(e) => setFormAgencyId(e.target.value ? Number(e.target.value) : null)}
               >
                 <option value="1">Blois</option>
                 <option value="2">Tours</option>
@@ -289,11 +362,22 @@ export default function Planning() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button onClick={addEvent} disabled={saving}>
-                {saving ? 'Enregistrement...' : '✅ Enregistrer'}
+              <button onClick={saveEvent} disabled={saving}>
+                {saving ? 'Enregistrement...' : editingEvent ? '💾 Modifier' : '✅ Enregistrer'}
               </button>
 
-              <button onClick={() => setShowForm(false)}>
+              {editingEvent && (
+                <button onClick={deleteEvent} disabled={saving}>
+                  🗑 Supprimer
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingEvent(null);
+                }}
+              >
                 Annuler
               </button>
             </div>
@@ -321,8 +405,8 @@ export default function Planning() {
         ))}
 
         {hours.map((h) => (
-          <>
-            <div className="calcell hour" key={h}>{h}</div>
+          <Fragment key={h}>
+            <div className="calcell hour">{h}</div>
 
             {weekDays.map((date, i) => (
               <div className="calcell" key={`${h}-${i}`}>
@@ -332,8 +416,17 @@ export default function Planning() {
                     getDayIndex(event.start_date, weekStart) === i
                   )
                   .map((event) => (
-                    <div className={`event ${getEventClass(event)}`} key={event.id}>
+                    <div
+                      className={`event ${getEventClass(event)}`}
+                      key={event.id}
+                      onClick={() => openEditEventForm(event)}
+                      style={{ cursor: 'pointer' }}
+                      title="Cliquer pour modifier ou supprimer"
+                    >
                       <strong>{event.title}</strong>
+                      <div style={{ fontSize: 11, opacity: 0.85 }}>
+                        {formatTimeForInput(event.start_date)} - {formatTimeForInput(event.end_date)}
+                      </div>
                       {event.description && (
                         <div style={{ fontSize: 12, opacity: 0.9 }}>
                           {event.description}
@@ -343,7 +436,7 @@ export default function Planning() {
                   ))}
               </div>
             ))}
-          </>
+          </Fragment>
         ))}
       </div>
     </div>
