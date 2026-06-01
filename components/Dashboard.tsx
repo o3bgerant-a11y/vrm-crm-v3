@@ -50,8 +50,17 @@ export default function Dashboard() {
                 <tr key={s.id}>
                   <td>{s.vehicle_name}</td>
                   <td>{s.agents?.full_name || '-'}</td>
-                  <td>{JSON.stringify(s.agents)}</td>
-                  <td>{euro(Number(s.margin_amount || 0))}</td>
+                  <td>
+  <span className="badge">
+    {s.agents?.agency_id === 1
+      ? 'Blois'
+      : s.agents?.agency_id === 2
+      ? 'Tours'
+      : s.agents?.agency_id === 3
+      ? 'Bourges'
+      : '-'}
+  </span>
+</td>                  <td>{euro(Number(s.margin_amount || 0))}</td>
                 </tr>
               ))}
             </tbody>
