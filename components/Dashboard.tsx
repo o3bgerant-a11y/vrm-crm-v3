@@ -12,7 +12,7 @@ export default function Dashboard() {
     async function loadSales() {
       const { data, error } = await supabase
         .from('vehicle_sales')
-        .select('id, vehicle_name, sale_price, margin_amount, warranty_sold, agents(full_name)')       
+        .select('id, vehicle_name, sale_price, margin_amount, warranty_sold, agents(full_name, agency_id, agencies(name))')
         .order('id', { ascending: false });
 
       if (!error && data) setSales(data);
