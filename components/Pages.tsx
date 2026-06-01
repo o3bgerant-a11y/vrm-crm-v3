@@ -104,6 +104,7 @@ export function Ventes() {
   const [saving, setSaving] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
+  const [editingSale, setEditingSale] = useState<VehicleSale | null>(null);
 
   const [vehicleName, setVehicleName] = useState('');
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState('');
@@ -165,6 +166,7 @@ export function Ventes() {
   }, []);
 
   function resetForm() {
+    setEditingSale(null);
     setVehicleName('');
     setVehiclePhotoUrl('');
     setSaleDate(today);
@@ -177,6 +179,29 @@ export function Ventes() {
     setWarrantyType('');
     setWarrantyAmount('');
     setComments('');
+  }
+
+  function openNewSaleForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEditSaleForm(sale: VehicleSale) {
+    setEditingSale(sale);
+    setVehicleName(sale.vehicle_name || '');
+    setVehiclePhotoUrl(sale.vehicle_photo_url || '');
+    setSaleDate(sale.sale_date || today);
+    setAgentId(sale.agent_id || '');
+    setSellerPrice(String(sale.seller_price ?? ''));
+    setSalePrice(String(sale.sale_price ?? ''));
+    setRegistration(sale.registration || '');
+    setVin(sale.vin || '');
+    setWarrantySold(Boolean(sale.warranty_sold));
+    setWarrantyType(sale.warranty_type || '');
+    setWarrantyAmount(String(sale.warranty_amount ?? ''));
+    setComments(sale.comments || sale.notes || '');
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function saveSale() {
@@ -199,7 +224,7 @@ export function Ventes() {
 
     const payload = {
       agent_id: Number(agentId),
-      weekly_report_id: 1,
+      weekly_report_id: editingSale?.weekly_report_id || 1,
       sale_date: saleDate || null,
       vehicle_name: vehicleName.trim(),
       vehicle_photo_url: vehiclePhotoUrl.trim() || null,
@@ -214,13 +239,43 @@ export function Ventes() {
       comments: comments.trim() || null,
     };
 
-    const { error } = await supabase
-      .from('vehicle_sales')
-      .insert(payload);
+    const { error } = editingSale
+      ? await supabase
+          .from('vehicle_sales')
+          .update(payload)
+          .eq('id', editingSale.id)
+      : await supabase
+          .from('vehicle_sales')
+          .insert(payload);
 
     if (error) {
-      console.error('Erreur ajout vente:', error);
+      console.error('Erreur sauvegarde vente:', error);
       alert("Erreur pendant l'enregistrement de la vente.");
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadSales();
+    }
+
+    setSaving(false);
+  }
+
+  async function deleteSale() {
+    if (!editingSale) return;
+
+    const ok = confirm(`Supprimer la vente "${editingSale.vehicle_name}" ?`);
+    if (!ok) return;
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from('vehicle_sales')
+      .delete()
+      .eq('id', editingSale.id);
+
+    if (error) {
+      console.error('Erreur suppression vente:', error);
+      alert('Erreur pendant la suppression de la vente.');
     } else {
       resetForm();
       setShowForm(false);
@@ -256,23 +311,26 @@ export function Ventes() {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
           <h3>Ventes véhicules</h3>
-          <p className="muted">Ajout et suivi des ventes connectées à Supabase.</p>
+          <p className="muted">Ajout, modification et suivi des ventes connectées à Supabase.</p>
         </div>
 
         <button
           className="btn"
           onClick={() => {
-            resetForm();
-            setShowForm(!showForm);
+            if (showForm && !editingSale) {
+              setShowForm(false);
+            } else {
+              openNewSaleForm();
+            }
           }}
         >
-          {showForm ? 'Fermer' : '➕ Nouvelle vente'}
+          {showForm && !editingSale ? 'Fermer' : '➕ Nouvelle vente'}
         </button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
-          <h4>🚗 Nouvelle vente</h4>
+          <h4>{editingSale ? '✏️ Modifier la vente' : '🚗 Nouvelle vente'}</h4>
 
           <div style={{ display: 'grid', gap: 10 }}>
             <input
@@ -378,8 +436,14 @@ export function Ventes() {
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" onClick={saveSale} disabled={saving}>
-                {saving ? 'Enregistrement...' : '✅ Enregistrer la vente'}
+                {saving ? 'Enregistrement...' : editingSale ? '💾 Modifier la vente' : '✅ Enregistrer la vente'}
               </button>
+
+              {editingSale && (
+                <button onClick={deleteSale} disabled={saving}>
+                  🗑 Supprimer
+                </button>
+              )}
 
               <button
                 onClick={() => {
@@ -423,7 +487,12 @@ export function Ventes() {
 
           <tbody>
             {filteredSales.map(s => (
-              <tr key={s.id}>
+              <tr
+                key={s.id}
+                onClick={() => openEditSaleForm(s)}
+                style={{ cursor: 'pointer' }}
+                title="Cliquer pour modifier la vente"
+              >
                 <td>
                   <strong>{s.vehicle_name}</strong>
                   {(s.registration || s.vin) && (
