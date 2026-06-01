@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -13,6 +13,10 @@ const hours = [
   '7h', '8h', '9h', '10h', '11h', '12h',
   '13h', '14h', '15h', '16h', '17h', '18h', '19h'
 ];
+
+const START_HOUR = 7;
+const END_HOUR = 20;
+const HOUR_HEIGHT = 76;
 
 const timeSlots = Array.from({ length: 53 }, (_, i) => {
   const totalMinutes = 7 * 60 + i * 15;
@@ -69,10 +73,6 @@ function getTimePart(value: string) {
   return value.slice(11, 16);
 }
 
-function getHourLabel(value: string) {
-  return `${Number(value.slice(11, 13))}h`;
-}
-
 function getLocalDate(value: string) {
   const datePart = getDatePart(value);
   const [year, month, day] = datePart.split('-').map(Number);
@@ -110,10 +110,15 @@ function getDurationMinutes(event: PlanningEvent) {
   return Math.max(15, end - start);
 }
 
+function getEventTop(event: PlanningEvent) {
+  const start = timeToMinutes(getTimePart(event.start_date));
+  const calendarStart = START_HOUR * 60;
+  return Math.max(0, Math.round(((start - calendarStart) / 60) * HOUR_HEIGHT));
+}
+
 function getEventHeight(event: PlanningEvent) {
   const minutes = getDurationMinutes(event);
-  const hourHeight = 76;
-  return Math.max(44, Math.round((minutes / 60) * hourHeight));
+  return Math.max(44, Math.round((minutes / 60) * HOUR_HEIGHT));
 }
 
 export default function Planning() {
@@ -421,56 +426,103 @@ export default function Planning() {
         <p className="muted">Aucun événement enregistré sur cette semaine.</p>
       )}
 
-      <div className="calendar">
-        <div className="calcell calhead">Heure</div>
+      <div style={{ overflowX: 'auto', marginTop: 12 }}>
+        <div
+          style={{
+            minWidth: 950,
+            display: 'grid',
+            gridTemplateColumns: '70px repeat(7, 1fr)',
+            border: '1px solid rgba(148, 163, 184, 0.25)',
+            borderRadius: 16,
+            overflow: 'hidden',
+            background: 'rgba(15, 23, 42, 0.35)'
+          }}
+        >
+          <div className="calcell calhead">Heure</div>
 
-        {weekDays.map((date, i) => (
-          <div className="calcell calhead" key={date.toISOString()}>
-            <div>{dayNames[i]}</div>
-            <strong>{date.getDate()}</strong>
-            <div style={{ fontSize: 12, opacity: 0.75 }}>
-              {monthNames[date.getMonth()].slice(0, 3)}
+          {weekDays.map((date, i) => (
+            <div className="calcell calhead" key={date.toISOString()}>
+              <div>{dayNames[i]}</div>
+              <strong>{date.getDate()}</strong>
+              <div style={{ fontSize: 12, opacity: 0.75 }}>
+                {monthNames[date.getMonth()].slice(0, 3)}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {hours.map((h) => (
-          <Fragment key={h}>
-            <div className="calcell hour">{h}</div>
-
-            {weekDays.map((date, i) => (
-              <div className="calcell" key={`${h}-${i}`}>
-                {events
-                  .filter((event) =>
-                    getHourLabel(event.start_date) === h &&
-                    getDayIndex(event.start_date, weekStart) === i
-                  )
-                  .map((event) => (
-                    <div
-                      className={`event ${getEventClass(event)}`}
-                      key={event.id}
-                      onClick={() => openEditEventForm(event)}
-                      style={{
-                        cursor: 'pointer',
-                        minHeight: `${getEventHeight(event)}px`
-                      }}
-                      title="Cliquer pour modifier ou supprimer"
-                    >
-                      <strong>{event.title}</strong>
-                      <div style={{ fontSize: 11, opacity: 0.85 }}>
-                        {getTimePart(event.start_date)} - {getTimePart(event.end_date)}
-                      </div>
-                      {event.description && (
-                        <div style={{ fontSize: 12, opacity: 0.9 }}>
-                          {event.description}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+          <div style={{ position: 'relative' }}>
+            {hours.map((h) => (
+              <div
+                key={h}
+                className="calcell hour"
+                style={{
+                  height: HOUR_HEIGHT,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'center',
+                  paddingTop: 8
+                }}
+              >
+                {h}
               </div>
             ))}
-          </Fragment>
-        ))}
+          </div>
+
+          {weekDays.map((date, dayIndex) => {
+            const dayEvents = events.filter((event) => getDayIndex(event.start_date, weekStart) === dayIndex);
+
+            return (
+              <div
+                key={date.toISOString()}
+                style={{
+                  position: 'relative',
+                  minHeight: (END_HOUR - START_HOUR) * HOUR_HEIGHT,
+                  borderLeft: '1px solid rgba(148, 163, 184, 0.18)'
+                }}
+              >
+                {hours.map((h) => (
+                  <div
+                    key={h}
+                    style={{
+                      height: HOUR_HEIGHT,
+                      borderBottom: '1px solid rgba(148, 163, 184, 0.14)'
+                    }}
+                  />
+                ))}
+
+                {dayEvents.map((event) => (
+                  <div
+                    className={`event ${getEventClass(event)}`}
+                    key={event.id}
+                    onClick={() => openEditEventForm(event)}
+                    style={{
+                      position: 'absolute',
+                      top: getEventTop(event) + 4,
+                      left: 6,
+                      right: 6,
+                      minHeight: getEventHeight(event) - 8,
+                      height: getEventHeight(event) - 8,
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                      zIndex: 2
+                    }}
+                    title="Cliquer pour modifier ou supprimer"
+                  >
+                    <strong>{event.title}</strong>
+                    <div style={{ fontSize: 11, opacity: 0.85 }}>
+                      {getTimePart(event.start_date)} - {getTimePart(event.end_date)}
+                    </div>
+                    {event.description && getEventHeight(event) > 65 && (
+                      <div style={{ fontSize: 12, opacity: 0.9 }}>
+                        {event.description}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
