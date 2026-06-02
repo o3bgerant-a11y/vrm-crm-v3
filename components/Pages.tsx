@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { documents } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 
-const euro = (n: number) => n.toLocaleString('fr-FR') + ' €';
+const euro = (n: number) => n.toLocaleString('fr-FR') + ' ‚Ç¨';
 
 const agencyName = (agencyId: any) => {
   const id = Number(agencyId);
@@ -53,6 +52,18 @@ type DirectionMessage = {
   agency_id: number | null;
   agent_id: number | null;
   pinned: boolean | null;
+  created_at: string | null;
+};
+
+type AgentDocument = {
+  id: number;
+  title: string;
+  category: string | null;
+  description: string | null;
+  file_url: string | null;
+  target_type: string | null;
+  agency_id: number | null;
+  agent_id: number | null;
   created_at: string | null;
 };
 
@@ -191,7 +202,7 @@ export function Agences() {
     <div className="grid cards3">
       {agencyRows.map((agency, index) => (
         <div className="card" key={agency.agency}>
-          <h3>{index === 0 ? '👑 ' : ''}{agency.agency}</h3>
+          <h3>{index === 0 ? 'üëë ' : ''}{agency.agency}</h3>
 
           <p className="muted">
             #{index + 1} au classement agences
@@ -295,12 +306,12 @@ export function Agents() {
   return (
     <div className="card">
       <h3>Agents commerciaux</h3>
-      <p className="muted">Données réelles calculées depuis Supabase.</p>
+      <p className="muted">Donn√©es r√©elles calcul√©es depuis Supabase.</p>
 
       {loading && <p className="muted">Chargement des agents...</p>}
 
       {!loading && agentRows.length === 0 && (
-        <p className="muted">Aucun agent trouvé dans Supabase.</p>
+        <p className="muted">Aucun agent trouv√© dans Supabase.</p>
       )}
 
       {!loading && agentRows.length > 0 && (
@@ -320,7 +331,7 @@ export function Agents() {
           <tbody>
             {agentRows.map(agent => (
               <tr key={agent.id}>
-                <td><strong>{agent.rankGlobal === 1 ? '👑 ' : ''}{agent.name}</strong></td>
+                <td><strong>{agent.rankGlobal === 1 ? 'üëë ' : ''}{agent.name}</strong></td>
                 <td><span className="badge">{agent.agency}</span></td>
                 <td>{agent.sales}</td>
                 <td>{euro(agent.ca)}</td>
@@ -449,12 +460,12 @@ export function Ventes() {
 
   async function saveSale() {
     if (!vehicleName.trim()) {
-      alert('Il faut indiquer le véhicule vendu.');
+      alert('Il faut indiquer le v√©hicule vendu.');
       return;
     }
 
     if (!agentId) {
-      alert('Il faut sélectionner un agent commercial.');
+      alert('Il faut s√©lectionner un agent commercial.');
       return;
     }
 
@@ -548,8 +559,8 @@ export function Ventes() {
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
-          <h3>Ventes véhicules</h3>
-          <p className="muted">Ajout, modification et suivi des ventes connectées à Supabase.</p>
+          <h3>Ventes v√©hicules</h3>
+          <p className="muted">Ajout, modification et suivi des ventes connect√©es √† Supabase.</p>
         </div>
 
         <button
@@ -562,23 +573,23 @@ export function Ventes() {
             }
           }}
         >
-          {showForm && !editingSale ? 'Fermer' : '➕ Nouvelle vente'}
+          {showForm && !editingSale ? 'Fermer' : '‚ûï Nouvelle vente'}
         </button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
-          <h4>{editingSale ? '✏️ Modifier la vente' : '🚗 Nouvelle vente'}</h4>
+          <h4>{editingSale ? '‚úèÔ∏è Modifier la vente' : 'üöó Nouvelle vente'}</h4>
 
           <div style={{ display: 'grid', gap: 10 }}>
             <input
-              placeholder="Véhicule vendu ex : Mercedes Classe A 200 AMG"
+              placeholder="V√©hicule vendu ex : Mercedes Classe A 200 AMG"
               value={vehicleName}
               onChange={(e) => setVehicleName(e.target.value)}
             />
 
             <input
-              placeholder="URL photo véhicule facultatif"
+              placeholder="URL photo v√©hicule facultatif"
               value={vehiclePhotoUrl}
               onChange={(e) => setVehiclePhotoUrl(e.target.value)}
             />
@@ -594,10 +605,10 @@ export function Ventes() {
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}
               >
-                <option value="">Sélectionner un agent</option>
+                <option value="">S√©lectionner un agent</option>
                 {agentOptions.map((agent) => (
                   <option key={agent.id} value={agent.id}>
-                    {agent.full_name} — {agencyName(agent.agency_id)}
+                    {agent.full_name} ‚Äî {agencyName(agent.agency_id)}
                   </option>
                 ))}
               </select>
@@ -631,7 +642,7 @@ export function Ventes() {
               />
 
               <div className="item">
-                <span className="muted">Marge calculée</span>
+                <span className="muted">Marge calcul√©e</span>
                 <div style={{ fontSize: 22, fontWeight: 800 }}>
                   {euro(calculatedMargin)}
                 </div>
@@ -674,12 +685,12 @@ export function Ventes() {
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" onClick={saveSale} disabled={saving}>
-                {saving ? 'Enregistrement...' : editingSale ? '💾 Modifier la vente' : '✅ Enregistrer la vente'}
+                {saving ? 'Enregistrement...' : editingSale ? 'üíæ Modifier la vente' : '‚úÖ Enregistrer la vente'}
               </button>
 
               {editingSale && (
                 <button onClick={deleteSale} disabled={saving}>
-                  🗑 Supprimer
+                  üóë Supprimer
                 </button>
               )}
 
@@ -699,7 +710,7 @@ export function Ventes() {
 
       <input
         className="search"
-        placeholder="Recherche marque, modèle, immatriculation, VIN, agent... ex : Mercedes"
+        placeholder="Recherche marque, mod√®le, immatriculation, VIN, agent... ex : Mercedes"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -707,14 +718,14 @@ export function Ventes() {
       {loading && <p className="muted">Chargement des ventes...</p>}
 
       {!loading && filteredSales.length === 0 && (
-        <p className="muted">Aucune vente trouvée.</p>
+        <p className="muted">Aucune vente trouv√©e.</p>
       )}
 
       {!loading && filteredSales.length > 0 && (
         <table className="table">
           <thead>
             <tr>
-              <th>Véhicule</th>
+              <th>V√©hicule</th>
               <th>Agent</th>
               <th>Agence</th>
               <th>Prix vente</th>
@@ -736,7 +747,7 @@ export function Ventes() {
                   {(s.registration || s.vin) && (
                     <div className="muted" style={{ fontSize: 12 }}>
                       {s.registration ? `Immat: ${s.registration}` : ''}
-                      {s.registration && s.vin ? ' — ' : ''}
+                      {s.registration && s.vin ? ' ‚Äî ' : ''}
                       {s.vin ? `VIN: ${s.vin}` : ''}
                     </div>
                   )}
@@ -758,7 +769,7 @@ export function Ventes() {
 
                 <td>
                   {s.warranty_sold
-                    ? `${s.warranty_type || 'Oui'}${s.warranty_amount ? ` — ${euro(Number(s.warranty_amount))}` : ''}`
+                    ? `${s.warranty_type || 'Oui'}${s.warranty_amount ? ` ‚Äî ${euro(Number(s.warranty_amount))}` : ''}`
                     : 'Non'}
                 </td>
               </tr>
@@ -782,7 +793,7 @@ export function Garanties() {
       <div className="card">
         <h3>Taux garantie</h3>
         <div className="stat-value">75%</div>
-        <p className="stat-good">Très bon niveau</p>
+        <p className="stat-good">Tr√®s bon niveau</p>
       </div>
 
       <div className="card">
@@ -882,7 +893,7 @@ export function Messages() {
     }
 
     if (!message.trim()) {
-      alert('Il faut écrire un message.');
+      alert('Il faut √©crire un message.');
       return;
     }
 
@@ -943,7 +954,7 @@ export function Messages() {
 
     if (item.target_type === 'agent') {
       const agent = agentsList.find(a => Number(a.id) === Number(item.agent_id));
-      return agent ? `Agent ${agent.full_name}` : 'Agent ciblé';
+      return agent ? `Agent ${agent.full_name}` : 'Agent cibl√©';
     }
 
     return 'Tous les agents';
@@ -978,13 +989,13 @@ export function Messages() {
             }
           }}
         >
-          {showForm && !editingMessage ? 'Fermer' : '➕ Nouveau message'}
+          {showForm && !editingMessage ? 'Fermer' : '‚ûï Nouveau message'}
         </button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
-          <h4>{editingMessage ? '✏️ Modifier le message' : '📢 Nouveau message Direction'}</h4>
+          <h4>{editingMessage ? '‚úèÔ∏è Modifier le message' : 'üì¢ Nouveau message Direction'}</h4>
 
           <div style={{ display: 'grid', gap: 10 }}>
             <input
@@ -994,7 +1005,7 @@ export function Messages() {
             />
 
             <textarea
-              placeholder="Message à afficher aux agents..."
+              placeholder="Message √† afficher aux agents..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
@@ -1010,7 +1021,7 @@ export function Messages() {
               >
                 <option value="all">Tous les agents</option>
                 <option value="agency">Une agence</option>
-                <option value="agent">Un agent précis</option>
+                <option value="agent">Un agent pr√©cis</option>
               </select>
 
               {targetType === 'agency' && (
@@ -1018,7 +1029,7 @@ export function Messages() {
                   value={agencyId}
                   onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}
                 >
-                  <option value="">Sélectionner une agence</option>
+                  <option value="">S√©lectionner une agence</option>
                   <option value={1}>Blois</option>
                   <option value={2}>Tours</option>
                   <option value={3}>Bourges</option>
@@ -1030,10 +1041,10 @@ export function Messages() {
                   value={agentId}
                   onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}
                 >
-                  <option value="">Sélectionner un agent</option>
+                  <option value="">S√©lectionner un agent</option>
                   {agentsList.map((agent) => (
                     <option key={agent.id} value={agent.id}>
-                      {agent.full_name} — {agencyName(agent.agency_id)}
+                      {agent.full_name} ‚Äî {agencyName(agent.agency_id)}
                     </option>
                   ))}
                 </select>
@@ -1045,18 +1056,18 @@ export function Messages() {
                   checked={pinned}
                   onChange={(e) => setPinned(e.target.checked)}
                 />
-                Épingler le message 📌
+                √âpingler le message üìå
               </label>
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" onClick={saveMessage} disabled={saving}>
-                {saving ? 'Enregistrement...' : editingMessage ? '💾 Modifier le message' : '✅ Publier le message'}
+                {saving ? 'Enregistrement...' : editingMessage ? 'üíæ Modifier le message' : '‚úÖ Publier le message'}
               </button>
 
               {editingMessage && (
                 <button onClick={deleteMessage} disabled={saving}>
-                  🗑 Supprimer
+                  üóë Supprimer
                 </button>
               )}
 
@@ -1090,10 +1101,10 @@ export function Messages() {
               style={{ cursor: 'pointer' }}
               title="Cliquer pour modifier le message"
             >
-              <strong>{item.pinned ? '📌 ' : ''}{item.title}</strong>
+              <strong>{item.pinned ? 'üìå ' : ''}{item.title}</strong>
 
               <p className="muted" style={{ marginTop: 4 }}>
-                {targetLabel(item)} {item.created_at ? `— ${formatDate(item.created_at)}` : ''}
+                {targetLabel(item)} {item.created_at ? `‚Äî ${formatDate(item.created_at)}` : ''}
               </p>
 
               <p style={{ whiteSpace: 'pre-wrap' }}>
@@ -1108,21 +1119,339 @@ export function Messages() {
 }
 
 export function Documents() {
+  const [agentDocuments, setAgentDocuments] = useState<AgentDocument[]>([]);
+  const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<AgentDocument | null>(null);
+
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('G√©n√©ral');
+  const [description, setDescription] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+  const [targetType, setTargetType] = useState('all');
+  const [agencyId, setAgencyId] = useState<number | ''>('');
+  const [agentId, setAgentId] = useState<number | ''>('');
+
+  async function loadDocuments() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('agent_documents')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erreur chargement documents agents:', error);
+      setAgentDocuments([]);
+    } else {
+      setAgentDocuments(data || []);
+    }
+
+    setLoading(false);
+  }
+
+  async function loadAgents() {
+    const { data, error } = await supabase
+      .from('agents')
+      .select('id, full_name, agency_id')
+      .order('full_name', { ascending: true });
+
+    if (error) {
+      console.error('Erreur chargement agents pour documents:', error);
+      setAgentsList([]);
+    } else {
+      setAgentsList(data || []);
+    }
+  }
+
+  useEffect(() => {
+    loadDocuments();
+    loadAgents();
+  }, []);
+
+  function resetForm() {
+    setEditingDocument(null);
+    setTitle('');
+    setCategory('G√©n√©ral');
+    setDescription('');
+    setFileUrl('');
+    setTargetType('all');
+    setAgencyId('');
+    setAgentId('');
+  }
+
+  function openNewDocumentForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEditDocumentForm(item: AgentDocument) {
+    setEditingDocument(item);
+    setTitle(item.title || '');
+    setCategory(item.category || 'G√©n√©ral');
+    setDescription(item.description || '');
+    setFileUrl(item.file_url || '');
+    setTargetType(item.target_type || 'all');
+    setAgencyId(item.agency_id || '');
+    setAgentId(item.agent_id || '');
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function saveDocument() {
+    if (!title.trim()) {
+      alert('Il faut indiquer un titre de document.');
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      title: title.trim(),
+      category: category.trim() || 'G√©n√©ral',
+      description: description.trim() || null,
+      file_url: fileUrl.trim() || null,
+      target_type: targetType,
+      agency_id: targetType === 'agency' ? Number(agencyId) || null : null,
+      agent_id: targetType === 'agent' ? Number(agentId) || null : null,
+    };
+
+    const { error } = editingDocument
+      ? await supabase.from('agent_documents').update(payload).eq('id', editingDocument.id)
+      : await supabase.from('agent_documents').insert(payload);
+
+    if (error) {
+      console.error('Erreur sauvegarde document agent:', error);
+      alert("Erreur pendant l'enregistrement du document.");
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadDocuments();
+    }
+
+    setSaving(false);
+  }
+
+  async function deleteDocument() {
+    if (!editingDocument) return;
+
+    const ok = confirm(`Supprimer le document "${editingDocument.title}" ?`);
+    if (!ok) return;
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from('agent_documents')
+      .delete()
+      .eq('id', editingDocument.id);
+
+    if (error) {
+      console.error('Erreur suppression document agent:', error);
+      alert('Erreur pendant la suppression du document.');
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadDocuments();
+    }
+
+    setSaving(false);
+  }
+
+  function targetLabel(item: AgentDocument) {
+    if (item.target_type === 'agency') return `Agence ${agencyName(item.agency_id)}`;
+
+    if (item.target_type === 'agent') {
+      const agent = agentsList.find(a => Number(a.id) === Number(item.agent_id));
+      return agent ? `Agent ${agent.full_name}` : 'Agent cibl√©';
+    }
+
+    return 'Tous les agents';
+  }
+
+  function formatDate(value: string | null) {
+    if (!value) return '';
+    return new Date(value).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
   return (
     <div className="card">
-      <h3>Documents agents</h3>
-
-      {documents.map(d => (
-        <div className="item" key={d}>
-          📄 {d}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <h3>Documents agents</h3>
+          <p className="muted">Ajoute des documents, proc√©dures, garanties ou supports commerciaux pour les agents.</p>
         </div>
-      ))}
 
-      <button className="btn">Ajouter un document</button>
+        <button
+          className="btn"
+          onClick={() => {
+            if (showForm && !editingDocument) {
+              setShowForm(false);
+            } else {
+              openNewDocumentForm();
+            }
+          }}
+        >
+          {showForm && !editingDocument ? 'Fermer' : '‚ûï Nouveau document'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
+          <h4>{editingDocument ? '‚úèÔ∏è Modifier le document' : 'üìÑ Nouveau document agent'}</h4>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <input
+              placeholder="Titre du document ex : Proc√©dure garantie Opteven"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="G√©n√©ral">G√©n√©ral</option>
+                <option value="Garantie">Garantie</option>
+                <option value="Proc√©dure">Proc√©dure</option>
+                <option value="Formation">Formation</option>
+                <option value="Commercial">Commercial</option>
+                <option value="Administratif">Administratif</option>
+              </select>
+
+              <input
+                placeholder="Lien du fichier ou URL"
+                value={fileUrl}
+                onChange={(e) => setFileUrl(e.target.value)}
+              />
+            </div>
+
+            <textarea
+              placeholder="Description ou consigne li√©e au document..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
+              <select
+                value={targetType}
+                onChange={(e) => {
+                  setTargetType(e.target.value);
+                  setAgencyId('');
+                  setAgentId('');
+                }}
+              >
+                <option value="all">Tous les agents</option>
+                <option value="agency">Une agence</option>
+                <option value="agent">Un agent pr√©cis</option>
+              </select>
+
+              {targetType === 'agency' && (
+                <select
+                  value={agencyId}
+                  onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">S√©lectionner une agence</option>
+                  <option value={1}>Blois</option>
+                  <option value={2}>Tours</option>
+                  <option value={3}>Bourges</option>
+                </select>
+              )}
+
+              {targetType === 'agent' && (
+                <select
+                  value={agentId}
+                  onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">S√©lectionner un agent</option>
+                  {agentsList.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.full_name} ‚Äî {agencyName(agent.agency_id)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn" onClick={saveDocument} disabled={saving}>
+                {saving ? 'Enregistrement...' : editingDocument ? 'üíæ Modifier le document' : '‚úÖ Ajouter le document'}
+              </button>
+
+              {editingDocument && (
+                <button onClick={deleteDocument} disabled={saving}>
+                  üóë Supprimer
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  resetForm();
+                  setShowForm(false);
+                }}
+                disabled={saving}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading && <p className="muted">Chargement des documents...</p>}
+
+      {!loading && agentDocuments.length === 0 && (
+        <p className="muted">Aucun document agent pour le moment.</p>
+      )}
+
+      {!loading && agentDocuments.length > 0 && (
+        <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+          {agentDocuments.map((item) => (
+            <div
+              className="item"
+              key={item.id}
+              onClick={() => openEditDocumentForm(item)}
+              style={{ cursor: 'pointer' }}
+              title="Cliquer pour modifier le document"
+            >
+              <strong>üìÑ {item.title}</strong>
+
+              <p className="muted" style={{ marginTop: 4 }}>
+                {item.category || 'G√©n√©ral'} ‚Äî {targetLabel(item)} {item.created_at ? `‚Äî ${formatDate(item.created_at)}` : ''}
+              </p>
+
+              {item.description && (
+                <p style={{ whiteSpace: 'pre-wrap' }}>{item.description}</p>
+              )}
+
+              {item.file_url && (
+                <p>
+                  <a
+                    href={item.file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Ouvrir le document
+                  </a>
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-
 export function Stats() {
   const [sales, setSales] = useState<VehicleSale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1180,7 +1509,7 @@ export function Stats() {
     }>();
 
     monthSales.forEach((sale) => {
-      const name = sale.agents?.full_name || 'Agent non renseigné';
+      const name = sale.agents?.full_name || 'Agent non renseign√©';
       const agency = agencyName(sale.agents?.agency_id);
 
       const current = map.get(name) || {
@@ -1236,9 +1565,9 @@ export function Stats() {
   return (
     <div className="section">
       <div className="card">
-        <h3>Statistiques réelles</h3>
+        <h3>Statistiques r√©elles</h3>
         <p className="muted">
-          Données calculées automatiquement depuis les ventes enregistrées dans Supabase.
+          Donn√©es calcul√©es automatiquement depuis les ventes enregistr√©es dans Supabase.
         </p>
       </div>
 
@@ -1260,7 +1589,7 @@ export function Stats() {
         </div>
 
         <div className="card">
-          <h3>Cette année</h3>
+          <h3>Cette ann√©e</h3>
           <div className="stat-value">{euro(year.ca)}</div>
           <p className="muted">{year.salesCount} vente(s)</p>
           <p>Marge : <strong>{euro(year.margin)}</strong></p>
@@ -1270,7 +1599,7 @@ export function Stats() {
 
       <div className="grid cards3">
         <div className="card">
-          <h3>Total général</h3>
+          <h3>Total g√©n√©ral</h3>
           <div className="stat-value">{euro(total.ca)}</div>
           <p className="muted">{total.salesCount} vente(s) au total</p>
         </div>
@@ -1278,7 +1607,7 @@ export function Stats() {
         <div className="card">
           <h3>Marge moyenne</h3>
           <div className="stat-value">{euro(Math.round(total.averageMargin))}</div>
-          <p className="muted">Moyenne par véhicule vendu</p>
+          <p className="muted">Moyenne par v√©hicule vendu</p>
         </div>
 
         <div className="card">
@@ -1292,14 +1621,14 @@ export function Stats() {
         <h3>Classement agents du mois</h3>
 
         {agentRanking.length === 0 ? (
-          <p className="muted">Aucun agent classé ce mois-ci.</p>
+          <p className="muted">Aucun agent class√© ce mois-ci.</p>
         ) : (
           agentRanking.map((agent, i) => (
             <div className="rank" key={agent.name}>
               <span>
-                {i === 0 ? '👑 ' : ''}
+                {i === 0 ? 'üëë ' : ''}
                 {i + 1}. {agent.name}
-                <span className="muted"> — {agent.agency} — {agent.sales} vente(s)</span>
+                <span className="muted"> ‚Äî {agent.agency} ‚Äî {agent.sales} vente(s)</span>
               </span>
               <strong>{euro(agent.margin)}</strong>
             </div>
@@ -1324,7 +1653,7 @@ export function Stats() {
           <tbody>
             {agencyRanking.map((agency, i) => (
               <tr key={agency.agency}>
-                <td>{i === 0 ? '👑 ' : ''}{agency.agency}</td>
+                <td>{i === 0 ? 'üëë ' : ''}{agency.agency}</td>
                 <td>{agency.sales}</td>
                 <td>{euro(agency.ca)}</td>
                 <td><strong>{euro(agency.margin)}</strong></td>
