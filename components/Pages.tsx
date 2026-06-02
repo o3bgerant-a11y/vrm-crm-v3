@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { agencies, agents as staticAgents, documents, messages } from '@/lib/data';
+import { agencies, documents, messages } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 
 const euro = (n: number) => n.toLocaleString('fr-FR') + ' €';
@@ -108,33 +108,126 @@ export function Agences() {
 }
 
 export function Agents() {
+  const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
+  const [sales, setSales] = useState<VehicleSale[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadAgentsPage() {
+    setLoading(true);
+
+    const { data: agentsData, error: agentsError } = await supabase
+      .from('agents')
+      .select('id, full_name, agency_id')
+      .order('full_name', { ascending: true });
+
+    const { data: salesData, error: salesError } = await supabase
+      .from('vehicle_sales')
+      .select(`
+        *,
+        agents!vehicle_sales_agent_id_fkey (
+          full_name,
+          agency_id
+        )
+      `)
+      .order('id', { ascending: false });
+
+    if (agentsError) {
+      console.error('Erreur chargement agents:', agentsError);
+      setAgentsList([]);
+    } else {
+      setAgentsList(agentsData || []);
+    }
+
+    if (salesError) {
+      console.error('Erreur chargement ventes agents:', salesError);
+      setSales([]);
+    } else {
+      setSales(salesData || []);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadAgentsPage();
+  }, []);
+
+  const agentRows = useMemo(() => {
+    const rows = agentsList.map((agent) => {
+      const agentSales = sales.filter(sale => Number(sale.agent_id) === Number(agent.id));
+
+      return {
+        id: agent.id,
+        name: agent.full_name,
+        agency: agencyName(agent.agency_id),
+        sales: agentSales.length,
+        ca: agentSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0),
+        margin: agentSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0),
+        warranties: agentSales.filter(sale => sale.warranty_sold).length,
+      };
+    });
+
+    const globalSorted = [...rows].sort((a, b) => b.margin - a.margin);
+
+    return rows
+      .map((row) => {
+        const rankGlobal = globalSorted.findIndex(item => item.id === row.id) + 1;
+
+        const agencySorted = globalSorted
+          .filter(item => item.agency === row.agency)
+          .sort((a, b) => b.margin - a.margin);
+
+        const rankAgency = agencySorted.findIndex(item => item.id === row.id) + 1;
+
+        return {
+          ...row,
+          rankGlobal,
+          rankAgency,
+        };
+      })
+      .sort((a, b) => a.rankGlobal - b.rankGlobal);
+  }, [agentsList, sales]);
+
   return (
     <div className="card">
       <h3>Agents commerciaux</h3>
+      <p className="muted">Données réelles calculées depuis Supabase.</p>
 
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Agent</th>
-            <th>Agence</th>
-            <th>Ventes</th>
-            <th>Garanties</th>
-            <th>Classement</th>
-          </tr>
-        </thead>
+      {loading && <p className="muted">Chargement des agents...</p>}
 
-        <tbody>
-          {staticAgents.map(a => (
-            <tr key={a.name}>
-              <td>{a.rankGlobal === 1 ? '👑 ' : ''}{a.name}</td>
-              <td>{a.agency}</td>
-              <td>{a.sales}</td>
-              <td>{a.warranties}</td>
-              <td>#{a.rankGlobal} global / #{a.rankAgency} agence</td>
+      {!loading && agentRows.length === 0 && (
+        <p className="muted">Aucun agent trouvé dans Supabase.</p>
+      )}
+
+      {!loading && agentRows.length > 0 && (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Agent</th>
+              <th>Agence</th>
+              <th>Ventes</th>
+              <th>CA</th>
+              <th>Marge</th>
+              <th>Garanties</th>
+              <th>Classement</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {agentRows.map(agent => (
+              <tr key={agent.id}>
+                <td><strong>{agent.rankGlobal === 1 ? '👑 ' : ''}{agent.name}</strong></td>
+                <td><span className="badge">{agent.agency}</span></td>
+                <td>{agent.sales}</td>
+                <td>{euro(agent.ca)}</td>
+                <td><strong>{euro(agent.margin)}</strong></td>
+                <td>{agent.warranties}</td>
+                <td>#{agent.rankGlobal} global / #{agent.rankAgency} agence</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
