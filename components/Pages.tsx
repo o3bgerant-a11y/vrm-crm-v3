@@ -19,6 +19,17 @@ type AgentOption = {
   id: number;
   full_name: string;
   agency_id: number | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  birth_date?: string | null;
+  entry_date?: string | null;
+  status?: string | null;
+  contract_type?: string | null;
+  role?: string | null;
+  notes?: string | null;
 };
 
 type VehicleSale = {
@@ -221,13 +232,31 @@ export function Agents() {
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [sales, setSales] = useState<VehicleSale[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<AgentOption | null>(null);
+
+  const [fullName, setFullName] = useState('');
+  const [agencyId, setAgencyId] = useState<number | ''>('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [address, setAddress] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [city, setCity] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [entryDate, setEntryDate] = useState('');
+  const [status, setStatus] = useState('Actif');
+  const [contractType, setContractType] = useState('');
+  const [role, setRole] = useState('Agent commercial');
+  const [notes, setNotes] = useState('');
 
   async function loadAgentsPage() {
     setLoading(true);
 
     const { data: agentsData, error: agentsError } = await supabase
       .from('agents')
-      .select('id, full_name, agency_id')
+      .select('*')
       .order('full_name', { ascending: true });
 
     const { data: salesData, error: salesError } = await supabase
@@ -245,7 +274,7 @@ export function Agents() {
       console.error('Erreur chargement agents:', agentsError);
       setAgentsList([]);
     } else {
-      setAgentsList(agentsData || []);
+      setAgentsList((agentsData || []) as AgentOption[]);
     }
 
     if (salesError) {
@@ -262,11 +291,123 @@ export function Agents() {
     loadAgentsPage();
   }, []);
 
+  function resetForm() {
+    setEditingAgent(null);
+    setFullName('');
+    setAgencyId('');
+    setPhone('');
+    setEmail('');
+    setAddress('');
+    setPostalCode('');
+    setCity('');
+    setBirthDate('');
+    setEntryDate('');
+    setStatus('Actif');
+    setContractType('');
+    setRole('Agent commercial');
+    setNotes('');
+  }
+
+  function openNewAgentForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEditAgentForm(agent: AgentOption) {
+    setEditingAgent(agent);
+    setFullName(agent.full_name || '');
+    setAgencyId(agent.agency_id || '');
+    setPhone(agent.phone || '');
+    setEmail(agent.email || '');
+    setAddress(agent.address || '');
+    setPostalCode(agent.postal_code || '');
+    setCity(agent.city || '');
+    setBirthDate(agent.birth_date || '');
+    setEntryDate(agent.entry_date || '');
+    setStatus(agent.status || 'Actif');
+    setContractType(agent.contract_type || '');
+    setRole(agent.role || 'Agent commercial');
+    setNotes(agent.notes || '');
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function saveAgent() {
+    if (!fullName.trim()) {
+      alert("Il faut indiquer le nom de l'agent.");
+      return;
+    }
+
+    if (!agencyId) {
+      alert("Il faut sélectionner une agence.");
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      full_name: fullName.trim(),
+      agency_id: Number(agencyId),
+      phone: phone.trim() || null,
+      email: email.trim() || null,
+      address: address.trim() || null,
+      postal_code: postalCode.trim() || null,
+      city: city.trim() || null,
+      birth_date: birthDate || null,
+      entry_date: entryDate || null,
+      status: status.trim() || 'Actif',
+      contract_type: contractType.trim() || null,
+      role: role.trim() || 'Agent commercial',
+      notes: notes.trim() || null,
+    };
+
+    const { error } = editingAgent
+      ? await supabase.from('agents').update(payload).eq('id', editingAgent.id)
+      : await supabase.from('agents').insert(payload);
+
+    if (error) {
+      console.error('Erreur sauvegarde agent:', error);
+      alert("Erreur pendant l'enregistrement de l'agent. Vérifie que les colonnes phone, email, address, postal_code, city, birth_date, entry_date, status, contract_type, role et notes existent bien dans la table agents.");
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadAgentsPage();
+    }
+
+    setSaving(false);
+  }
+
+  async function deleteAgent() {
+    if (!editingAgent) return;
+
+    const ok = confirm(`Supprimer l'agent "${editingAgent.full_name}" ? Attention : si des ventes sont rattachées à cet agent, Supabase peut refuser la suppression.`);
+    if (!ok) return;
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from('agents')
+      .delete()
+      .eq('id', editingAgent.id);
+
+    if (error) {
+      console.error('Erreur suppression agent:', error);
+      alert("Erreur pendant la suppression de l'agent. Il a peut-être déjà des ventes rattachées.");
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadAgentsPage();
+    }
+
+    setSaving(false);
+  }
+
   const agentRows = useMemo(() => {
     const rows = agentsList.map((agent) => {
       const agentSales = sales.filter(sale => Number(sale.agent_id) === Number(agent.id));
 
       return {
+        ...agent,
         id: agent.id,
         name: agent.full_name,
         agency: agencyName(agent.agency_id),
@@ -300,8 +441,105 @@ export function Agents() {
 
   return (
     <div className="card">
-      <h3>Agents commerciaux</h3>
-      <p className="muted">Données réelles calculées depuis Supabase.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <h3>Agents commerciaux</h3>
+          <p className="muted">Clique sur un agent pour ouvrir et modifier sa fiche complète.</p>
+        </div>
+
+        <button
+          className="btn"
+          onClick={() => {
+            if (showForm && !editingAgent) {
+              setShowForm(false);
+            } else {
+              openNewAgentForm();
+            }
+          }}
+        >
+          {showForm && !editingAgent ? 'Fermer' : 'Nouvel agent'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
+          <h4>{editingAgent ? `Fiche agent : ${editingAgent.full_name}` : 'Nouvel agent commercial'}</h4>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 10 }}>
+              <input placeholder="Nom complet ex : Maveryk Leveau" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+
+              <select value={agencyId} onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">Sélectionner une agence</option>
+                <option value={1}>Blois</option>
+                <option value={2}>Tours</option>
+                <option value={3}>Bourges</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
+              <input placeholder="Téléphone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="Actif">Actif</option>
+                <option value="En pause">En pause</option>
+                <option value="Sorti">Sorti</option>
+              </select>
+            </div>
+
+            <input placeholder="Adresse" value={address} onChange={(e) => setAddress(e.target.value)} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(150px, 1fr))', gap: 10 }}>
+              <input placeholder="Code postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
+              <input placeholder="Ville" value={city} onChange={(e) => setCity(e.target.value)} />
+              <input type="date" title="Date de naissance" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+              <input type="date" title="Date d'entrée entreprise" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 10 }}>
+              <input placeholder="Poste / rôle ex : Agent commercial" value={role} onChange={(e) => setRole(e.target.value)} />
+              <input placeholder="Type de contrat / statut ex : Agent co indépendant" value={contractType} onChange={(e) => setContractType(e.target.value)} />
+            </div>
+
+            <textarea placeholder="Notes internes : objectifs, points forts, points à travailler, infos utiles..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+
+            {editingAgent && (
+              <div className="grid cards3">
+                <div className="item">
+                  <span className="muted">CA total</span>
+                  <div style={{ fontSize: 22, fontWeight: 800 }}>
+                    {euro(agentRows.find(a => a.id === editingAgent.id)?.ca || 0)}
+                  </div>
+                </div>
+
+                <div className="item">
+                  <span className="muted">Marge totale</span>
+                  <div style={{ fontSize: 22, fontWeight: 800 }}>
+                    {euro(agentRows.find(a => a.id === editingAgent.id)?.margin || 0)}
+                  </div>
+                </div>
+
+                <div className="item">
+                  <span className="muted">Classement</span>
+                  <div style={{ fontSize: 22, fontWeight: 800 }}>
+                    #{agentRows.find(a => a.id === editingAgent.id)?.rankGlobal || '-'} global
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn" onClick={saveAgent} disabled={saving}>
+                {saving ? 'Enregistrement...' : editingAgent ? 'Modifier la fiche agent' : "Créer l'agent"}
+              </button>
+
+              {editingAgent && <button onClick={deleteAgent} disabled={saving}>Supprimer</button>}
+
+              <button onClick={() => { resetForm(); setShowForm(false); }} disabled={saving}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading && <p className="muted">Chargement des agents...</p>}
 
@@ -315,6 +553,8 @@ export function Agents() {
             <tr>
               <th>Agent</th>
               <th>Agence</th>
+              <th>Téléphone</th>
+              <th>Email</th>
               <th>Ventes</th>
               <th>CA</th>
               <th>Marge</th>
@@ -325,9 +565,14 @@ export function Agents() {
 
           <tbody>
             {agentRows.map(agent => (
-              <tr key={agent.id}>
-                <td><strong>{agent.rankGlobal === 1 ? '👑 ' : ''}{agent.name}</strong></td>
+              <tr key={agent.id} onClick={() => openEditAgentForm(agent)} style={{ cursor: 'pointer' }} title="Cliquer pour modifier la fiche agent">
+                <td>
+                  <strong>{agent.rankGlobal === 1 ? '👑 ' : ''}{agent.name}</strong>
+                  {agent.role && <div className="muted" style={{ fontSize: 12 }}>{agent.role}</div>}
+                </td>
                 <td><span className="badge">{agent.agency}</span></td>
+                <td>{agent.phone || '-'}</td>
+                <td>{agent.email || '-'}</td>
                 <td>{agent.sales}</td>
                 <td>{euro(agent.ca)}</td>
                 <td><strong>{euro(agent.margin)}</strong></td>
@@ -341,7 +586,6 @@ export function Agents() {
     </div>
   );
 }
-
 export function Ventes() {
   const today = new Date().toISOString().slice(0, 10);
 
