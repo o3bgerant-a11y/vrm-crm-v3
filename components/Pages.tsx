@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const euro = (n: number) => n.toLocaleString('fr-FR') + ' ‚Ç¨';
+const euro = (n: number) => n.toLocaleString('fr-FR') + ' €';
 
 const agencyName = (agencyId: any) => {
   const id = Number(agencyId);
@@ -202,19 +202,14 @@ export function Agences() {
     <div className="grid cards3">
       {agencyRows.map((agency, index) => (
         <div className="card" key={agency.agency}>
-          <h3>{index === 0 ? 'üëë ' : ''}{agency.agency}</h3>
-
-          <p className="muted">
-            #{index + 1} au classement agences
-          </p>
-
+          <h3>{index === 0 ? '👑 ' : ''}{agency.agency}</h3>
+          <p className="muted">#{index + 1} au classement agences</p>
           <p>Agents : <strong>{agency.agents}</strong></p>
           <p>Ventes : <strong>{agency.sales}</strong></p>
           <p>CA total : <strong>{euro(agency.ca)}</strong></p>
           <p>Marge : <strong>{euro(agency.margin)}</strong></p>
           <p>Garanties : <strong>{agency.warranties}</strong></p>
           <p>Taux garantie : <strong>{agency.warrantyRate}%</strong></p>
-
           <button className="btn">Voir comparatif</button>
         </div>
       ))}
@@ -306,12 +301,12 @@ export function Agents() {
   return (
     <div className="card">
       <h3>Agents commerciaux</h3>
-      <p className="muted">Donn√©es r√©elles calcul√©es depuis Supabase.</p>
+      <p className="muted">Données réelles calculées depuis Supabase.</p>
 
       {loading && <p className="muted">Chargement des agents...</p>}
 
       {!loading && agentRows.length === 0 && (
-        <p className="muted">Aucun agent trouv√© dans Supabase.</p>
+        <p className="muted">Aucun agent trouvé dans Supabase.</p>
       )}
 
       {!loading && agentRows.length > 0 && (
@@ -331,7 +326,7 @@ export function Agents() {
           <tbody>
             {agentRows.map(agent => (
               <tr key={agent.id}>
-                <td><strong>{agent.rankGlobal === 1 ? 'üëë ' : ''}{agent.name}</strong></td>
+                <td><strong>{agent.rankGlobal === 1 ? '👑 ' : ''}{agent.name}</strong></td>
                 <td><span className="badge">{agent.agency}</span></td>
                 <td>{agent.sales}</td>
                 <td>{euro(agent.ca)}</td>
@@ -460,12 +455,12 @@ export function Ventes() {
 
   async function saveSale() {
     if (!vehicleName.trim()) {
-      alert('Il faut indiquer le v√©hicule vendu.');
+      alert('Il faut indiquer le véhicule vendu.');
       return;
     }
 
     if (!agentId) {
-      alert('Il faut s√©lectionner un agent commercial.');
+      alert('Il faut sélectionner un agent commercial.');
       return;
     }
 
@@ -559,8 +554,8 @@ export function Ventes() {
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
-          <h3>Ventes v√©hicules</h3>
-          <p className="muted">Ajout, modification et suivi des ventes connect√©es √† Supabase.</p>
+          <h3>Ventes véhicules</h3>
+          <p className="muted">Ajout, modification et suivi des ventes connectées à Supabase.</p>
         </div>
 
         <button
@@ -573,159 +568,81 @@ export function Ventes() {
             }
           }}
         >
-          {showForm && !editingSale ? 'Fermer' : '‚ûï Nouvelle vente'}
+          {showForm && !editingSale ? 'Fermer' : 'Nouvelle vente'}
         </button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
-          <h4>{editingSale ? '‚úèÔ∏è Modifier la vente' : 'üöó Nouvelle vente'}</h4>
+          <h4>{editingSale ? 'Modifier la vente' : 'Nouvelle vente'}</h4>
 
           <div style={{ display: 'grid', gap: 10 }}>
-            <input
-              placeholder="V√©hicule vendu ex : Mercedes Classe A 200 AMG"
-              value={vehicleName}
-              onChange={(e) => setVehicleName(e.target.value)}
-            />
-
-            <input
-              placeholder="URL photo v√©hicule facultatif"
-              value={vehiclePhotoUrl}
-              onChange={(e) => setVehiclePhotoUrl(e.target.value)}
-            />
+            <input placeholder="Véhicule vendu ex : Mercedes Classe A 200 AMG" value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} />
+            <input placeholder="URL photo véhicule facultatif" value={vehiclePhotoUrl} onChange={(e) => setVehiclePhotoUrl(e.target.value)} />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-              <input
-                type="date"
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
-              />
+              <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />
 
-              <select
-                value={agentId}
-                onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}
-              >
-                <option value="">S√©lectionner un agent</option>
+              <select value={agentId} onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">Sélectionner un agent</option>
                 {agentOptions.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.full_name} ‚Äî {agencyName(agent.agency_id)}
-                  </option>
+                  <option key={agent.id} value={agent.id}>{agent.full_name} — {agencyName(agent.agency_id)}</option>
                 ))}
               </select>
 
-              <input
-                placeholder="Immatriculation"
-                value={registration}
-                onChange={(e) => setRegistration(e.target.value.toUpperCase())}
-              />
+              <input placeholder="Immatriculation" value={registration} onChange={(e) => setRegistration(e.target.value.toUpperCase())} />
             </div>
 
-            <input
-              placeholder="VIN facultatif"
-              value={vin}
-              onChange={(e) => setVin(e.target.value.toUpperCase())}
-            />
+            <input placeholder="VIN facultatif" value={vin} onChange={(e) => setVin(e.target.value.toUpperCase())} />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
-              <input
-                type="number"
-                placeholder="Prix net vendeur"
-                value={sellerPrice}
-                onChange={(e) => setSellerPrice(e.target.value)}
-              />
-
-              <input
-                type="number"
-                placeholder="Prix de vente"
-                value={salePrice}
-                onChange={(e) => setSalePrice(e.target.value)}
-              />
-
+              <input type="number" placeholder="Prix net vendeur" value={sellerPrice} onChange={(e) => setSellerPrice(e.target.value)} />
+              <input type="number" placeholder="Prix de vente" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
               <div className="item">
-                <span className="muted">Marge calcul√©e</span>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>
-                  {euro(calculatedMargin)}
-                </div>
+                <span className="muted">Marge calculée</span>
+                <div style={{ fontSize: 22, fontWeight: 800 }}>{euro(calculatedMargin)}</div>
               </div>
             </div>
 
             <div className="item">
               <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={warrantySold}
-                  onChange={(e) => setWarrantySold(e.target.checked)}
-                />
+                <input type="checkbox" checked={warrantySold} onChange={(e) => setWarrantySold(e.target.checked)} />
                 Garantie vendue
               </label>
 
               {warrantySold && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10, marginTop: 10 }}>
-                  <input
-                    placeholder="Type garantie ex : Opteven Premium"
-                    value={warrantyType}
-                    onChange={(e) => setWarrantyType(e.target.value)}
-                  />
-
-                  <input
-                    type="number"
-                    placeholder="Montant garantie"
-                    value={warrantyAmount}
-                    onChange={(e) => setWarrantyAmount(e.target.value)}
-                  />
+                  <input placeholder="Type garantie ex : Opteven Premium" value={warrantyType} onChange={(e) => setWarrantyType(e.target.value)} />
+                  <input type="number" placeholder="Montant garantie" value={warrantyAmount} onChange={(e) => setWarrantyAmount(e.target.value)} />
                 </div>
               )}
             </div>
 
-            <textarea
-              placeholder="Commentaires"
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-            />
+            <textarea placeholder="Commentaires" value={comments} onChange={(e) => setComments(e.target.value)} />
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" onClick={saveSale} disabled={saving}>
-                {saving ? 'Enregistrement...' : editingSale ? 'üíæ Modifier la vente' : '‚úÖ Enregistrer la vente'}
+                {saving ? 'Enregistrement...' : editingSale ? 'Modifier la vente' : 'Enregistrer la vente'}
               </button>
 
-              {editingSale && (
-                <button onClick={deleteSale} disabled={saving}>
-                  üóë Supprimer
-                </button>
-              )}
+              {editingSale && <button onClick={deleteSale} disabled={saving}>Supprimer</button>}
 
-              <button
-                onClick={() => {
-                  resetForm();
-                  setShowForm(false);
-                }}
-                disabled={saving}
-              >
-                Annuler
-              </button>
+              <button onClick={() => { resetForm(); setShowForm(false); }} disabled={saving}>Annuler</button>
             </div>
           </div>
         </div>
       )}
 
-      <input
-        className="search"
-        placeholder="Recherche marque, mod√®le, immatriculation, VIN, agent... ex : Mercedes"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <input className="search" placeholder="Recherche marque, modèle, immatriculation, VIN, agent... ex : Mercedes" value={search} onChange={(e) => setSearch(e.target.value)} />
 
       {loading && <p className="muted">Chargement des ventes...</p>}
-
-      {!loading && filteredSales.length === 0 && (
-        <p className="muted">Aucune vente trouv√©e.</p>
-      )}
+      {!loading && filteredSales.length === 0 && <p className="muted">Aucune vente trouvée.</p>}
 
       {!loading && filteredSales.length > 0 && (
         <table className="table">
           <thead>
             <tr>
-              <th>V√©hicule</th>
+              <th>Véhicule</th>
               <th>Agent</th>
               <th>Agence</th>
               <th>Prix vente</th>
@@ -736,40 +653,24 @@ export function Ventes() {
 
           <tbody>
             {filteredSales.map(s => (
-              <tr
-                key={s.id}
-                onClick={() => openEditSaleForm(s)}
-                style={{ cursor: 'pointer' }}
-                title="Cliquer pour modifier la vente"
-              >
+              <tr key={s.id} onClick={() => openEditSaleForm(s)} style={{ cursor: 'pointer' }} title="Cliquer pour modifier la vente">
                 <td>
                   <strong>{s.vehicle_name}</strong>
                   {(s.registration || s.vin) && (
                     <div className="muted" style={{ fontSize: 12 }}>
                       {s.registration ? `Immat: ${s.registration}` : ''}
-                      {s.registration && s.vin ? ' ‚Äî ' : ''}
+                      {s.registration && s.vin ? ' — ' : ''}
                       {s.vin ? `VIN: ${s.vin}` : ''}
                     </div>
                   )}
                 </td>
-
                 <td>{s.agents?.full_name || '-'}</td>
-
-                <td>
-                  <span className="badge">
-                    {agencyName(s.agents?.agency_id)}
-                  </span>
-                </td>
-
+                <td><span className="badge">{agencyName(s.agents?.agency_id)}</span></td>
                 <td>{euro(Number(s.sale_price || 0))}</td>
-
-                <td>
-                  <strong>{euro(Number(s.margin_amount || 0))}</strong>
-                </td>
-
+                <td><strong>{euro(Number(s.margin_amount || 0))}</strong></td>
                 <td>
                   {s.warranty_sold
-                    ? `${s.warranty_type || 'Oui'}${s.warranty_amount ? ` ‚Äî ${euro(Number(s.warranty_amount))}` : ''}`
+                    ? `${s.warranty_type || 'Oui'}${s.warranty_amount ? ` — ${euro(Number(s.warranty_amount))}` : ''}`
                     : 'Non'}
                 </td>
               </tr>
@@ -793,7 +694,7 @@ export function Garanties() {
       <div className="card">
         <h3>Taux garantie</h3>
         <div className="stat-value">75%</div>
-        <p className="stat-good">Tr√®s bon niveau</p>
+        <p className="stat-good">Très bon niveau</p>
       </div>
 
       <div className="card">
@@ -893,7 +794,7 @@ export function Messages() {
     }
 
     if (!message.trim()) {
-      alert('Il faut √©crire un message.');
+      alert('Il faut écrire un message.');
       return;
     }
 
@@ -954,7 +855,7 @@ export function Messages() {
 
     if (item.target_type === 'agent') {
       const agent = agentsList.find(a => Number(a.id) === Number(item.agent_id));
-      return agent ? `Agent ${agent.full_name}` : 'Agent cibl√©';
+      return agent ? `Agent ${agent.full_name}` : 'Agent ciblé';
     }
 
     return 'Tous les agents';
@@ -989,47 +890,28 @@ export function Messages() {
             }
           }}
         >
-          {showForm && !editingMessage ? 'Fermer' : '‚ûï Nouveau message'}
+          {showForm && !editingMessage ? 'Fermer' : 'Nouveau message'}
         </button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
-          <h4>{editingMessage ? '‚úèÔ∏è Modifier le message' : 'üì¢ Nouveau message Direction'}</h4>
+          <h4>{editingMessage ? 'Modifier le message' : 'Nouveau message Direction'}</h4>
 
           <div style={{ display: 'grid', gap: 10 }}>
-            <input
-              placeholder="Titre du message ex : Objectif de la semaine"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-
-            <textarea
-              placeholder="Message √† afficher aux agents..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-            />
+            <input placeholder="Titre du message ex : Objectif de la semaine" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <textarea placeholder="Message à afficher aux agents..." value={message} onChange={(e) => setMessage(e.target.value)} />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-              <select
-                value={targetType}
-                onChange={(e) => {
-                  setTargetType(e.target.value);
-                  setAgencyId('');
-                  setAgentId('');
-                }}
-              >
+              <select value={targetType} onChange={(e) => { setTargetType(e.target.value); setAgencyId(''); setAgentId(''); }}>
                 <option value="all">Tous les agents</option>
                 <option value="agency">Une agence</option>
-                <option value="agent">Un agent pr√©cis</option>
+                <option value="agent">Un agent précis</option>
               </select>
 
               {targetType === 'agency' && (
-                <select
-                  value={agencyId}
-                  onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}
-                >
-                  <option value="">S√©lectionner une agence</option>
+                <select value={agencyId} onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">Sélectionner une agence</option>
                   <option value={1}>Blois</option>
                   <option value={2}>Tours</option>
                   <option value={3}>Bourges</option>
@@ -1037,79 +919,45 @@ export function Messages() {
               )}
 
               {targetType === 'agent' && (
-                <select
-                  value={agentId}
-                  onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}
-                >
-                  <option value="">S√©lectionner un agent</option>
+                <select value={agentId} onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">Sélectionner un agent</option>
                   {agentsList.map((agent) => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.full_name} ‚Äî {agencyName(agent.agency_id)}
-                    </option>
+                    <option key={agent.id} value={agent.id}>{agent.full_name} — {agencyName(agent.agency_id)}</option>
                   ))}
                 </select>
               )}
 
               <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={pinned}
-                  onChange={(e) => setPinned(e.target.checked)}
-                />
-                √âpingler le message üìå
+                <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+                Épingler le message
               </label>
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" onClick={saveMessage} disabled={saving}>
-                {saving ? 'Enregistrement...' : editingMessage ? 'üíæ Modifier le message' : '‚úÖ Publier le message'}
+                {saving ? 'Enregistrement...' : editingMessage ? 'Modifier le message' : 'Publier le message'}
               </button>
 
-              {editingMessage && (
-                <button onClick={deleteMessage} disabled={saving}>
-                  üóë Supprimer
-                </button>
-              )}
+              {editingMessage && <button onClick={deleteMessage} disabled={saving}>Supprimer</button>}
 
-              <button
-                onClick={() => {
-                  resetForm();
-                  setShowForm(false);
-                }}
-                disabled={saving}
-              >
-                Annuler
-              </button>
+              <button onClick={() => { resetForm(); setShowForm(false); }} disabled={saving}>Annuler</button>
             </div>
           </div>
         </div>
       )}
 
       {loading && <p className="muted">Chargement des messages...</p>}
-
-      {!loading && directionMessages.length === 0 && (
-        <p className="muted">Aucun message Direction pour le moment.</p>
-      )}
+      {!loading && directionMessages.length === 0 && <p className="muted">Aucun message Direction pour le moment.</p>}
 
       {!loading && directionMessages.length > 0 && (
         <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
           {directionMessages.map((item) => (
-            <div
-              className="item"
-              key={item.id}
-              onClick={() => openEditMessageForm(item)}
-              style={{ cursor: 'pointer' }}
-              title="Cliquer pour modifier le message"
-            >
-              <strong>{item.pinned ? 'üìå ' : ''}{item.title}</strong>
-
+            <div className="item" key={item.id} onClick={() => openEditMessageForm(item)} style={{ cursor: 'pointer' }} title="Cliquer pour modifier le message">
+              <strong>{item.pinned ? '📌 ' : ''}{item.title}</strong>
               <p className="muted" style={{ marginTop: 4 }}>
-                {targetLabel(item)} {item.created_at ? `‚Äî ${formatDate(item.created_at)}` : ''}
+                {targetLabel(item)} {item.created_at ? `— ${formatDate(item.created_at)}` : ''}
               </p>
-
-              <p style={{ whiteSpace: 'pre-wrap' }}>
-                {item.message}
-              </p>
+              <p style={{ whiteSpace: 'pre-wrap' }}>{item.message}</p>
             </div>
           ))}
         </div>
@@ -1119,7 +967,7 @@ export function Messages() {
 }
 
 export function Documents() {
-  const [agentDocuments, setAgentDocuments] = useState<AgentDocument[]>([]);
+  const [documentsList, setDocumentsList] = useState<AgentDocument[]>([]);
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1128,9 +976,10 @@ export function Documents() {
   const [editingDocument, setEditingDocument] = useState<AgentDocument | null>(null);
 
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('G√©n√©ral');
+  const [category, setCategory] = useState('Général');
   const [description, setDescription] = useState('');
   const [fileUrl, setFileUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [targetType, setTargetType] = useState('all');
   const [agencyId, setAgencyId] = useState<number | ''>('');
   const [agentId, setAgentId] = useState<number | ''>('');
@@ -1145,9 +994,9 @@ export function Documents() {
 
     if (error) {
       console.error('Erreur chargement documents agents:', error);
-      setAgentDocuments([]);
+      setDocumentsList([]);
     } else {
-      setAgentDocuments(data || []);
+      setDocumentsList(data || []);
     }
 
     setLoading(false);
@@ -1175,9 +1024,10 @@ export function Documents() {
   function resetForm() {
     setEditingDocument(null);
     setTitle('');
-    setCategory('G√©n√©ral');
+    setCategory('Général');
     setDescription('');
     setFileUrl('');
+    setSelectedFile(null);
     setTargetType('all');
     setAgencyId('');
     setAgentId('');
@@ -1191,9 +1041,10 @@ export function Documents() {
   function openEditDocumentForm(item: AgentDocument) {
     setEditingDocument(item);
     setTitle(item.title || '');
-    setCategory(item.category || 'G√©n√©ral');
+    setCategory(item.category || 'Général');
     setDescription(item.description || '');
     setFileUrl(item.file_url || '');
+    setSelectedFile(null);
     setTargetType(item.target_type || 'all');
     setAgencyId(item.agency_id || '');
     setAgentId(item.agent_id || '');
@@ -1201,35 +1052,70 @@ export function Documents() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  async function uploadSelectedFile() {
+    if (!selectedFile) return fileUrl.trim() || null;
+
+    const cleanName = selectedFile.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9._-]/g, '-');
+
+    const path = `${Date.now()}-${cleanName}`;
+
+    const { error } = await supabase.storage
+      .from('agent-documents')
+      .upload(path, selectedFile, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Erreur upload document:', error);
+      throw error;
+    }
+
+    const { data } = supabase.storage
+      .from('agent-documents')
+      .getPublicUrl(path);
+
+    return data.publicUrl;
+  }
+
   async function saveDocument() {
     if (!title.trim()) {
-      alert('Il faut indiquer un titre de document.');
+      alert('Il faut indiquer un titre.');
       return;
     }
 
     setSaving(true);
 
-    const payload = {
-      title: title.trim(),
-      category: category.trim() || 'G√©n√©ral',
-      description: description.trim() || null,
-      file_url: fileUrl.trim() || null,
-      target_type: targetType,
-      agency_id: targetType === 'agency' ? Number(agencyId) || null : null,
-      agent_id: targetType === 'agent' ? Number(agentId) || null : null,
-    };
+    try {
+      const finalFileUrl = await uploadSelectedFile();
 
-    const { error } = editingDocument
-      ? await supabase.from('agent_documents').update(payload).eq('id', editingDocument.id)
-      : await supabase.from('agent_documents').insert(payload);
+      const payload = {
+        title: title.trim(),
+        category: category.trim() || 'Général',
+        description: description.trim() || null,
+        file_url: finalFileUrl,
+        target_type: targetType,
+        agency_id: targetType === 'agency' ? Number(agencyId) || null : null,
+        agent_id: targetType === 'agent' ? Number(agentId) || null : null,
+      };
 
-    if (error) {
-      console.error('Erreur sauvegarde document agent:', error);
-      alert("Erreur pendant l'enregistrement du document.");
-    } else {
-      resetForm();
-      setShowForm(false);
-      await loadDocuments();
+      const { error } = editingDocument
+        ? await supabase.from('agent_documents').update(payload).eq('id', editingDocument.id)
+        : await supabase.from('agent_documents').insert(payload);
+
+      if (error) {
+        console.error('Erreur sauvegarde document:', error);
+        alert("Erreur pendant l'enregistrement du document.");
+      } else {
+        resetForm();
+        setShowForm(false);
+        await loadDocuments();
+      }
+    } catch (error) {
+      alert("Erreur pendant l'envoi du fichier.");
     }
 
     setSaving(false);
@@ -1249,7 +1135,7 @@ export function Documents() {
       .eq('id', editingDocument.id);
 
     if (error) {
-      console.error('Erreur suppression document agent:', error);
+      console.error('Erreur suppression document:', error);
       alert('Erreur pendant la suppression du document.');
     } else {
       resetForm();
@@ -1265,7 +1151,7 @@ export function Documents() {
 
     if (item.target_type === 'agent') {
       const agent = agentsList.find(a => Number(a.id) === Number(item.agent_id));
-      return agent ? `Agent ${agent.full_name}` : 'Agent cibl√©';
+      return agent ? `Agent ${agent.full_name}` : 'Agent ciblé';
     }
 
     return 'Tous les agents';
@@ -1277,8 +1163,6 @@ export function Documents() {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     });
   }
 
@@ -1287,7 +1171,7 @@ export function Documents() {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
           <h3>Documents agents</h3>
-          <p className="muted">Ajoute des documents, proc√©dures, garanties ou supports commerciaux pour les agents.</p>
+          <p className="muted">Ajoute des documents, procédures, garanties ou supports commerciaux pour les agents.</p>
         </div>
 
         <button
@@ -1300,67 +1184,63 @@ export function Documents() {
             }
           }}
         >
-          {showForm && !editingDocument ? 'Fermer' : '‚ûï Nouveau document'}
+          {showForm && !editingDocument ? 'Fermer' : 'Ajouter un document'}
         </button>
       </div>
 
       {showForm && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
-          <h4>{editingDocument ? '‚úèÔ∏è Modifier le document' : 'üìÑ Nouveau document agent'}</h4>
+          <h4>{editingDocument ? 'Modifier le document agent' : 'Nouveau document agent'}</h4>
 
           <div style={{ display: 'grid', gap: 10 }}>
             <input
-              placeholder="Titre du document ex : Proc√©dure garantie Opteven"
+              placeholder="Titre du document ex : Procédure garantie Opteven"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                <option value="G√©n√©ral">G√©n√©ral</option>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(220px, 2fr)', gap: 10 }}>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                <option value="Général">Général</option>
                 <option value="Garantie">Garantie</option>
-                <option value="Proc√©dure">Proc√©dure</option>
+                <option value="Procédure">Procédure</option>
                 <option value="Formation">Formation</option>
                 <option value="Commercial">Commercial</option>
                 <option value="Administratif">Administratif</option>
               </select>
 
               <input
-                placeholder="Lien du fichier ou URL"
+                placeholder="Lien du fichier ou URL facultatif"
                 value={fileUrl}
                 onChange={(e) => setFileUrl(e.target.value)}
               />
             </div>
 
+            <input
+              type="file"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+            />
+
+            {selectedFile && (
+              <p className="muted">Fichier sélectionné : {selectedFile.name}</p>
+            )}
+
             <textarea
-              placeholder="Description ou consigne li√©e au document..."
+              placeholder="Description ou consigne liée au document..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-              <select
-                value={targetType}
-                onChange={(e) => {
-                  setTargetType(e.target.value);
-                  setAgencyId('');
-                  setAgentId('');
-                }}
-              >
+              <select value={targetType} onChange={(e) => { setTargetType(e.target.value); setAgencyId(''); setAgentId(''); }}>
                 <option value="all">Tous les agents</option>
                 <option value="agency">Une agence</option>
-                <option value="agent">Un agent pr√©cis</option>
+                <option value="agent">Un agent précis</option>
               </select>
 
               {targetType === 'agency' && (
-                <select
-                  value={agencyId}
-                  onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}
-                >
-                  <option value="">S√©lectionner une agence</option>
+                <select value={agencyId} onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">Sélectionner une agence</option>
                   <option value={1}>Blois</option>
                   <option value={2}>Tours</option>
                   <option value={3}>Bourges</option>
@@ -1368,15 +1248,10 @@ export function Documents() {
               )}
 
               {targetType === 'agent' && (
-                <select
-                  value={agentId}
-                  onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}
-                >
-                  <option value="">S√©lectionner un agent</option>
+                <select value={agentId} onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">Sélectionner un agent</option>
                   {agentsList.map((agent) => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.full_name} ‚Äî {agencyName(agent.agency_id)}
-                    </option>
+                    <option key={agent.id} value={agent.id}>{agent.full_name} — {agencyName(agent.agency_id)}</option>
                   ))}
                 </select>
               )}
@@ -1384,49 +1259,28 @@ export function Documents() {
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" onClick={saveDocument} disabled={saving}>
-                {saving ? 'Enregistrement...' : editingDocument ? 'üíæ Modifier le document' : '‚úÖ Ajouter le document'}
+                {saving ? 'Enregistrement...' : editingDocument ? 'Modifier le document' : 'Ajouter le document'}
               </button>
 
-              {editingDocument && (
-                <button onClick={deleteDocument} disabled={saving}>
-                  üóë Supprimer
-                </button>
-              )}
+              {editingDocument && <button onClick={deleteDocument} disabled={saving}>Supprimer</button>}
 
-              <button
-                onClick={() => {
-                  resetForm();
-                  setShowForm(false);
-                }}
-                disabled={saving}
-              >
-                Annuler
-              </button>
+              <button onClick={() => { resetForm(); setShowForm(false); }} disabled={saving}>Annuler</button>
             </div>
           </div>
         </div>
       )}
 
       {loading && <p className="muted">Chargement des documents...</p>}
+      {!loading && documentsList.length === 0 && <p className="muted">Aucun document agent pour le moment.</p>}
 
-      {!loading && agentDocuments.length === 0 && (
-        <p className="muted">Aucun document agent pour le moment.</p>
-      )}
-
-      {!loading && agentDocuments.length > 0 && (
+      {!loading && documentsList.length > 0 && (
         <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-          {agentDocuments.map((item) => (
-            <div
-              className="item"
-              key={item.id}
-              onClick={() => openEditDocumentForm(item)}
-              style={{ cursor: 'pointer' }}
-              title="Cliquer pour modifier le document"
-            >
-              <strong>üìÑ {item.title}</strong>
+          {documentsList.map((item) => (
+            <div className="item" key={item.id} onClick={() => openEditDocumentForm(item)} style={{ cursor: 'pointer' }} title="Cliquer pour modifier le document">
+              <strong>{item.title}</strong>
 
               <p className="muted" style={{ marginTop: 4 }}>
-                {item.category || 'G√©n√©ral'} ‚Äî {targetLabel(item)} {item.created_at ? `‚Äî ${formatDate(item.created_at)}` : ''}
+                {item.category || 'Général'} — {targetLabel(item)} {item.created_at ? `— ${formatDate(item.created_at)}` : ''}
               </p>
 
               {item.description && (
@@ -1434,16 +1288,14 @@ export function Documents() {
               )}
 
               {item.file_url && (
-                <p>
-                  <a
-                    href={item.file_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Ouvrir le document
-                  </a>
-                </p>
+                <a
+                  href={item.file_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Ouvrir le document
+                </a>
               )}
             </div>
           ))}
@@ -1452,6 +1304,7 @@ export function Documents() {
     </div>
   );
 }
+
 export function Stats() {
   const [sales, setSales] = useState<VehicleSale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1509,7 +1362,7 @@ export function Stats() {
     }>();
 
     monthSales.forEach((sale) => {
-      const name = sale.agents?.full_name || 'Agent non renseign√©';
+      const name = sale.agents?.full_name || 'Agent non renseigné';
       const agency = agencyName(sale.agents?.agency_id);
 
       const current = map.get(name) || {
@@ -1565,10 +1418,8 @@ export function Stats() {
   return (
     <div className="section">
       <div className="card">
-        <h3>Statistiques r√©elles</h3>
-        <p className="muted">
-          Donn√©es calcul√©es automatiquement depuis les ventes enregistr√©es dans Supabase.
-        </p>
+        <h3>Statistiques réelles</h3>
+        <p className="muted">Données calculées automatiquement depuis les ventes enregistrées dans Supabase.</p>
       </div>
 
       <div className="grid cards3">
@@ -1589,7 +1440,7 @@ export function Stats() {
         </div>
 
         <div className="card">
-          <h3>Cette ann√©e</h3>
+          <h3>Cette année</h3>
           <div className="stat-value">{euro(year.ca)}</div>
           <p className="muted">{year.salesCount} vente(s)</p>
           <p>Marge : <strong>{euro(year.margin)}</strong></p>
@@ -1599,7 +1450,7 @@ export function Stats() {
 
       <div className="grid cards3">
         <div className="card">
-          <h3>Total g√©n√©ral</h3>
+          <h3>Total général</h3>
           <div className="stat-value">{euro(total.ca)}</div>
           <p className="muted">{total.salesCount} vente(s) au total</p>
         </div>
@@ -1607,7 +1458,7 @@ export function Stats() {
         <div className="card">
           <h3>Marge moyenne</h3>
           <div className="stat-value">{euro(Math.round(total.averageMargin))}</div>
-          <p className="muted">Moyenne par v√©hicule vendu</p>
+          <p className="muted">Moyenne par véhicule vendu</p>
         </div>
 
         <div className="card">
@@ -1621,14 +1472,14 @@ export function Stats() {
         <h3>Classement agents du mois</h3>
 
         {agentRanking.length === 0 ? (
-          <p className="muted">Aucun agent class√© ce mois-ci.</p>
+          <p className="muted">Aucun agent classé ce mois-ci.</p>
         ) : (
           agentRanking.map((agent, i) => (
             <div className="rank" key={agent.name}>
               <span>
-                {i === 0 ? 'üëë ' : ''}
+                {i === 0 ? '👑 ' : ''}
                 {i + 1}. {agent.name}
-                <span className="muted"> ‚Äî {agent.agency} ‚Äî {agent.sales} vente(s)</span>
+                <span className="muted"> — {agent.agency} — {agent.sales} vente(s)</span>
               </span>
               <strong>{euro(agent.margin)}</strong>
             </div>
@@ -1653,7 +1504,7 @@ export function Stats() {
           <tbody>
             {agencyRanking.map((agency, i) => (
               <tr key={agency.agency}>
-                <td>{i === 0 ? 'üëë ' : ''}{agency.agency}</td>
+                <td>{i === 0 ? '👑 ' : ''}{agency.agency}</td>
                 <td>{agency.sales}</td>
                 <td>{euro(agency.ca)}</td>
                 <td><strong>{euro(agency.margin)}</strong></td>
