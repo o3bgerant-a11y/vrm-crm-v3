@@ -134,6 +134,68 @@ export default function Parametres() {
     setSaving(false);
   }
 
+  async function updateAccount(profile: Profile, action: 'block' | 'activate' | 'archive') {
+    if (profile.role === 'patron') {
+      alert('Le compte Patron ne peut pas être modifié ici.');
+      return;
+    }
+
+    let confirmMessage = '';
+
+    if (action === 'block') {
+      confirmMessage = `Bloquer l'accès de ${profile.full_name} ?`;
+    }
+
+    if (action === 'activate') {
+      confirmMessage = `Réactiver l'accès de ${profile.full_name} ?`;
+    }
+
+    if (action === 'archive') {
+      confirmMessage = `Archiver ${profile.full_name} ? Ses ventes resteront conservées.`;
+    }
+
+    const ok = confirm(confirmMessage);
+    if (!ok) return;
+
+    setSaving(true);
+
+    try {
+      const response = await fetch('/api/update-agent-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profile_id: profile.id,
+          action,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || "Erreur pendant la mise à jour du compte.");
+        setSaving(false);
+        return;
+      }
+
+      await loadProfiles();
+    } catch (error) {
+      console.error(error);
+      alert("Erreur serveur pendant la mise à jour du compte.");
+    }
+
+    setSaving(false);
+  }
+
+  function statusLabel(status: string) {
+    if (status === 'active') return 'Actif';
+    if (status === 'blocked') return 'Bloqué';
+    if (status === 'archived') return 'Archivé';
+
+    return status;
+  }
+
   return (
     <div className="section">
       <div className="card">
@@ -254,6 +316,7 @@ export default function Parametres() {
                 <th>Rôle</th>
                 <th>Agence</th>
                 <th>Statut</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -277,7 +340,46 @@ export default function Parametres() {
                   </td>
 
                   <td>
-                    {profile.status}
+                    <strong>{statusLabel(profile.status)}</strong>
+                  </td>
+
+                  <td>
+                    {profile.role === 'patron' ? (
+                      <span className="muted">Compte Patron</span>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {profile.status !== 'blocked' && profile.status !== 'archived' && (
+                          <button
+                            onClick={() => updateAccount(profile, 'block')}
+                            disabled={saving}
+                          >
+                            Bloquer
+                          </button>
+                        )}
+
+                        {profile.status === 'blocked' && (
+                          <button
+                            onClick={() => updateAccount(profile, 'activate')}
+                            disabled={saving}
+                          >
+                            Réactiver
+                          </button>
+                        )}
+
+                        {profile.status !== 'archived' && (
+                          <button
+                            onClick={() => updateAccount(profile, 'archive')}
+                            disabled={saving}
+                          >
+                            Archiver
+                          </button>
+                        )}
+
+                        {profile.status === 'archived' && (
+                          <span className="muted">Archivé</span>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
