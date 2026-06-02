@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { agencies, documents, messages } from '@/lib/data';
+import { documents, messages } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 
 const euro = (n: number) => n.toLocaleString('fr-FR') + ' €';
@@ -92,14 +92,107 @@ function calculateStats(sales: VehicleSale[]) {
 }
 
 export function Agences() {
+  const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
+  const [sales, setSales] = useState<VehicleSale[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadAgenciesPage() {
+    setLoading(true);
+
+    const { data: agentsData, error: agentsError } = await supabase
+      .from('agents')
+      .select('id, full_name, agency_id')
+      .order('full_name', { ascending: true });
+
+    const { data: salesData, error: salesError } = await supabase
+      .from('vehicle_sales')
+      .select(`
+        *,
+        agents!vehicle_sales_agent_id_fkey (
+          full_name,
+          agency_id
+        )
+      `)
+      .order('id', { ascending: false });
+
+    if (agentsError) {
+      console.error('Erreur chargement agences/agents:', agentsError);
+      setAgentsList([]);
+    } else {
+      setAgentsList(agentsData || []);
+    }
+
+    if (salesError) {
+      console.error('Erreur chargement agences/ventes:', salesError);
+      setSales([]);
+    } else {
+      setSales(salesData || []);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadAgenciesPage();
+  }, []);
+
+  const agencyRows = useMemo(() => {
+    const base = [
+      { id: 1, agency: 'Blois', agents: 0, sales: 0, ca: 0, margin: 0, warranties: 0 },
+      { id: 2, agency: 'Tours', agents: 0, sales: 0, ca: 0, margin: 0, warranties: 0 },
+      { id: 3, agency: 'Bourges', agents: 0, sales: 0, ca: 0, margin: 0, warranties: 0 },
+    ];
+
+    agentsList.forEach((agent) => {
+      const row = base.find(item => item.id === Number(agent.agency_id));
+      if (row) row.agents += 1;
+    });
+
+    sales.forEach((sale) => {
+      const agencyId = Number(sale.agents?.agency_id);
+      const row = base.find(item => item.id === agencyId);
+
+      if (!row) return;
+
+      row.sales += 1;
+      row.ca += Number(sale.sale_price || 0);
+      row.margin += Number(sale.margin_amount || 0);
+      row.warranties += sale.warranty_sold ? 1 : 0;
+    });
+
+    return base
+      .map((row) => ({
+        ...row,
+        warrantyRate: row.sales > 0 ? Math.round((row.warranties / row.sales) * 100) : 0,
+      }))
+      .sort((a, b) => b.margin - a.margin);
+  }, [agentsList, sales]);
+
+  if (loading) {
+    return (
+      <div className="card">
+        <p className="muted">Chargement des agences...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid cards3">
-      {agencies.map((a, i) => (
-        <div className="card" key={a}>
-          <h3>{a}</h3>
-          <p className="muted">Agents : {i === 0 ? 2 : 1}</p>
-          <p>CA semaine : <strong>{euro([49300, 21400, 23600][i])}</strong></p>
-          <p>Marge : <strong>{euro([5600, 2500, 2700][i])}</strong></p>
+      {agencyRows.map((agency, index) => (
+        <div className="card" key={agency.agency}>
+          <h3>{index === 0 ? '👑 ' : ''}{agency.agency}</h3>
+
+          <p className="muted">
+            #{index + 1} au classement agences
+          </p>
+
+          <p>Agents : <strong>{agency.agents}</strong></p>
+          <p>Ventes : <strong>{agency.sales}</strong></p>
+          <p>CA total : <strong>{euro(agency.ca)}</strong></p>
+          <p>Marge : <strong>{euro(agency.margin)}</strong></p>
+          <p>Garanties : <strong>{agency.warranties}</strong></p>
+          <p>Taux garantie : <strong>{agency.warrantyRate}%</strong></p>
+
           <button className="btn">Voir comparatif</button>
         </div>
       ))}
