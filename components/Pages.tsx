@@ -683,24 +683,285 @@ export function Ventes() {
 }
 
 export function Garanties() {
+  const [sales, setSales] = useState<VehicleSale[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadWarrantySales() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('vehicle_sales')
+      .select(`
+        *,
+        agents!vehicle_sales_agent_id_fkey (
+          full_name,
+          agency_id
+        )
+      `)
+      .order('id', { ascending: false });
+
+    if (error) {
+      console.error('Erreur chargement garanties:', error);
+      setSales([]);
+    } else {
+      setSales(data || []);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadWarrantySales();
+  }, []);
+
+  const totalSales = sales.length;
+  const warrantySales = sales.filter(sale => sale.warranty_sold);
+  const totalWarranties = warrantySales.length;
+  const totalWarrantyAmount = warrantySales.reduce((total, sale) => total + Number(sale.warranty_amount || 0), 0);
+  const warrantyRate = totalSales > 0 ? Math.round((totalWarranties / totalSales) * 100) : 0;
+
+  const agentWarrantyRanking = useMemo(() => {
+    const map = new Map<string, {
+      name: string;
+      agency: string;
+      sales: number;
+      warranties: number;
+      warrantyAmount: number;
+      warrantyRate: number;
+    }>();
+
+    sales.forEach((sale) => {
+      const name = sale.agents?.full_name || 'Agent non renseigné';
+      const agency = agencyName(sale.agents?.agency_id);
+
+      const current = map.get(name) || {
+        name,
+        agency,
+        sales: 0,
+        warranties: 0,
+        warrantyAmount: 0,
+        warrantyRate: 0,
+      };
+
+      current.sales += 1;
+
+      if (sale.warranty_sold) {
+        current.warranties += 1;
+        current.warrantyAmount += Number(sale.warranty_amount || 0);
+      }
+
+      current.warrantyRate = current.sales > 0 ? Math.round((current.warranties / current.sales) * 100) : 0;
+
+      map.set(name, current);
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (b.warranties !== a.warranties) return b.warranties - a.warranties;
+      return b.warrantyAmount - a.warrantyAmount;
+    });
+  }, [sales]);
+
+  const agencyWarrantyRanking = useMemo(() => {
+    const base = [
+      { agency: 'Blois', sales: 0, warranties: 0, warrantyAmount: 0, warrantyRate: 0 },
+      { agency: 'Tours', sales: 0, warranties: 0, warrantyAmount: 0, warrantyRate: 0 },
+      { agency: 'Bourges', sales: 0, warranties: 0, warrantyAmount: 0, warrantyRate: 0 },
+    ];
+
+    sales.forEach((sale) => {
+      const agency = agencyName(sale.agents?.agency_id);
+      const row = base.find(item => item.agency === agency);
+
+      if (!row) return;
+
+      row.sales += 1;
+
+      if (sale.warranty_sold) {
+        row.warranties += 1;
+        row.warrantyAmount += Number(sale.warranty_amount || 0);
+      }
+    });
+
+    return base
+      .map((row) => ({
+        ...row,
+        warrantyRate: row.sales > 0 ? Math.round((row.warranties / row.sales) * 100) : 0,
+      }))
+      .sort((a, b) => {
+        if (b.warranties !== a.warranties) return b.warranties - a.warranties;
+        return b.warrantyAmount - a.warrantyAmount;
+      });
+  }, [sales]);
+
+  const bestAgent = agentWarrantyRanking.length > 0 ? agentWarrantyRanking[0] : null;
+  const bestAgency = agencyWarrantyRanking.length > 0 ? agencyWarrantyRanking[0] : null;
+
+  if (loading) {
+    return (
+      <div className="card">
+        <p className="muted">Chargement des garanties...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid cards3">
+    <div className="section">
       <div className="card">
-        <h3>Garanties vendues</h3>
-        <div className="stat-value">3</div>
-        <p className="muted">Objectif : augmenter le taux par agent</p>
+        <h3>Garanties</h3>
+        <p className="muted">Données réelles calculées depuis les ventes enregistrées dans Supabase.</p>
+      </div>
+
+      <div className="grid cards3">
+        <div className="card">
+          <h3>Garanties vendues</h3>
+          <div className="stat-value">{totalWarranties}</div>
+          <p className="muted">Sur {totalSales} vente(s) enregistrée(s)</p>
+        </div>
+
+        <div className="card">
+          <h3>Taux garantie</h3>
+          <div className="stat-value">{warrantyRate}%</div>
+          <p className={warrantyRate >= 50 ? 'stat-good' : 'muted'}>
+            {warrantyRate >= 50 ? 'Bon niveau de vente garantie' : 'Objectif : augmenter le taux par agent'}
+          </p>
+        </div>
+
+        <div className="card">
+          <h3>Montant garanties</h3>
+          <div className="stat-value">{euro(totalWarrantyAmount)}</div>
+          <p className="muted">Montant total des garanties vendues</p>
+        </div>
+      </div>
+
+      <div className="grid cards3">
+        <div className="card">
+          <h3>Meilleur agent</h3>
+          <div className="stat-value">{bestAgent ? bestAgent.name : '-'}</div>
+          <p className="muted">
+            {bestAgent
+              ? `${bestAgent.warranties} garantie(s) — ${euro(bestAgent.warrantyAmount)}`
+              : 'Aucune garantie vendue pour le moment'}
+          </p>
+        </div>
+
+        <div className="card">
+          <h3>Meilleure agence</h3>
+          <div className="stat-value">{bestAgency ? bestAgency.agency : '-'}</div>
+          <p className="muted">
+            {bestAgency
+              ? `${bestAgency.warranties} garantie(s) — taux ${bestAgency.warrantyRate}%`
+              : 'Aucune agence classée pour le moment'}
+          </p>
+        </div>
+
+        <div className="card">
+          <h3>Ventes sans garantie</h3>
+          <div className="stat-value">{totalSales - totalWarranties}</div>
+          <p className="muted">Potentiel de progression commerciale</p>
+        </div>
       </div>
 
       <div className="card">
-        <h3>Taux garantie</h3>
-        <div className="stat-value">75%</div>
-        <p className="stat-good">Très bon niveau</p>
+        <h3>Classement garanties par agent</h3>
+
+        {agentWarrantyRanking.length === 0 ? (
+          <p className="muted">Aucun agent à afficher pour le moment.</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Agence</th>
+                <th>Ventes</th>
+                <th>Garanties</th>
+                <th>Taux</th>
+                <th>Montant</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {agentWarrantyRanking.map((agent, i) => (
+                <tr key={agent.name}>
+                  <td><strong>{i === 0 ? '👑 ' : ''}{agent.name}</strong></td>
+                  <td><span className="badge">{agent.agency}</span></td>
+                  <td>{agent.sales}</td>
+                  <td>{agent.warranties}</td>
+                  <td>{agent.warrantyRate}%</td>
+                  <td><strong>{euro(agent.warrantyAmount)}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="card">
-        <h3>Meilleur agent</h3>
-        <div className="stat-value">Maveryk</div>
-        <p>5 garanties</p>
+        <h3>Classement garanties par agence</h3>
+
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Agence</th>
+              <th>Ventes</th>
+              <th>Garanties</th>
+              <th>Taux</th>
+              <th>Montant</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {agencyWarrantyRanking.map((agency, i) => (
+              <tr key={agency.agency}>
+                <td><strong>{i === 0 ? '👑 ' : ''}{agency.agency}</strong></td>
+                <td>{agency.sales}</td>
+                <td>{agency.warranties}</td>
+                <td>{agency.warrantyRate}%</td>
+                <td><strong>{euro(agency.warrantyAmount)}</strong></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h3>Détail des garanties vendues</h3>
+
+        {warrantySales.length === 0 ? (
+          <p className="muted">Aucune garantie vendue pour le moment.</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Véhicule</th>
+                <th>Agent</th>
+                <th>Agence</th>
+                <th>Type garantie</th>
+                <th>Montant</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {warrantySales.map((sale) => (
+                <tr key={sale.id}>
+                  <td>
+                    <strong>{sale.vehicle_name || '-'}</strong>
+                    {(sale.registration || sale.vin) && (
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {sale.registration ? `Immat: ${sale.registration}` : ''}
+                        {sale.registration && sale.vin ? ' — ' : ''}
+                        {sale.vin ? `VIN: ${sale.vin}` : ''}
+                      </div>
+                    )}
+                  </td>
+                  <td>{sale.agents?.full_name || '-'}</td>
+                  <td><span className="badge">{agencyName(sale.agents?.agency_id)}</span></td>
+                  <td>{sale.warranty_type || 'Garantie vendue'}</td>
+                  <td><strong>{euro(Number(sale.warranty_amount || 0))}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
