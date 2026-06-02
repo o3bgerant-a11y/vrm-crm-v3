@@ -4,7 +4,37 @@ import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import Planning from '@/components/Planning';
-import { Agences, Agents, Ventes, Garanties, Messages, Documents, Stats } from '@/components/Pages';
+import {
+  Agences,
+  Agents,
+  Ventes,
+  Garanties,
+  Messages,
+  Documents,
+  Stats
+} from '@/components/Pages';
+
+const Parametres = () => (
+  <div className="card">
+    <h3>⚙️ Paramètres CRM</h3>
+
+    <p className="muted">
+      Gestion des accès agents commerciaux.
+    </p>
+
+    <div style={{ marginTop: 20 }}>
+      <button className="btn">
+        ➕ Créer un agent
+      </button>
+    </div>
+
+    <div style={{ marginTop: 20 }}>
+      <p>
+        La création automatique des comptes agents sera branchée à Supabase dans la prochaine étape.
+      </p>
+    </div>
+  </div>
+);
 
 const titles: Record<string, string> = {
   dashboard: 'Tableau de bord Patron',
@@ -16,6 +46,7 @@ const titles: Record<string, string> = {
   messages: 'Messages Direction',
   documents: 'Documents',
   stats: 'Statistiques',
+  parametres: 'Paramètres CRM',
 };
 
 export default function Home() {
@@ -36,12 +67,14 @@ export default function Home() {
             <select><option>2026</option></select>
             <select><option>Mai</option></select>
             <select><option>S22</option></select>
+
             <select>
               <option>Toutes les agences</option>
               <option>Blois</option>
               <option>Tours</option>
               <option>Bourges</option>
             </select>
+
             <select>
               <option>Tous les agents</option>
               <option>Maveryk</option>
@@ -58,6 +91,7 @@ export default function Home() {
         {active === 'messages' && <Messages />}
         {active === 'documents' && <Documents />}
         {active === 'stats' && <Stats />}
+        {active === 'parametres' && <Parametres />}
       </main>
     </div>
   );
