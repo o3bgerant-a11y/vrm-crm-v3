@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import Planning from '@/components/Planning';
+import Parametres from '@/components/Parametres';
 import {
   Agences,
   Agents,
@@ -13,28 +14,6 @@ import {
   Documents,
   Stats
 } from '@/components/Pages';
-
-const Parametres = () => (
-  <div className="card">
-    <h3>⚙️ Paramètres CRM</h3>
-
-    <p className="muted">
-      Gestion des accès agents commerciaux.
-    </p>
-
-    <div style={{ marginTop: 20 }}>
-      <button className="btn">
-        ➕ Créer un agent
-      </button>
-    </div>
-
-    <div style={{ marginTop: 20 }}>
-      <p>
-        La création automatique des comptes agents sera branchée à Supabase dans la prochaine étape.
-      </p>
-    </div>
-  </div>
-);
 
 const titles: Record<string, string> = {
   dashboard: 'Tableau de bord Patron',
