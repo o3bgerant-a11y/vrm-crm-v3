@@ -45,6 +45,52 @@ type VehicleSale = {
   } | null;
 };
 
+function saleDateToDate(value: string | null) {
+  if (!value) return null;
+  return new Date(value);
+}
+
+function startOfWeek(date: Date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function startOfYear(date: Date) {
+  return new Date(date.getFullYear(), 0, 1);
+}
+
+function isAfterOrEqual(date: Date | null, start: Date) {
+  if (!date) return false;
+  return date.getTime() >= start.getTime();
+}
+
+function calculateStats(sales: VehicleSale[]) {
+  const ca = sales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
+  const margin = sales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
+  const warranties = sales.filter(sale => sale.warranty_sold).length;
+  const warrantyAmount = sales.reduce((total, sale) => total + Number(sale.warranty_amount || 0), 0);
+  const averageMargin = sales.length > 0 ? margin / sales.length : 0;
+  const warrantyRate = sales.length > 0 ? Math.round((warranties / sales.length) * 100) : 0;
+
+  return {
+    ca,
+    margin,
+    salesCount: sales.length,
+    warranties,
+    warrantyAmount,
+    averageMargin,
+    warrantyRate,
+  };
+}
+
 export function Agences() {
   return (
     <div className="grid cards3">
@@ -240,13 +286,8 @@ export function Ventes() {
     };
 
     const { error } = editingSale
-      ? await supabase
-          .from('vehicle_sales')
-          .update(payload)
-          .eq('id', editingSale.id)
-      : await supabase
-          .from('vehicle_sales')
-          .insert(payload);
+      ? await supabase.from('vehicle_sales').update(payload).eq('id', editingSale.id)
+      : await supabase.from('vehicle_sales').insert(payload);
 
     if (error) {
       console.error('Erreur sauvegarde vente:', error);
@@ -590,36 +631,215 @@ export function Documents() {
 }
 
 export function Stats() {
+  const [sales, setSales] = useState<VehicleSale[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadSales() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('vehicle_sales')
+      .select(`
+        *,
+        agents!vehicle_sales_agent_id_fkey (
+          full_name,
+          agency_id
+        )
+      `)
+      .order('id', { ascending: false });
+
+    if (error) {
+      console.error('Erreur stats:', error);
+      setSales([]);
+    } else {
+      setSales(data || []);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadSales();
+  }, []);
+
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const monthStart = startOfMonth(now);
+  const yearStart = startOfYear(now);
+
+  const weekSales = sales.filter(sale => isAfterOrEqual(saleDateToDate(sale.sale_date), weekStart));
+  const monthSales = sales.filter(sale => isAfterOrEqual(saleDateToDate(sale.sale_date), monthStart));
+  const yearSales = sales.filter(sale => isAfterOrEqual(saleDateToDate(sale.sale_date), yearStart));
+
+  const week = calculateStats(weekSales);
+  const month = calculateStats(monthSales);
+  const year = calculateStats(yearSales);
+  const total = calculateStats(sales);
+
+  const agentRanking = useMemo(() => {
+    const map = new Map<string, {
+      name: string;
+      agency: string;
+      sales: number;
+      ca: number;
+      margin: number;
+      warranties: number;
+    }>();
+
+    monthSales.forEach((sale) => {
+      const name = sale.agents?.full_name || 'Agent non renseigné';
+      const agency = agencyName(sale.agents?.agency_id);
+
+      const current = map.get(name) || {
+        name,
+        agency,
+        sales: 0,
+        ca: 0,
+        margin: 0,
+        warranties: 0,
+      };
+
+      current.sales += 1;
+      current.ca += Number(sale.sale_price || 0);
+      current.margin += Number(sale.margin_amount || 0);
+      current.warranties += sale.warranty_sold ? 1 : 0;
+
+      map.set(name, current);
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.margin - a.margin);
+  }, [monthSales]);
+
+  const agencyRanking = useMemo(() => {
+    const base = [
+      { agency: 'Blois', sales: 0, ca: 0, margin: 0, warranties: 0 },
+      { agency: 'Tours', sales: 0, ca: 0, margin: 0, warranties: 0 },
+      { agency: 'Bourges', sales: 0, ca: 0, margin: 0, warranties: 0 },
+    ];
+
+    monthSales.forEach((sale) => {
+      const agency = agencyName(sale.agents?.agency_id);
+      const row = base.find(item => item.agency === agency);
+
+      if (!row) return;
+
+      row.sales += 1;
+      row.ca += Number(sale.sale_price || 0);
+      row.margin += Number(sale.margin_amount || 0);
+      row.warranties += sale.warranty_sold ? 1 : 0;
+    });
+
+    return base.sort((a, b) => b.margin - a.margin);
+  }, [monthSales]);
+
+  if (loading) {
+    return (
+      <div className="card">
+        <p className="muted">Chargement des statistiques...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="section">
       <div className="card">
-        <h3>Statistiques semaine / mois / année</h3>
+        <h3>Statistiques réelles</h3>
         <p className="muted">
-          Graphiques et comparatifs à connecter aux données Supabase.
+          Données calculées automatiquement depuis les ventes enregistrées dans Supabase.
         </p>
+      </div>
 
-        <div className="item">Classement global agents</div>
-        <div className="item">Comparatif Blois / Tours / Bourges</div>
-        <div className="item">Évolution marges et garanties</div>
+      <div className="grid cards3">
+        <div className="card">
+          <h3>Cette semaine</h3>
+          <div className="stat-value">{euro(week.ca)}</div>
+          <p className="muted">{week.salesCount} vente(s)</p>
+          <p>Marge : <strong>{euro(week.margin)}</strong></p>
+          <p>Garanties : <strong>{week.warranties}</strong></p>
+        </div>
+
+        <div className="card">
+          <h3>Ce mois</h3>
+          <div className="stat-value">{euro(month.ca)}</div>
+          <p className="muted">{month.salesCount} vente(s)</p>
+          <p>Marge : <strong>{euro(month.margin)}</strong></p>
+          <p>Garanties : <strong>{month.warranties}</strong></p>
+        </div>
+
+        <div className="card">
+          <h3>Cette année</h3>
+          <div className="stat-value">{euro(year.ca)}</div>
+          <p className="muted">{year.salesCount} vente(s)</p>
+          <p>Marge : <strong>{euro(year.margin)}</strong></p>
+          <p>Garanties : <strong>{year.warranties}</strong></p>
+        </div>
+      </div>
+
+      <div className="grid cards3">
+        <div className="card">
+          <h3>Total général</h3>
+          <div className="stat-value">{euro(total.ca)}</div>
+          <p className="muted">{total.salesCount} vente(s) au total</p>
+        </div>
+
+        <div className="card">
+          <h3>Marge moyenne</h3>
+          <div className="stat-value">{euro(Math.round(total.averageMargin))}</div>
+          <p className="muted">Moyenne par véhicule vendu</p>
+        </div>
+
+        <div className="card">
+          <h3>Taux garantie</h3>
+          <div className="stat-value">{total.warrantyRate}%</div>
+          <p className="muted">{total.warranties} garantie(s) vendue(s)</p>
+        </div>
       </div>
 
       <div className="card">
-        <h3>Objectifs</h3>
+        <h3>Classement agents du mois</h3>
 
-        <div className="rank">
-          <span>Ventes</span>
-          <strong>82%</strong>
-        </div>
+        {agentRanking.length === 0 ? (
+          <p className="muted">Aucun agent classé ce mois-ci.</p>
+        ) : (
+          agentRanking.map((agent, i) => (
+            <div className="rank" key={agent.name}>
+              <span>
+                {i === 0 ? '👑 ' : ''}
+                {i + 1}. {agent.name}
+                <span className="muted"> — {agent.agency} — {agent.sales} vente(s)</span>
+              </span>
+              <strong>{euro(agent.margin)}</strong>
+            </div>
+          ))
+        )}
+      </div>
 
-        <div className="rank">
-          <span>Marges</span>
-          <strong>92%</strong>
-        </div>
+      <div className="card">
+        <h3>Comparatif agences du mois</h3>
 
-        <div className="rank">
-          <span>Garanties</span>
-          <strong>75%</strong>
-        </div>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Agence</th>
+              <th>Ventes</th>
+              <th>CA</th>
+              <th>Marge</th>
+              <th>Garanties</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {agencyRanking.map((agency, i) => (
+              <tr key={agency.agency}>
+                <td>{i === 0 ? '👑 ' : ''}{agency.agency}</td>
+                <td>{agency.sales}</td>
+                <td>{euro(agency.ca)}</td>
+                <td><strong>{euro(agency.margin)}</strong></td>
+                <td>{agency.warranties}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
