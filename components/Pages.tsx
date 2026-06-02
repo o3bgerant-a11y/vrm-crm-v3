@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { documents, messages } from '@/lib/data';
+import { documents } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 
 const euro = (n: number) => n.toLocaleString('fr-FR') + ' €';
@@ -43,6 +43,17 @@ type VehicleSale = {
     full_name: string | null;
     agency_id: number | null;
   } | null;
+};
+
+type DirectionMessage = {
+  id: number;
+  title: string;
+  message: string;
+  target_type: string | null;
+  agency_id: number | null;
+  agent_id: number | null;
+  pinned: boolean | null;
+  created_at: string | null;
 };
 
 function saleDateToDate(value: string | null) {
@@ -784,18 +795,314 @@ export function Garanties() {
 }
 
 export function Messages() {
+  const [directionMessages, setDirectionMessages] = useState<DirectionMessage[]>([]);
+  const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<DirectionMessage | null>(null);
+
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+  const [targetType, setTargetType] = useState('all');
+  const [agencyId, setAgencyId] = useState<number | ''>('');
+  const [agentId, setAgentId] = useState<number | ''>('');
+  const [pinned, setPinned] = useState(false);
+
+  async function loadMessages() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('direction_messages')
+      .select('*')
+      .order('pinned', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erreur chargement messages direction:', error);
+      setDirectionMessages([]);
+    } else {
+      setDirectionMessages(data || []);
+    }
+
+    setLoading(false);
+  }
+
+  async function loadAgents() {
+    const { data, error } = await supabase
+      .from('agents')
+      .select('id, full_name, agency_id')
+      .order('full_name', { ascending: true });
+
+    if (error) {
+      console.error('Erreur chargement agents pour messages:', error);
+      setAgentsList([]);
+    } else {
+      setAgentsList(data || []);
+    }
+  }
+
+  useEffect(() => {
+    loadMessages();
+    loadAgents();
+  }, []);
+
+  function resetForm() {
+    setEditingMessage(null);
+    setTitle('');
+    setMessage('');
+    setTargetType('all');
+    setAgencyId('');
+    setAgentId('');
+    setPinned(false);
+  }
+
+  function openNewMessageForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEditMessageForm(item: DirectionMessage) {
+    setEditingMessage(item);
+    setTitle(item.title || '');
+    setMessage(item.message || '');
+    setTargetType(item.target_type || 'all');
+    setAgencyId(item.agency_id || '');
+    setAgentId(item.agent_id || '');
+    setPinned(Boolean(item.pinned));
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function saveMessage() {
+    if (!title.trim()) {
+      alert('Il faut indiquer un titre.');
+      return;
+    }
+
+    if (!message.trim()) {
+      alert('Il faut écrire un message.');
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      title: title.trim(),
+      message: message.trim(),
+      target_type: targetType,
+      agency_id: targetType === 'agency' ? Number(agencyId) || null : null,
+      agent_id: targetType === 'agent' ? Number(agentId) || null : null,
+      pinned,
+    };
+
+    const { error } = editingMessage
+      ? await supabase.from('direction_messages').update(payload).eq('id', editingMessage.id)
+      : await supabase.from('direction_messages').insert(payload);
+
+    if (error) {
+      console.error('Erreur sauvegarde message direction:', error);
+      alert("Erreur pendant l'enregistrement du message.");
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadMessages();
+    }
+
+    setSaving(false);
+  }
+
+  async function deleteMessage() {
+    if (!editingMessage) return;
+
+    const ok = confirm(`Supprimer le message "${editingMessage.title}" ?`);
+    if (!ok) return;
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from('direction_messages')
+      .delete()
+      .eq('id', editingMessage.id);
+
+    if (error) {
+      console.error('Erreur suppression message direction:', error);
+      alert('Erreur pendant la suppression du message.');
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadMessages();
+    }
+
+    setSaving(false);
+  }
+
+  function targetLabel(item: DirectionMessage) {
+    if (item.target_type === 'agency') return `Agence ${agencyName(item.agency_id)}`;
+
+    if (item.target_type === 'agent') {
+      const agent = agentsList.find(a => Number(a.id) === Number(item.agent_id));
+      return agent ? `Agent ${agent.full_name}` : 'Agent ciblé';
+    }
+
+    return 'Tous les agents';
+  }
+
+  function formatDate(value: string | null) {
+    if (!value) return '';
+    return new Date(value).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
   return (
     <div className="card">
-      <h3>Messages Direction</h3>
-
-      {messages.map(m => (
-        <div className="item" key={m.title}>
-          <strong>{m.pinned ? '📌 ' : ''}{m.title}</strong>
-          <p className="muted">{m.text}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <h3>Messages Direction</h3>
+          <p className="muted">Publie des annonces visibles par les agents commerciaux.</p>
         </div>
-      ))}
 
-      <button className="btn">Publier un message</button>
+        <button
+          className="btn"
+          onClick={() => {
+            if (showForm && !editingMessage) {
+              setShowForm(false);
+            } else {
+              openNewMessageForm();
+            }
+          }}
+        >
+          {showForm && !editingMessage ? 'Fermer' : '➕ Nouveau message'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
+          <h4>{editingMessage ? '✏️ Modifier le message' : '📢 Nouveau message Direction'}</h4>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <input
+              placeholder="Titre du message ex : Objectif de la semaine"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+
+            <textarea
+              placeholder="Message à afficher aux agents..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
+              <select
+                value={targetType}
+                onChange={(e) => {
+                  setTargetType(e.target.value);
+                  setAgencyId('');
+                  setAgentId('');
+                }}
+              >
+                <option value="all">Tous les agents</option>
+                <option value="agency">Une agence</option>
+                <option value="agent">Un agent précis</option>
+              </select>
+
+              {targetType === 'agency' && (
+                <select
+                  value={agencyId}
+                  onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">Sélectionner une agence</option>
+                  <option value={1}>Blois</option>
+                  <option value={2}>Tours</option>
+                  <option value={3}>Bourges</option>
+                </select>
+              )}
+
+              {targetType === 'agent' && (
+                <select
+                  value={agentId}
+                  onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">Sélectionner un agent</option>
+                  {agentsList.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.full_name} — {agencyName(agent.agency_id)}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={pinned}
+                  onChange={(e) => setPinned(e.target.checked)}
+                />
+                Épingler le message 📌
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn" onClick={saveMessage} disabled={saving}>
+                {saving ? 'Enregistrement...' : editingMessage ? '💾 Modifier le message' : '✅ Publier le message'}
+              </button>
+
+              {editingMessage && (
+                <button onClick={deleteMessage} disabled={saving}>
+                  🗑 Supprimer
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  resetForm();
+                  setShowForm(false);
+                }}
+                disabled={saving}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading && <p className="muted">Chargement des messages...</p>}
+
+      {!loading && directionMessages.length === 0 && (
+        <p className="muted">Aucun message Direction pour le moment.</p>
+      )}
+
+      {!loading && directionMessages.length > 0 && (
+        <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+          {directionMessages.map((item) => (
+            <div
+              className="item"
+              key={item.id}
+              onClick={() => openEditMessageForm(item)}
+              style={{ cursor: 'pointer' }}
+              title="Cliquer pour modifier le message"
+            >
+              <strong>{item.pinned ? '📌 ' : ''}{item.title}</strong>
+
+              <p className="muted" style={{ marginTop: 4 }}>
+                {targetLabel(item)} {item.created_at ? `— ${formatDate(item.created_at)}` : ''}
+              </p>
+
+              <p style={{ whiteSpace: 'pre-wrap' }}>
+                {item.message}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
