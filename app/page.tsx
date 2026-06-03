@@ -27,7 +27,7 @@ type CurrentAgent = {
 };
 
 const titles: Record<string, string> = {
-  dashboard: 'Tableau de bord Responsable',
+  dashboard: 'Tableau de bord',
   planning: 'Planning Benoît',
   agences: 'Agences',
   agents: 'Agents commerciaux',
@@ -180,7 +180,11 @@ export default function Home() {
 
   return (
     <div className="app">
-      <Sidebar active={active} setActive={setActive} />
+      <Sidebar
+        active={active}
+        setActive={setActive}
+        isResponsable={isResponsable}
+      />
 
       <main className="main">
         <div className="top">
