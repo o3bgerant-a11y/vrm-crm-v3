@@ -230,7 +230,12 @@ export default function Home() {
         {active === 'ventes' && <Ventes />}
         {active === 'garanties' && <Garanties />}
         {isResponsable && active === 'messages' && <Messages />}
-        {active === 'documents' && <Documents />}
+        {active === 'documents' && (
+          <Documents
+            currentAgent={currentAgent}
+            isResponsable={isResponsable}
+          />
+        )}
         {active === 'stats' && <Stats />}
         {isResponsable && active === 'parametres' && <Parametres />}
       </main>
