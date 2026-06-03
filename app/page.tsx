@@ -26,11 +26,6 @@ type CurrentAgent = {
   auth_user_id: string | null;
 };
 
-type ConnectedUser = {
-  id: string;
-  email?: string;
-} | null;
-
 const titles: Record<string, string> = {
   dashboard: 'Tableau de bord Responsable',
   planning: 'Planning Benoît',
@@ -47,46 +42,42 @@ const titles: Record<string, string> = {
 export default function Home() {
   const [active, setActive] = useState('dashboard');
   const [currentAgent, setCurrentAgent] = useState<CurrentAgent | null>(null);
-  const [connectedUser, setConnectedUser] = useState<ConnectedUser>(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   const isResponsable = currentAgent?.account_type === 'responsable';
 
-  useEffect(() => {
-    async function loadCurrentUser() {
-      setLoadingUser(true);
+  async function loadCurrentUser() {
+    setLoadingUser(true);
 
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+    const { data: userData, error: userError } = await supabase.auth.getUser();
 
-      if (userError || !userData.user) {
-        console.error('Utilisateur non connecté:', userError);
-        setConnectedUser(null);
-        setCurrentAgent(null);
-        setLoadingUser(false);
-        return;
-      }
-
-      setConnectedUser({
-        id: userData.user.id,
-        email: userData.user.email || '',
-      });
-
-      const { data: agentData, error: agentError } = await supabase
-        .from('agents')
-        .select('id, full_name, email, role, account_type, agency_id, auth_user_id')
-        .eq('auth_user_id', userData.user.id)
-        .maybeSingle();
-
-      if (agentError) {
-        console.error('Erreur recherche fiche agent:', agentError);
-        setCurrentAgent(null);
-      } else {
-        setCurrentAgent((agentData as CurrentAgent) || null);
-      }
-
+    if (userError || !userData.user) {
+      setCurrentAgent(null);
       setLoadingUser(false);
+      return;
     }
 
+    const { data: agentData, error: agentError } = await supabase
+      .from('agents')
+      .select('id, full_name, email, role, account_type, agency_id, auth_user_id')
+      .eq('auth_user_id', userData.user.id)
+      .maybeSingle();
+
+    if (agentError) {
+      console.error('Erreur recherche fiche agent:', agentError);
+      setCurrentAgent(null);
+    } else {
+      setCurrentAgent((agentData as CurrentAgent) || null);
+    }
+
+    setLoadingUser(false);
+  }
+
+  useEffect(() => {
     loadCurrentUser();
   }, []);
 
@@ -98,9 +89,36 @@ export default function Home() {
     }
   }, [currentAgent, isResponsable, active]);
 
+  async function signIn() {
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setLoginError('Indique ton email et ton mot de passe.');
+      return;
+    }
+
+    setLoginLoading(true);
+    setLoginError('');
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail.trim(),
+      password: loginPassword,
+    });
+
+    if (error) {
+      console.error('Erreur connexion:', error);
+      setLoginError('Connexion impossible. Vérifie l’email et le mot de passe.');
+    } else {
+      await loadCurrentUser();
+    }
+
+    setLoginLoading(false);
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
-    window.location.reload();
+    setCurrentAgent(null);
+    setLoginEmail('');
+    setLoginPassword('');
+    setActive('dashboard');
   }
 
   if (loadingUser) {
@@ -120,25 +138,40 @@ export default function Home() {
     return (
       <div className="app">
         <main className="main">
-          <div className="card">
-            <h2>Compte non relié</h2>
-
+          <div className="card" style={{ maxWidth: 520 }}>
+            <h2>Connexion CRM</h2>
             <p className="muted">
-              Ton compte est bien connecté, mais il n'est pas encore relié à une fiche agent dans Supabase.
+              Connecte-toi avec ton compte Responsable ou Agent.
             </p>
 
-            <div className="item" style={{ marginTop: 12, marginBottom: 12 }}>
-              <p><strong>Email connecté :</strong> {connectedUser?.email || '-'}</p>
-              <p><strong>ID connecté :</strong> {connectedUser?.id || '-'}</p>
+            <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+              />
+
+              <input
+                type="password"
+                placeholder="Mot de passe"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') signIn();
+                }}
+              />
+
+              {loginError && (
+                <p style={{ color: '#ff6b6b', fontWeight: 700 }}>
+                  {loginError}
+                </p>
+              )}
+
+              <button className="btn" onClick={signIn} disabled={loginLoading}>
+                {loginLoading ? 'Connexion...' : 'Se connecter'}
+              </button>
             </div>
-
-            <p>
-              Vérifie la colonne <strong>auth_user_id</strong> dans la table <strong>agents</strong>.
-            </p>
-
-            <button className="btn" onClick={signOut}>
-              Se déconnecter
-            </button>
           </div>
         </main>
       </div>
