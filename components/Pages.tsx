@@ -1881,8 +1881,8 @@ export function Documents({
           };
 
       const { error } = editingDocument && isResponsable
-        ? await supabase.from('agent_documents').update(payload).eq('id', editingDocument.id)
-        : await supabase.from('agent_documents').insert(payload);
+        ? await supabase.from('agent_documents').update(payload as any).eq('id', editingDocument.id)
+        : await supabase.from('agent_documents').insert(payload as any);
 
       if (error) {
         console.error('Erreur sauvegarde document:', error);
