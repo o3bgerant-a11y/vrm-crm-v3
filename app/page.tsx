@@ -48,6 +48,9 @@ export default function Home() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
+  const [documentsNotificationCount, setDocumentsNotificationCount] = useState(0);
+  const [messagesNotificationCount, setMessagesNotificationCount] = useState(0);
+
   const isResponsable = currentAgent?.account_type === 'responsable';
 
   async function loadCurrentUser() {
@@ -77,9 +80,98 @@ export default function Home() {
     setLoadingUser(false);
   }
 
+  async function loadNotifications(agent: CurrentAgent | null) {
+    if (!agent) {
+      setDocumentsNotificationCount(0);
+      setMessagesNotificationCount(0);
+      return;
+    }
+
+    const responsableMode = agent.account_type === 'responsable';
+
+    const { data: documentsData, error: documentsError } = await supabase
+      .from('agent_documents')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (documentsError) {
+      console.error('Erreur chargement notifications documents:', documentsError);
+      setDocumentsNotificationCount(0);
+    } else {
+      const documents = documentsData || [];
+
+      const count = documents.filter((doc: any) => {
+        const status = doc.document_status || 'nouveau';
+        const isNew = status === 'nouveau';
+
+        if (!isNew) return false;
+
+        if (responsableMode) {
+          return doc.sent_to_responsable === true || doc.target_type === 'responsable';
+        }
+
+        if (doc.sent_to_responsable === true || doc.target_type === 'responsable') {
+          return false;
+        }
+
+        if (doc.target_type === 'all' || !doc.target_type) return true;
+        if (doc.target_type === 'agency') return Number(doc.agency_id) === Number(agent.agency_id);
+        if (doc.target_type === 'agent') return Number(doc.agent_id) === Number(agent.id);
+
+        return false;
+      }).length;
+
+      setDocumentsNotificationCount(count);
+    }
+
+    const { data: messagesData, error: messagesError } = await supabase
+      .from('direction_messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (messagesError) {
+      console.error('Erreur chargement notifications messages:', messagesError);
+      setMessagesNotificationCount(0);
+    } else {
+      const messages = messagesData || [];
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const count = messages.filter((message: any) => {
+        if (responsableMode) return false;
+
+        const createdAt = message.created_at ? new Date(message.created_at) : null;
+        const isRecent = createdAt ? createdAt >= sevenDaysAgo : true;
+
+        if (!isRecent) return false;
+
+        if (message.target_type === 'all' || !message.target_type) return true;
+        if (message.target_type === 'agency') return Number(message.agency_id) === Number(agent.agency_id);
+        if (message.target_type === 'agent') return Number(message.agent_id) === Number(agent.id);
+
+        return false;
+      }).length;
+
+      setMessagesNotificationCount(count);
+    }
+  }
+
   useEffect(() => {
     loadCurrentUser();
   }, []);
+
+  useEffect(() => {
+    if (!currentAgent) return;
+
+    loadNotifications(currentAgent);
+
+    const interval = setInterval(() => {
+      loadNotifications(currentAgent);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [currentAgent]);
 
   useEffect(() => {
     if (!currentAgent) return;
@@ -118,6 +210,8 @@ export default function Home() {
     setCurrentAgent(null);
     setLoginEmail('');
     setLoginPassword('');
+    setDocumentsNotificationCount(0);
+    setMessagesNotificationCount(0);
     setActive('dashboard');
   }
 
@@ -184,6 +278,8 @@ export default function Home() {
         active={active}
         setActive={setActive}
         isResponsable={isResponsable}
+        documentsNotificationCount={documentsNotificationCount}
+        messagesNotificationCount={messagesNotificationCount}
       />
 
       <main className="main">
@@ -237,6 +333,7 @@ export default function Home() {
         )}
         {active === 'documents' && (
           <Documents
+            key={`documents-${currentAgent.id}-${isResponsable ? 'responsable' : 'agent'}`}
             currentAgent={currentAgent}
             isResponsable={isResponsable}
           />
