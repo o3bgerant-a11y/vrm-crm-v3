@@ -45,7 +45,7 @@ export default function Sidebar({
     return isResponsable;
   });
 
-  function getCount(id: string) {
+  function notificationCount(id: string) {
     if (id === 'documents') return documentsNotificationCount;
     if (id === 'messages') return messagesNotificationCount;
     return 0;
@@ -66,7 +66,7 @@ export default function Sidebar({
 
       <div className="nav">
         {visibleItems.map(([id, label, Icon]) => {
-          const count = getCount(id);
+          const count = notificationCount(id);
 
           return (
             <button
@@ -85,15 +85,16 @@ export default function Sidebar({
                   style={{
                     minWidth: 20,
                     height: 20,
+                    padding: '0 6px',
                     borderRadius: 999,
                     background: '#ef4444',
-                    color: '#fff',
+                    color: '#ffffff',
                     fontSize: 11,
-                    fontWeight: 700,
-                    display: 'flex',
+                    fontWeight: 800,
+                    display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '0 6px'
+                    marginLeft: 6,
                   }}
                 >
                   {count > 9 ? '9+' : count}
