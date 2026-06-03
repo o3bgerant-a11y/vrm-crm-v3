@@ -84,7 +84,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentAgent) return;
 
-    if (!isResponsable && ['agences', 'agents', 'messages', 'parametres'].includes(active)) {
+    if (!isResponsable && ['agences', 'agents', 'parametres'].includes(active)) {
       setActive('dashboard');
     }
   }, [currentAgent, isResponsable, active]);
@@ -229,7 +229,12 @@ export default function Home() {
         {isResponsable && active === 'agents' && <Agents />}
         {active === 'ventes' && <Ventes />}
         {active === 'garanties' && <Garanties />}
-        {isResponsable && active === 'messages' && <Messages />}
+        {active === 'messages' && (
+          <Messages
+            currentAgent={currentAgent}
+            isResponsable={isResponsable}
+          />
+        )}
         {active === 'documents' && (
           <Documents
             currentAgent={currentAgent}
