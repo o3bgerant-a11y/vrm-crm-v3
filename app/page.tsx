@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import Planning from '@/components/Planning';
 import Parametres from '@/components/Parametres';
+import { supabase } from '@/lib/supabase';
 import {
   Agences,
   Agents,
@@ -15,8 +16,18 @@ import {
   Stats
 } from '@/components/Pages';
 
+type CurrentAgent = {
+  id: number;
+  full_name: string;
+  email: string | null;
+  role: string | null;
+  account_type: string | null;
+  agency_id: number | null;
+  auth_user_id: string | null;
+};
+
 const titles: Record<string, string> = {
-  dashboard: 'Tableau de bord Patron',
+  dashboard: 'Tableau de bord Responsable',
   planning: 'Planning Benoît',
   agences: 'Agences',
   agents: 'Agents commerciaux',
@@ -30,6 +41,81 @@ const titles: Record<string, string> = {
 
 export default function Home() {
   const [active, setActive] = useState('dashboard');
+  const [currentAgent, setCurrentAgent] = useState<CurrentAgent | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+
+  const isResponsable = currentAgent?.account_type === 'responsable';
+
+  useEffect(() => {
+    async function loadCurrentUser() {
+      setLoadingUser(true);
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !userData.user) {
+        console.error('Utilisateur non connecté:', userError);
+        setCurrentAgent(null);
+        setLoadingUser(false);
+        return;
+      }
+
+      const { data: agentData, error: agentError } = await supabase
+        .from('agents')
+        .select('id, full_name, email, role, account_type, agency_id, auth_user_id')
+        .eq('auth_user_id', userData.user.id)
+        .single();
+
+      if (agentError) {
+        console.error('Aucune fiche agent reliée à ce compte:', agentError);
+        setCurrentAgent(null);
+      } else {
+        setCurrentAgent(agentData as CurrentAgent);
+      }
+
+      setLoadingUser(false);
+    }
+
+    loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    if (!currentAgent) return;
+
+    if (!isResponsable && ['agences', 'agents', 'messages', 'documents', 'parametres'].includes(active)) {
+      setActive('dashboard');
+    }
+  }, [currentAgent, isResponsable, active]);
+
+  if (loadingUser) {
+    return (
+      <div className="app">
+        <main className="main">
+          <div className="card">
+            <h2>Chargement du compte...</h2>
+            <p className="muted">Vérification du profil connecté.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!currentAgent) {
+    return (
+      <div className="app">
+        <main className="main">
+          <div className="card">
+            <h2>Compte non relié</h2>
+            <p className="muted">
+              Ton compte est bien connecté, mais il n'est pas encore relié à une fiche agent dans Supabase.
+            </p>
+            <p>
+              Vérifie la colonne <strong>auth_user_id</strong> dans la table <strong>agents</strong>.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -39,7 +125,9 @@ export default function Home() {
         <div className="top">
           <div>
             <h2>{titles[active]}</h2>
-            <p>CRM V3 Vroom Market — Blois, Tours, Bourges</p>
+            <p>
+              CRM V3 Vroom Market — {currentAgent.full_name} — {isResponsable ? 'Responsable' : 'Agent commercial'}
+            </p>
           </div>
 
           <div className="filters">
@@ -47,30 +135,35 @@ export default function Home() {
             <select><option>Mai</option></select>
             <select><option>S22</option></select>
 
-            <select>
-              <option>Toutes les agences</option>
-              <option>Blois</option>
-              <option>Tours</option>
-              <option>Bourges</option>
-            </select>
+            {isResponsable && (
+              <>
+                <select>
+                  <option>Toutes les agences</option>
+                  <option>Blois</option>
+                  <option>Tours</option>
+                  <option>Bourges</option>
+                </select>
 
-            <select>
-              <option>Tous les agents</option>
-              <option>Maveryk</option>
-            </select>
+                <select>
+                  <option>Tous les agents</option>
+                  <option>Maveryk</option>
+                </select>
+              </>
+            )}
           </div>
         </div>
 
         {active === 'dashboard' && <Dashboard />}
         {active === 'planning' && <Planning />}
-        {active === 'agences' && <Agences />}
-        {active === 'agents' && <Agents />}
+
+        {isResponsable && active === 'agences' && <Agences />}
+        {isResponsable && active === 'agents' && <Agents />}
         {active === 'ventes' && <Ventes />}
         {active === 'garanties' && <Garanties />}
-        {active === 'messages' && <Messages />}
-        {active === 'documents' && <Documents />}
+        {isResponsable && active === 'messages' && <Messages />}
+        {isResponsable && active === 'documents' && <Documents />}
         {active === 'stats' && <Stats />}
-        {active === 'parametres' && <Parametres />}
+        {isResponsable && active === 'parametres' && <Parametres />}
       </main>
     </div>
   );
