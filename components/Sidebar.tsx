@@ -15,25 +15,32 @@ import {
 } from 'lucide-react';
 
 const items = [
-  ['dashboard', 'Tableau de bord', Home],
-  ['planning', 'Planning Benoît', CalendarDays],
-  ['agences', 'Agences', Store],
-  ['agents', 'Agents commerciaux', Users],
-  ['ventes', 'Ventes', Car],
-  ['garanties', 'Garanties', ShieldCheck],
-  ['messages', 'Messages Direction', Megaphone],
-  ['documents', 'Documents', FileText],
-  ['stats', 'Statistiques', BarChart3],
-  ['parametres', 'Paramètres', Settings],
+  ['dashboard', 'Tableau de bord', Home, 'all'],
+  ['planning', 'Planning Benoît', CalendarDays, 'all'],
+  ['agences', 'Agences', Store, 'responsable'],
+  ['agents', 'Agents commerciaux', Users, 'responsable'],
+  ['ventes', 'Ventes', Car, 'all'],
+  ['garanties', 'Garanties', ShieldCheck, 'all'],
+  ['messages', 'Messages Direction', Megaphone, 'responsable'],
+  ['documents', 'Documents', FileText, 'responsable'],
+  ['stats', 'Statistiques', BarChart3, 'all'],
+  ['parametres', 'Paramètres', Settings, 'responsable'],
 ] as const;
 
 export default function Sidebar({
   active,
-  setActive
+  setActive,
+  isResponsable = true
 }: {
   active: string;
   setActive: (v: string) => void;
+  isResponsable?: boolean;
 }) {
+  const visibleItems = items.filter(([, , , access]) => {
+    if (access === 'all') return true;
+    return isResponsable;
+  });
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -43,12 +50,12 @@ export default function Sidebar({
 
         <div>
           <h1>Vroom Market</h1>
-          <p>CRM Responsable</p>
+          <p>{isResponsable ? 'CRM Responsable' : 'CRM Agent'}</p>
         </div>
       </div>
 
       <div className="nav">
-        {items.map(([id, label, Icon]) => (
+        {visibleItems.map(([id, label, Icon]) => (
           <button
             key={id}
             onClick={() => setActive(id)}
