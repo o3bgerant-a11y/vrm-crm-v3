@@ -22,7 +22,7 @@ const items = [
   ['ventes', 'Ventes', Car, 'all'],
   ['garanties', 'Garanties', ShieldCheck, 'all'],
   ['messages', 'Messages Direction', Megaphone, 'responsable'],
-  ['documents', 'Documents', FileText, 'responsable'],
+  ['documents', 'Documents', FileText, 'all'],
   ['stats', 'Statistiques', BarChart3, 'all'],
   ['parametres', 'Paramètres', Settings, 'responsable'],
 ] as const;
