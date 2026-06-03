@@ -26,6 +26,11 @@ type CurrentAgent = {
   auth_user_id: string | null;
 };
 
+type ConnectedUser = {
+  id: string;
+  email?: string;
+} | null;
+
 const titles: Record<string, string> = {
   dashboard: 'Tableau de bord Responsable',
   planning: 'Planning Benoît',
@@ -42,6 +47,7 @@ const titles: Record<string, string> = {
 export default function Home() {
   const [active, setActive] = useState('dashboard');
   const [currentAgent, setCurrentAgent] = useState<CurrentAgent | null>(null);
+  const [connectedUser, setConnectedUser] = useState<ConnectedUser>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
   const isResponsable = currentAgent?.account_type === 'responsable';
@@ -54,22 +60,28 @@ export default function Home() {
 
       if (userError || !userData.user) {
         console.error('Utilisateur non connecté:', userError);
+        setConnectedUser(null);
         setCurrentAgent(null);
         setLoadingUser(false);
         return;
       }
 
+      setConnectedUser({
+        id: userData.user.id,
+        email: userData.user.email || '',
+      });
+
       const { data: agentData, error: agentError } = await supabase
         .from('agents')
         .select('id, full_name, email, role, account_type, agency_id, auth_user_id')
         .eq('auth_user_id', userData.user.id)
-        .single();
+        .maybeSingle();
 
       if (agentError) {
-        console.error('Aucune fiche agent reliée à ce compte:', agentError);
+        console.error('Erreur recherche fiche agent:', agentError);
         setCurrentAgent(null);
       } else {
-        setCurrentAgent(agentData as CurrentAgent);
+        setCurrentAgent((agentData as CurrentAgent) || null);
       }
 
       setLoadingUser(false);
@@ -85,6 +97,11 @@ export default function Home() {
       setActive('dashboard');
     }
   }, [currentAgent, isResponsable, active]);
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    window.location.reload();
+  }
 
   if (loadingUser) {
     return (
@@ -105,12 +122,23 @@ export default function Home() {
         <main className="main">
           <div className="card">
             <h2>Compte non relié</h2>
+
             <p className="muted">
               Ton compte est bien connecté, mais il n'est pas encore relié à une fiche agent dans Supabase.
             </p>
+
+            <div className="item" style={{ marginTop: 12, marginBottom: 12 }}>
+              <p><strong>Email connecté :</strong> {connectedUser?.email || '-'}</p>
+              <p><strong>ID connecté :</strong> {connectedUser?.id || '-'}</p>
+            </div>
+
             <p>
               Vérifie la colonne <strong>auth_user_id</strong> dans la table <strong>agents</strong>.
             </p>
+
+            <button className="btn" onClick={signOut}>
+              Se déconnecter
+            </button>
           </div>
         </main>
       </div>
@@ -150,6 +178,10 @@ export default function Home() {
                 </select>
               </>
             )}
+
+            <button onClick={signOut}>
+              Déconnexion
+            </button>
           </div>
         </div>
 
