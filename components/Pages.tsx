@@ -1454,7 +1454,13 @@ export function Garanties() {
   );
 }
 
-export function Messages() {
+export function Messages({
+  currentAgent = null,
+  isResponsable = true,
+}: {
+  currentAgent?: CurrentAgentForPages | null;
+  isResponsable?: boolean;
+} = {}) {
   const [directionMessages, setDirectionMessages] = useState<DirectionMessage[]>([]);
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1519,11 +1525,14 @@ export function Messages() {
   }
 
   function openNewMessageForm() {
+    if (!isResponsable) return;
     resetForm();
     setShowForm(true);
   }
 
   function openEditMessageForm(item: DirectionMessage) {
+    if (!isResponsable) return;
+
     setEditingMessage(item);
     setTitle(item.title || '');
     setMessage(item.message || '');
@@ -1536,6 +1545,8 @@ export function Messages() {
   }
 
   async function saveMessage() {
+    if (!isResponsable) return;
+
     if (!title.trim()) {
       alert('Il faut indiquer un titre.');
       return;
@@ -1574,7 +1585,7 @@ export function Messages() {
   }
 
   async function deleteMessage() {
-    if (!editingMessage) return;
+    if (!editingMessage || !isResponsable) return;
 
     const ok = confirm(`Supprimer le message "${editingMessage.title}" ?`);
     if (!ok) return;
@@ -1620,29 +1631,46 @@ export function Messages() {
     });
   }
 
+  const visibleMessages = directionMessages.filter((item) => {
+    if (isResponsable) return true;
+    if (!currentAgent) return false;
+
+    if (item.target_type === 'all' || !item.target_type) return true;
+    if (item.target_type === 'agency') return Number(item.agency_id) === Number(currentAgent.agency_id);
+    if (item.target_type === 'agent') return Number(item.agent_id) === Number(currentAgent.id);
+
+    return false;
+  });
+
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
-          <h3>Messages Direction</h3>
-          <p className="muted">Publie des annonces visibles par les agents commerciaux.</p>
+          <h3>{isResponsable ? 'Messages Direction' : 'Messages de la Direction'}</h3>
+          <p className="muted">
+            {isResponsable
+              ? 'Publie des annonces visibles par tous les agents, une agence ou un agent précis.'
+              : 'Consulte les annonces et consignes envoyées par la Direction.'}
+          </p>
         </div>
 
-        <button
-          className="btn"
-          onClick={() => {
-            if (showForm && !editingMessage) {
-              setShowForm(false);
-            } else {
-              openNewMessageForm();
-            }
-          }}
-        >
-          {showForm && !editingMessage ? 'Fermer' : 'Nouveau message'}
-        </button>
+        {isResponsable && (
+          <button
+            className="btn"
+            onClick={() => {
+              if (showForm && !editingMessage) {
+                setShowForm(false);
+              } else {
+                openNewMessageForm();
+              }
+            }}
+          >
+            {showForm && !editingMessage ? 'Fermer' : 'Nouveau message'}
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {showForm && isResponsable && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
           <h4>{editingMessage ? 'Modifier le message' : 'Nouveau message Direction'}</h4>
 
@@ -1695,12 +1723,18 @@ export function Messages() {
       )}
 
       {loading && <p className="muted">Chargement des messages...</p>}
-      {!loading && directionMessages.length === 0 && <p className="muted">Aucun message Direction pour le moment.</p>}
+      {!loading && visibleMessages.length === 0 && <p className="muted">Aucun message Direction pour le moment.</p>}
 
-      {!loading && directionMessages.length > 0 && (
+      {!loading && visibleMessages.length > 0 && (
         <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-          {directionMessages.map((item) => (
-            <div className="item" key={item.id} onClick={() => openEditMessageForm(item)} style={{ cursor: 'pointer' }} title="Cliquer pour modifier le message">
+          {visibleMessages.map((item) => (
+            <div
+              className="item"
+              key={item.id}
+              onClick={() => openEditMessageForm(item)}
+              style={{ cursor: isResponsable ? 'pointer' : 'default' }}
+              title={isResponsable ? 'Cliquer pour modifier le message' : ''}
+            >
               <strong>{item.pinned ? '📌 ' : ''}{item.title}</strong>
               <p className="muted" style={{ marginTop: 4 }}>
                 {targetLabel(item)} {item.created_at ? `— ${formatDate(item.created_at)}` : ''}
@@ -1713,6 +1747,7 @@ export function Messages() {
     </div>
   );
 }
+
 
 export function Documents({
   currentAgent = null,
