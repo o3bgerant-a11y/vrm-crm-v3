@@ -1456,7 +1456,7 @@ export function Garanties() {
 
 export function Messages({
   currentAgent = null,
-  isResponsable = true,
+  isResponsable = false,
 }: {
   currentAgent?: CurrentAgentForPages | null;
   isResponsable?: boolean;
@@ -1751,7 +1751,7 @@ export function Messages({
 
 export function Documents({
   currentAgent = null,
-  isResponsable = true,
+  isResponsable = false,
 }: {
   currentAgent?: CurrentAgentForPages | null;
   isResponsable?: boolean;
