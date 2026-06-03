@@ -1769,7 +1769,7 @@ export function Documents({
   const [description, setDescription] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [targetType, setTargetType] = useState('all');
+  const [targetType, setTargetType] = useState(isResponsable ? 'all' : 'responsable');
   const [agencyId, setAgencyId] = useState<number | ''>('');
   const [agentId, setAgentId] = useState<number | ''>('');
   const [documentStatus, setDocumentStatus] = useState('nouveau');
@@ -1786,7 +1786,7 @@ export function Documents({
       console.error('Erreur chargement documents agents:', error);
       setDocumentsList([]);
     } else {
-      setDocumentsList(data || []);
+      setDocumentsList((data || []) as AgentDocument[]);
     }
 
     setLoading(false);
@@ -1838,7 +1838,7 @@ export function Documents({
     setDescription(item.description || '');
     setFileUrl(item.file_url || '');
     setSelectedFile(null);
-    setTargetType(item.target_type || 'all');
+    setTargetType(item.sent_to_responsable || item.target_type === 'responsable' ? 'responsable' : item.target_type || 'all');
     setAgencyId(item.agency_id || '');
     setAgentId(item.agent_id || '');
     setDocumentStatus(item.document_status || 'nouveau');
@@ -1886,6 +1886,16 @@ export function Documents({
       return;
     }
 
+    if (isResponsable && targetType === 'agency' && !agencyId) {
+      alert('Il faut sélectionner une agence.');
+      return;
+    }
+
+    if (isResponsable && targetType === 'agent' && !agentId) {
+      alert('Il faut sélectionner un agent.');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -1900,6 +1910,8 @@ export function Documents({
             target_type: targetType,
             agency_id: targetType === 'agency' ? Number(agencyId) || null : null,
             agent_id: targetType === 'agent' ? Number(agentId) || null : null,
+            sender_agent_id: null,
+            sent_to_responsable: targetType === 'responsable',
             document_status: documentStatus || 'nouveau',
           }
         : {
@@ -1911,8 +1923,8 @@ export function Documents({
             agency_id: currentAgent?.agency_id || null,
             agent_id: null,
             sender_agent_id: currentAgent?.id || null,
-            document_status: 'nouveau',
             sent_to_responsable: true,
+            document_status: 'nouveau',
           };
 
       const { error } = editingDocument && isResponsable
@@ -1921,7 +1933,7 @@ export function Documents({
 
       if (error) {
         console.error('Erreur sauvegarde document:', error);
-        alert("Erreur pendant l'enregistrement du document.");
+        alert("Erreur pendant l'enregistrement du document. Vérifie que les colonnes sender_agent_id, sent_to_responsable et document_status existent dans Supabase.");
       } else {
         resetForm();
         setShowForm(false);
@@ -1979,7 +1991,7 @@ export function Documents({
   function senderLabel(item: AgentDocument) {
     if (!item.sender_agent_id) return null;
     const agent = agentsList.find(a => Number(a.id) === Number(item.sender_agent_id));
-    return agent ? agent.full_name : 'Agent';
+    return agent ? agent.full_name : `Agent #${item.sender_agent_id}`;
   }
 
   function targetLabel(item: AgentDocument) {
@@ -2011,17 +2023,22 @@ export function Documents({
     if (isResponsable) return true;
     if (!currentAgent) return false;
 
-    if (Number(item.sender_agent_id) === Number(currentAgent.id)) return true;
-    if (item.target_type === 'all') return true;
+    if (item.sent_to_responsable || item.target_type === 'responsable') {
+      return Number(item.sender_agent_id) === Number(currentAgent.id);
+    }
+
+    if (item.target_type === 'all' || !item.target_type) return true;
     if (item.target_type === 'agency') return Number(item.agency_id) === Number(currentAgent.agency_id);
     if (item.target_type === 'agent') return Number(item.agent_id) === Number(currentAgent.id);
 
     return false;
   });
 
-  const newDocumentsCount = documentsList.filter((item) => (
-    isResponsable &&
-    Boolean(item.sent_to_responsable) &&
+  const receivedDocuments = documentsList.filter((item) => (
+    Boolean(item.sent_to_responsable) || item.target_type === 'responsable'
+  ));
+
+  const newDocumentsCount = receivedDocuments.filter((item) => (
     (item.document_status || 'nouveau') === 'nouveau'
   )).length;
 
@@ -2029,7 +2046,7 @@ export function Documents({
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
-          <h3>{isResponsable ? 'Documents agents' : 'Mes documents'}</h3>
+          <h3>{isResponsable ? `Documents agents${newDocumentsCount > 0 ? ` 🔔 ${newDocumentsCount}` : ''}` : 'Mes documents'}</h3>
           <p className="muted">
             {isResponsable
               ? 'Documents partagés avec les agents et documents reçus des agents.'
@@ -2051,14 +2068,14 @@ export function Documents({
             ? 'Fermer'
             : isResponsable
               ? 'Ajouter un document'
-              : 'Envoyer un document'}
+              : 'Envoyer au Responsable'}
         </button>
       </div>
 
       {isResponsable && newDocumentsCount > 0 && (
         <div className="item" style={{ marginTop: 14, border: '1px solid rgba(255,255,255,.25)' }}>
           <strong>🔔 {newDocumentsCount} nouveau(x) document(s) reçu(s)</strong>
-          <p className="muted">Des agents t'ont envoyé des documents à traiter.</p>
+          <p className="muted">Des agents t'ont envoyé des documents. Passe-les en “Vu” ou “Traité” après contrôle.</p>
         </div>
       )}
 
@@ -2111,18 +2128,24 @@ export function Documents({
             )}
 
             <textarea
-              placeholder={isResponsable ? 'Description ou consigne liée au document...' : 'Message au Responsable...'}
+              placeholder={isResponsable ? 'Description ou consigne pour les agents...' : 'Message au Responsable, commentaire, information utile...'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
 
             {isResponsable && (
               <>
+                <div className="item">
+                  <strong>Destination du document</strong>
+                  <p className="muted">Choisis qui doit voir le document. “Envoyé au Responsable” sert uniquement aux documents remontés par les agents.</p>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
                   <select value={targetType} onChange={(e) => { setTargetType(e.target.value); setAgencyId(''); setAgentId(''); }}>
                     <option value="all">Tous les agents</option>
                     <option value="agency">Une agence</option>
                     <option value="agent">Un agent précis</option>
+                    <option value="responsable">Envoyé au Responsable</option>
                   </select>
 
                   {targetType === 'agency' && (
@@ -2153,9 +2176,9 @@ export function Documents({
             )}
 
             {!isResponsable && (
-              <div className="item">
+              <div className="item" style={{ border: '1px solid rgba(255,255,255,.25)' }}>
                 <strong>Destinataire : Responsable</strong>
-                <p className="muted">Le document sera visible par la Direction uniquement.</p>
+                <p className="muted">Ce document sera privé : il sera visible uniquement par toi et par la Direction.</p>
               </div>
             )}
 
@@ -2192,7 +2215,7 @@ export function Documents({
               title={isResponsable ? 'Cliquer pour modifier le document' : ''}
             >
               <strong>
-                {item.sent_to_responsable && (item.document_status || 'nouveau') === 'nouveau' ? '🔔 ' : ''}
+                {(item.sent_to_responsable || item.target_type === 'responsable') && (item.document_status || 'nouveau') === 'nouveau' ? '🔔 ' : ''}
                 {item.title}
               </strong>
 
@@ -2200,7 +2223,7 @@ export function Documents({
                 {item.category || 'Général'} — {targetLabel(item)} {item.created_at ? `— ${formatDate(item.created_at)}` : ''}
               </p>
 
-              {isResponsable && item.sent_to_responsable && (
+              {isResponsable && (item.sent_to_responsable || item.target_type === 'responsable') && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, marginBottom: 8 }} onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => markDocumentStatus(item, 'nouveau')} disabled={(item.document_status || 'nouveau') === 'nouveau'}>Nouveau</button>
                   <button onClick={() => markDocumentStatus(item, 'vu')} disabled={item.document_status === 'vu'}>Vu</button>
