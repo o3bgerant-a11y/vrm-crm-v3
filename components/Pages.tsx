@@ -30,6 +30,11 @@ type AgentOption = {
   contract_type?: string | null;
   role?: string | null;
   notes?: string | null;
+  objective_sales?: number | null;
+  objective_margin?: number | null;
+  objective_warranties?: number | null;
+  vacation_notes?: string | null;
+  absence_notes?: string | null;
 };
 
 type VehicleSale = {
@@ -231,6 +236,7 @@ export function Agences() {
 export function Agents() {
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [sales, setSales] = useState<VehicleSale[]>([]);
+  const [documentsList, setDocumentsList] = useState<AgentDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -250,6 +256,11 @@ export function Agents() {
   const [contractType, setContractType] = useState('');
   const [role, setRole] = useState('Agent commercial');
   const [notes, setNotes] = useState('');
+  const [objectiveSales, setObjectiveSales] = useState('');
+  const [objectiveMargin, setObjectiveMargin] = useState('');
+  const [objectiveWarranties, setObjectiveWarranties] = useState('');
+  const [vacationNotes, setVacationNotes] = useState('');
+  const [absenceNotes, setAbsenceNotes] = useState('');
 
   async function loadAgentsPage() {
     setLoading(true);
@@ -270,6 +281,11 @@ export function Agents() {
       `)
       .order('id', { ascending: false });
 
+    const { data: documentsData, error: documentsError } = await supabase
+      .from('agent_documents')
+      .select('*')
+      .order('created_at', { ascending: false });
+
     if (agentsError) {
       console.error('Erreur chargement agents:', agentsError);
       setAgentsList([]);
@@ -282,6 +298,13 @@ export function Agents() {
       setSales([]);
     } else {
       setSales(salesData || []);
+    }
+
+    if (documentsError) {
+      console.error('Erreur chargement documents agents dans fiche agent:', documentsError);
+      setDocumentsList([]);
+    } else {
+      setDocumentsList(documentsData || []);
     }
 
     setLoading(false);
@@ -306,6 +329,11 @@ export function Agents() {
     setContractType('');
     setRole('Agent commercial');
     setNotes('');
+    setObjectiveSales('');
+    setObjectiveMargin('');
+    setObjectiveWarranties('');
+    setVacationNotes('');
+    setAbsenceNotes('');
   }
 
   function openNewAgentForm() {
@@ -328,6 +356,11 @@ export function Agents() {
     setContractType(agent.contract_type || '');
     setRole(agent.role || 'Agent commercial');
     setNotes(agent.notes || '');
+    setObjectiveSales(String(agent.objective_sales ?? ''));
+    setObjectiveMargin(String(agent.objective_margin ?? ''));
+    setObjectiveWarranties(String(agent.objective_warranties ?? ''));
+    setVacationNotes(agent.vacation_notes || '');
+    setAbsenceNotes(agent.absence_notes || '');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -359,6 +392,11 @@ export function Agents() {
       contract_type: contractType.trim() || null,
       role: role.trim() || 'Agent commercial',
       notes: notes.trim() || null,
+      objective_sales: objectiveSales ? Number(objectiveSales) : 0,
+      objective_margin: objectiveMargin ? Number(objectiveMargin) : 0,
+      objective_warranties: objectiveWarranties ? Number(objectiveWarranties) : 0,
+      vacation_notes: vacationNotes.trim() || null,
+      absence_notes: absenceNotes.trim() || null,
     };
 
     const { error } = editingAgent
@@ -367,7 +405,7 @@ export function Agents() {
 
     if (error) {
       console.error('Erreur sauvegarde agent:', error);
-      alert("Erreur pendant l'enregistrement de l'agent. Vérifie que les colonnes phone, email, address, postal_code, city, birth_date, entry_date, status, contract_type, role et notes existent bien dans la table agents.");
+      alert("Erreur pendant l'enregistrement de l'agent. Vérifie que les colonnes objectifs, congés et absences existent bien dans la table agents.");
     } else {
       resetForm();
       setShowForm(false);
@@ -402,19 +440,47 @@ export function Agents() {
     setSaving(false);
   }
 
+  function progressPercent(value: number, objective: number) {
+    if (!objective || objective <= 0) return 0;
+    return Math.min(100, Math.round((value / objective) * 100));
+  }
+
+  function formatDate(value: string | null) {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('fr-FR');
+  }
+
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const monthStart = startOfMonth(now);
+  const yearStart = startOfYear(now);
+
   const agentRows = useMemo(() => {
     const rows = agentsList.map((agent) => {
       const agentSales = sales.filter(sale => Number(sale.agent_id) === Number(agent.id));
+      const weekSales = agentSales.filter(sale => isAfterOrEqual(saleDateToDate(sale.sale_date), weekStart));
+      const monthSales = agentSales.filter(sale => isAfterOrEqual(saleDateToDate(sale.sale_date), monthStart));
+      const yearSales = agentSales.filter(sale => isAfterOrEqual(saleDateToDate(sale.sale_date), yearStart));
+
+      const totalStats = calculateStats(agentSales);
+      const weekStats = calculateStats(weekSales);
+      const monthStats = calculateStats(monthSales);
+      const yearStats = calculateStats(yearSales);
 
       return {
         ...agent,
         id: agent.id,
         name: agent.full_name,
         agency: agencyName(agent.agency_id),
-        sales: agentSales.length,
-        ca: agentSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0),
-        margin: agentSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0),
-        warranties: agentSales.filter(sale => sale.warranty_sold).length,
+        agentSales,
+        weekStats,
+        monthStats,
+        yearStats,
+        sales: totalStats.salesCount,
+        ca: totalStats.ca,
+        margin: totalStats.margin,
+        warranties: totalStats.warranties,
+        warrantyRate: totalStats.warrantyRate,
       };
     });
 
@@ -439,12 +505,30 @@ export function Agents() {
       .sort((a, b) => a.rankGlobal - b.rankGlobal);
   }, [agentsList, sales]);
 
+  const selectedAgentStats = editingAgent
+    ? agentRows.find(a => Number(a.id) === Number(editingAgent.id))
+    : null;
+
+  const selectedAgentDocuments = editingAgent
+    ? documentsList.filter((doc) => {
+        if (doc.target_type === 'all') return true;
+        if (doc.target_type === 'agency') return Number(doc.agency_id) === Number(editingAgent.agency_id);
+        if (doc.target_type === 'agent') return Number(doc.agent_id) === Number(editingAgent.id);
+        return false;
+      })
+    : [];
+
+  const selectedAgentSales = selectedAgentStats?.agentSales || [];
+  const monthlyObjectiveSales = Number(objectiveSales || editingAgent?.objective_sales || 0);
+  const monthlyObjectiveMargin = Number(objectiveMargin || editingAgent?.objective_margin || 0);
+  const monthlyObjectiveWarranties = Number(objectiveWarranties || editingAgent?.objective_warranties || 0);
+
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
           <h3>Agents commerciaux</h3>
-          <p className="muted">Clique sur un agent pour ouvrir et modifier sa fiche complète.</p>
+          <p className="muted">Clique sur un agent pour ouvrir sa fiche complète : RH, objectifs, ventes, documents et classements.</p>
         </div>
 
         <button
@@ -465,7 +549,34 @@ export function Agents() {
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
           <h4>{editingAgent ? `Fiche agent : ${editingAgent.full_name}` : 'Nouvel agent commercial'}</h4>
 
+          {editingAgent && selectedAgentStats && (
+            <div className="grid cards3" style={{ marginBottom: 14 }}>
+              <div className="card">
+                <h3>{selectedAgentStats.rankGlobal === 1 ? '👑 ' : ''}Classement global</h3>
+                <div className="stat-value">#{selectedAgentStats.rankGlobal}</div>
+                <p className="muted">Tous agents confondus</p>
+              </div>
+
+              <div className="card">
+                <h3>Classement agence</h3>
+                <div className="stat-value">#{selectedAgentStats.rankAgency}</div>
+                <p className="muted">Agence {selectedAgentStats.agency}</p>
+              </div>
+
+              <div className="card">
+                <h3>Taux garantie</h3>
+                <div className="stat-value">{selectedAgentStats.warrantyRate}%</div>
+                <p className="muted">{selectedAgentStats.warranties} garantie(s) sur {selectedAgentStats.sales} vente(s)</p>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gap: 10 }}>
+            <div className="item">
+              <strong>Informations agent</strong>
+              <p className="muted">Identité, coordonnées et situation interne.</p>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 10 }}>
               <input placeholder="Nom complet ex : Maveryk Leveau" value={fullName} onChange={(e) => setFullName(e.target.value)} />
 
@@ -501,31 +612,152 @@ export function Agents() {
               <input placeholder="Type de contrat / statut ex : Agent co indépendant" value={contractType} onChange={(e) => setContractType(e.target.value)} />
             </div>
 
-            <textarea placeholder="Notes internes : objectifs, points forts, points à travailler, infos utiles..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <div className="item">
+              <strong>Objectifs mensuels</strong>
+              <p className="muted">Ces objectifs servent à suivre automatiquement la progression de l'agent.</p>
+            </div>
 
-            {editingAgent && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
+              <input type="number" placeholder="Objectif ventes / mois" value={objectiveSales} onChange={(e) => setObjectiveSales(e.target.value)} />
+              <input type="number" placeholder="Objectif marge / mois" value={objectiveMargin} onChange={(e) => setObjectiveMargin(e.target.value)} />
+              <input type="number" placeholder="Objectif garanties / mois" value={objectiveWarranties} onChange={(e) => setObjectiveWarranties(e.target.value)} />
+            </div>
+
+            {editingAgent && selectedAgentStats && (
               <div className="grid cards3">
                 <div className="item">
-                  <span className="muted">CA total</span>
-                  <div style={{ fontSize: 22, fontWeight: 800 }}>
-                    {euro(agentRows.find(a => a.id === editingAgent.id)?.ca || 0)}
-                  </div>
+                  <span className="muted">Objectif ventes</span>
+                  <div style={{ fontSize: 22, fontWeight: 800 }}>{selectedAgentStats.monthStats.salesCount} / {monthlyObjectiveSales || 0}</div>
+                  <p className="muted">Progression : {progressPercent(selectedAgentStats.monthStats.salesCount, monthlyObjectiveSales)}%</p>
                 </div>
 
                 <div className="item">
-                  <span className="muted">Marge totale</span>
-                  <div style={{ fontSize: 22, fontWeight: 800 }}>
-                    {euro(agentRows.find(a => a.id === editingAgent.id)?.margin || 0)}
-                  </div>
+                  <span className="muted">Objectif marge</span>
+                  <div style={{ fontSize: 22, fontWeight: 800 }}>{euro(selectedAgentStats.monthStats.margin)} / {euro(monthlyObjectiveMargin || 0)}</div>
+                  <p className="muted">Progression : {progressPercent(selectedAgentStats.monthStats.margin, monthlyObjectiveMargin)}%</p>
                 </div>
 
                 <div className="item">
-                  <span className="muted">Classement</span>
-                  <div style={{ fontSize: 22, fontWeight: 800 }}>
-                    #{agentRows.find(a => a.id === editingAgent.id)?.rankGlobal || '-'} global
-                  </div>
+                  <span className="muted">Objectif garanties</span>
+                  <div style={{ fontSize: 22, fontWeight: 800 }}>{selectedAgentStats.monthStats.warranties} / {monthlyObjectiveWarranties || 0}</div>
+                  <p className="muted">Progression : {progressPercent(selectedAgentStats.monthStats.warranties, monthlyObjectiveWarranties)}%</p>
                 </div>
               </div>
+            )}
+
+            <div className="item">
+              <strong>Congés et absences</strong>
+              <p className="muted">Suivi simple pour cette première version. Le calendrier congés détaillé pourra venir après.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 10 }}>
+              <textarea placeholder="Congés prévus / vacances / indisponibilités..." value={vacationNotes} onChange={(e) => setVacationNotes(e.target.value)} />
+              <textarea placeholder="Absences / retards / remarques RH..." value={absenceNotes} onChange={(e) => setAbsenceNotes(e.target.value)} />
+            </div>
+
+            <textarea placeholder="Notes internes : objectifs, points forts, points à travailler, infos utiles..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+
+            {editingAgent && selectedAgentStats && (
+              <>
+                <div className="item">
+                  <strong>Performance commerciale</strong>
+                  <p className="muted">Calcul automatique depuis les ventes de l'agent.</p>
+                </div>
+
+                <div className="grid cards3">
+                  <div className="card">
+                    <h3>Semaine</h3>
+                    <div className="stat-value">{euro(selectedAgentStats.weekStats.ca)}</div>
+                    <p className="muted">{selectedAgentStats.weekStats.salesCount} vente(s)</p>
+                    <p>Marge : <strong>{euro(selectedAgentStats.weekStats.margin)}</strong></p>
+                    <p>Garanties : <strong>{selectedAgentStats.weekStats.warranties}</strong></p>
+                  </div>
+
+                  <div className="card">
+                    <h3>Mois</h3>
+                    <div className="stat-value">{euro(selectedAgentStats.monthStats.ca)}</div>
+                    <p className="muted">{selectedAgentStats.monthStats.salesCount} vente(s)</p>
+                    <p>Marge : <strong>{euro(selectedAgentStats.monthStats.margin)}</strong></p>
+                    <p>Garanties : <strong>{selectedAgentStats.monthStats.warranties}</strong></p>
+                  </div>
+
+                  <div className="card">
+                    <h3>Année</h3>
+                    <div className="stat-value">{euro(selectedAgentStats.yearStats.ca)}</div>
+                    <p className="muted">{selectedAgentStats.yearStats.salesCount} vente(s)</p>
+                    <p>Marge : <strong>{euro(selectedAgentStats.yearStats.margin)}</strong></p>
+                    <p>Garanties : <strong>{selectedAgentStats.yearStats.warranties}</strong></p>
+                  </div>
+                </div>
+
+                <div className="card">
+                  <h3>Véhicules vendus par cet agent</h3>
+
+                  {selectedAgentSales.length === 0 ? (
+                    <p className="muted">Aucune vente rattachée à cet agent pour le moment.</p>
+                  ) : (
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Véhicule</th>
+                          <th>Prix vente</th>
+                          <th>Marge</th>
+                          <th>Garantie</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {selectedAgentSales.map((sale) => (
+                          <tr key={sale.id}>
+                            <td>{formatDate(sale.sale_date)}</td>
+                            <td>
+                              <strong>{sale.vehicle_name || '-'}</strong>
+                              {(sale.registration || sale.vin) && (
+                                <div className="muted" style={{ fontSize: 12 }}>
+                                  {sale.registration ? `Immat: ${sale.registration}` : ''}
+                                  {sale.registration && sale.vin ? ' — ' : ''}
+                                  {sale.vin ? `VIN: ${sale.vin}` : ''}
+                                </div>
+                              )}
+                            </td>
+                            <td>{euro(Number(sale.sale_price || 0))}</td>
+                            <td><strong>{euro(Number(sale.margin_amount || 0))}</strong></td>
+                            <td>
+                              {sale.warranty_sold
+                                ? `${sale.warranty_type || 'Oui'}${sale.warranty_amount ? ` — ${euro(Number(sale.warranty_amount))}` : ''}`
+                                : 'Non'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div className="card">
+                  <h3>Documents visibles pour cet agent</h3>
+
+                  {selectedAgentDocuments.length === 0 ? (
+                    <p className="muted">Aucun document rattaché à cet agent, son agence ou tous les agents.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {selectedAgentDocuments.map((doc) => (
+                        <div className="item" key={doc.id}>
+                          <strong>{doc.title}</strong>
+                          <p className="muted">{doc.category || 'Général'}</p>
+                          {doc.description && <p style={{ whiteSpace: 'pre-wrap' }}>{doc.description}</p>}
+                          {doc.file_url && (
+                            <a href={doc.file_url} target="_blank" rel="noreferrer">
+                              Ouvrir le document
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -569,6 +801,7 @@ export function Agents() {
                 <td>
                   <strong>{agent.rankGlobal === 1 ? '👑 ' : ''}{agent.name}</strong>
                   {agent.role && <div className="muted" style={{ fontSize: 12 }}>{agent.role}</div>}
+                  {agent.status && <div className="muted" style={{ fontSize: 12 }}>Statut : {agent.status}</div>}
                 </td>
                 <td><span className="badge">{agent.agency}</span></td>
                 <td>{agent.phone || '-'}</td>
