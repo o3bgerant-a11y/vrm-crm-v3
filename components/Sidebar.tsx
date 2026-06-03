@@ -43,7 +43,7 @@ export default function Sidebar({
 
         <div>
           <h1>Vroom Market</h1>
-          <p>CRM V3</p>
+          <p>CRM Responsable</p>
         </div>
       </div>
 
