@@ -21,7 +21,7 @@ const items = [
   ['agents', 'Agents commerciaux', Users, 'responsable'],
   ['ventes', 'Ventes', Car, 'all'],
   ['garanties', 'Garanties', ShieldCheck, 'all'],
-  ['messages', 'Messages Direction', Megaphone, 'responsable'],
+  ['messages', 'Messages Direction', Megaphone, 'all'],
   ['documents', 'Documents', FileText, 'all'],
   ['stats', 'Statistiques', BarChart3, 'all'],
   ['parametres', 'Paramètres', Settings, 'responsable'],
