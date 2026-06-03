@@ -1756,6 +1756,8 @@ export function Documents({
   currentAgent?: CurrentAgentForPages | null;
   isResponsable?: boolean;
 } = {}) {
+  const responsableMode = isResponsable === true && currentAgent?.account_type === 'responsable';
+
   const [documentsList, setDocumentsList] = useState<AgentDocument[]>([]);
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1769,10 +1771,21 @@ export function Documents({
   const [description, setDescription] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [targetType, setTargetType] = useState(isResponsable ? 'all' : 'responsable');
+  const [targetType, setTargetType] = useState(responsableMode ? 'all' : 'responsable');
   const [agencyId, setAgencyId] = useState<number | ''>('');
   const [agentId, setAgentId] = useState<number | ''>('');
   const [documentStatus, setDocumentStatus] = useState('nouveau');
+
+  useEffect(() => {
+    if (!responsableMode) {
+      setTargetType('responsable');
+      setAgencyId('');
+      setAgentId('');
+      setDocumentStatus('nouveau');
+    } else if (!editingDocument && targetType === 'responsable') {
+      setTargetType('all');
+    }
+  }, [responsableMode, currentAgent?.id]);
 
   async function loadDocuments() {
     setLoading(true);
@@ -1818,7 +1831,7 @@ export function Documents({
     setDescription('');
     setFileUrl('');
     setSelectedFile(null);
-    setTargetType(isResponsable ? 'all' : 'responsable');
+    setTargetType(responsableMode ? 'all' : 'responsable');
     setAgencyId('');
     setAgentId('');
     setDocumentStatus('nouveau');
@@ -1830,7 +1843,7 @@ export function Documents({
   }
 
   function openEditDocumentForm(item: AgentDocument) {
-    if (!isResponsable) return;
+    if (!responsableMode) return;
 
     setEditingDocument(item);
     setTitle(item.title || '');
@@ -1881,17 +1894,17 @@ export function Documents({
       return;
     }
 
-    if (!isResponsable && !currentAgent) {
+    if (!responsableMode && !currentAgent) {
       alert("Impossible d'envoyer le document : compte agent non reconnu.");
       return;
     }
 
-    if (isResponsable && targetType === 'agency' && !agencyId) {
+    if (responsableMode && targetType === 'agency' && !agencyId) {
       alert('Il faut sélectionner une agence.');
       return;
     }
 
-    if (isResponsable && targetType === 'agent' && !agentId) {
+    if (responsableMode && targetType === 'agent' && !agentId) {
       alert('Il faut sélectionner un agent.');
       return;
     }
@@ -1901,7 +1914,7 @@ export function Documents({
     try {
       const finalFileUrl = await uploadSelectedFile();
 
-      const payload = isResponsable
+      const payload = responsableMode
         ? {
             title: title.trim(),
             category: category.trim() || 'Général',
@@ -1927,7 +1940,7 @@ export function Documents({
             document_status: 'nouveau',
           };
 
-      const { error } = editingDocument && isResponsable
+      const { error } = editingDocument && responsableMode
         ? await supabase.from('agent_documents').update(payload as any).eq('id', editingDocument.id)
         : await supabase.from('agent_documents').insert(payload as any);
 
@@ -1948,7 +1961,7 @@ export function Documents({
   }
 
   async function deleteDocument() {
-    if (!editingDocument || !isResponsable) return;
+    if (!editingDocument || !responsableMode) return;
 
     const ok = confirm(`Supprimer le document "${editingDocument.title}" ?`);
     if (!ok) return;
@@ -1973,7 +1986,7 @@ export function Documents({
   }
 
   async function markDocumentStatus(item: AgentDocument, status: string) {
-    if (!isResponsable) return;
+    if (!responsableMode) return;
 
     const { error } = await supabase
       .from('agent_documents')
@@ -2020,7 +2033,7 @@ export function Documents({
   }
 
   const visibleDocuments = documentsList.filter((item) => {
-    if (isResponsable) return true;
+    if (responsableMode) return true;
     if (!currentAgent) return false;
 
     if (item.sent_to_responsable || item.target_type === 'responsable') {
@@ -2046,9 +2059,9 @@ export function Documents({
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
-          <h3>{isResponsable ? `Documents agents${newDocumentsCount > 0 ? ` 🔔 ${newDocumentsCount}` : ''}` : 'Mes documents'}</h3>
+          <h3>{responsableMode ? `Documents agents${newDocumentsCount > 0 ? ` 🔔 ${newDocumentsCount}` : ''}` : 'Mes documents'}</h3>
           <p className="muted">
-            {isResponsable
+            {responsableMode
               ? 'Documents partagés avec les agents et documents reçus des agents.'
               : 'Consulte les documents transmis par la Direction et envoie un document au Responsable.'}
           </p>
@@ -2066,13 +2079,13 @@ export function Documents({
         >
           {showForm && !editingDocument
             ? 'Fermer'
-            : isResponsable
+            : responsableMode
               ? 'Ajouter un document'
               : 'Envoyer au Responsable'}
         </button>
       </div>
 
-      {isResponsable && newDocumentsCount > 0 && (
+      {responsableMode && newDocumentsCount > 0 && (
         <div className="item" style={{ marginTop: 14, border: '1px solid rgba(255,255,255,.25)' }}>
           <strong>🔔 {newDocumentsCount} nouveau(x) document(s) reçu(s)</strong>
           <p className="muted">Des agents t'ont envoyé des documents. Passe-les en “Vu” ou “Traité” après contrôle.</p>
@@ -2084,14 +2097,14 @@ export function Documents({
           <h4>
             {editingDocument
               ? 'Modifier le document agent'
-              : isResponsable
+              : responsableMode
                 ? 'Nouveau document agent'
                 : 'Envoyer un document au Responsable'}
           </h4>
 
           <div style={{ display: 'grid', gap: 10 }}>
             <input
-              placeholder={isResponsable ? 'Titre du document ex : Procédure garantie Opteven' : 'Titre ex : Carte grise Mercedes Classe A'}
+              placeholder={responsableMode ? 'Titre du document ex : Procédure garantie Opteven' : 'Titre ex : Carte grise Mercedes Classe A'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -2128,12 +2141,12 @@ export function Documents({
             )}
 
             <textarea
-              placeholder={isResponsable ? 'Description ou consigne pour les agents...' : 'Message au Responsable, commentaire, information utile...'}
+              placeholder={responsableMode ? 'Description ou consigne pour les agents...' : 'Message au Responsable, commentaire, information utile...'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
 
-            {isResponsable && (
+            {responsableMode && (
               <>
                 <div className="item">
                   <strong>Destination du document</strong>
@@ -2175,7 +2188,7 @@ export function Documents({
               </>
             )}
 
-            {!isResponsable && (
+            {!responsableMode && (
               <div className="item" style={{ border: '1px solid rgba(255,255,255,.25)' }}>
                 <strong>Destinataire : Responsable</strong>
                 <p className="muted">Ce document sera privé : il sera visible uniquement par toi et par la Direction.</p>
@@ -2188,12 +2201,12 @@ export function Documents({
                   ? 'Enregistrement...'
                   : editingDocument
                     ? 'Modifier le document'
-                    : isResponsable
+                    : responsableMode
                       ? 'Ajouter le document'
                       : 'Envoyer au Responsable'}
               </button>
 
-              {editingDocument && isResponsable && <button onClick={deleteDocument} disabled={saving}>Supprimer</button>}
+              {editingDocument && responsableMode && <button onClick={deleteDocument} disabled={saving}>Supprimer</button>}
 
               <button onClick={() => { resetForm(); setShowForm(false); }} disabled={saving}>Annuler</button>
             </div>
@@ -2211,8 +2224,8 @@ export function Documents({
               className="item"
               key={item.id}
               onClick={() => openEditDocumentForm(item)}
-              style={{ cursor: isResponsable ? 'pointer' : 'default' }}
-              title={isResponsable ? 'Cliquer pour modifier le document' : ''}
+              style={{ cursor: responsableMode ? 'pointer' : 'default' }}
+              title={responsableMode ? 'Cliquer pour modifier le document' : ''}
             >
               <strong>
                 {(item.sent_to_responsable || item.target_type === 'responsable') && (item.document_status || 'nouveau') === 'nouveau' ? '🔔 ' : ''}
@@ -2223,7 +2236,7 @@ export function Documents({
                 {item.category || 'Général'} — {targetLabel(item)} {item.created_at ? `— ${formatDate(item.created_at)}` : ''}
               </p>
 
-              {isResponsable && (item.sent_to_responsable || item.target_type === 'responsable') && (
+              {responsableMode && (item.sent_to_responsable || item.target_type === 'responsable') && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, marginBottom: 8 }} onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => markDocumentStatus(item, 'nouveau')} disabled={(item.document_status || 'nouveau') === 'nouveau'}>Nouveau</button>
                   <button onClick={() => markDocumentStatus(item, 'vu')} disabled={item.document_status === 'vu'}>Vu</button>
