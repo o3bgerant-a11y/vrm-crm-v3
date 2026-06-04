@@ -93,6 +93,44 @@ type CurrentAgentForPages = {
   account_type: string | null;
 };
 
+type LeadItem = {
+  id: number;
+  year_number: number | null;
+  month_number: number | null;
+  week_number: number | null;
+  agency_id: number | null;
+  agent_id: number | null;
+  source: string | null;
+  status: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
+  vehicle_brand: string | null;
+  vehicle_model: string | null;
+  vehicle_registration: string | null;
+  vehicle_year: number | null;
+  vehicle_mileage: number | null;
+  lead_date: string | null;
+  appointment_date: string | null;
+  appointment_time: string | null;
+  seller_expected_price: number | null;
+  seller_net_price: number | null;
+  mandate_signed: boolean | null;
+  vehicle_entered: boolean | null;
+  sale_done: boolean | null;
+  sale_price: number | null;
+  margin_amount: number | null;
+  warranty_sold: boolean | null;
+  warranty_amount: number | null;
+  comments: string | null;
+  created_at: string | null;
+  agents?: {
+    full_name: string | null;
+    agency_id: number | null;
+  } | null;
+};
+
+
 function saleDateToDate(value: string | null) {
   if (!value) return null;
   return new Date(value);
@@ -829,6 +867,596 @@ export function Agents() {
     </div>
   );
 }
+export function Leads() {
+  const today = new Date().toISOString().slice(0, 10);
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+
+  const [leads, setLeads] = useState<LeadItem[]>([]);
+  const [agentOptions, setAgentOptions] = useState<AgentOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
+
+  const [yearNumber, setYearNumber] = useState(String(currentYear));
+  const [monthNumber, setMonthNumber] = useState(String(currentMonth));
+  const [weekNumber, setWeekNumber] = useState('');
+  const [agencyId, setAgencyId] = useState<number | ''>('');
+  const [agentId, setAgentId] = useState<number | ''>('');
+  const [source, setSource] = useState('Call Center');
+  const [status, setStatus] = useState('Nouveau');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [vehicleBrand, setVehicleBrand] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleRegistration, setVehicleRegistration] = useState('');
+  const [vehicleYear, setVehicleYear] = useState('');
+  const [vehicleMileage, setVehicleMileage] = useState('');
+  const [leadDate, setLeadDate] = useState(today);
+  const [appointmentDate, setAppointmentDate] = useState('');
+  const [appointmentTime, setAppointmentTime] = useState('');
+  const [sellerExpectedPrice, setSellerExpectedPrice] = useState('');
+  const [sellerNetPrice, setSellerNetPrice] = useState('');
+  const [mandateSigned, setMandateSigned] = useState(false);
+  const [vehicleEntered, setVehicleEntered] = useState(false);
+  const [saleDone, setSaleDone] = useState(false);
+  const [salePrice, setSalePrice] = useState('');
+  const [marginAmount, setMarginAmount] = useState('');
+  const [warrantySold, setWarrantySold] = useState(false);
+  const [warrantyAmount, setWarrantyAmount] = useState('');
+  const [comments, setComments] = useState('');
+
+  const leadSources = ['Call Center', 'Démarchage Agent', 'Visite spontanée', 'Leboncoin', 'Facebook', 'Google', 'Recommandation', 'Passage agence', 'Autre'];
+  const leadStatuses = ['Nouveau', 'RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu', 'À relancer', 'Perdu', 'Refusé'];
+
+  async function loadAgents() {
+    const { data, error } = await supabase
+      .from('agents')
+      .select('id, full_name, agency_id')
+      .order('full_name', { ascending: true });
+
+    if (error) {
+      console.error('Erreur chargement agents leads:', error);
+      setAgentOptions([]);
+    } else {
+      setAgentOptions(data || []);
+    }
+  }
+
+  async function loadLeads() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*, agents (full_name, agency_id)')
+      .order('id', { ascending: false });
+
+    if (error) {
+      console.error('Erreur chargement leads:', error);
+      setLeads([]);
+    } else {
+      setLeads((data || []) as LeadItem[]);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadAgents();
+    loadLeads();
+  }, []);
+
+  function resetForm() {
+    setEditingLead(null);
+    setYearNumber(String(currentYear));
+    setMonthNumber(String(currentMonth));
+    setWeekNumber('');
+    setAgencyId('');
+    setAgentId('');
+    setSource('Call Center');
+    setStatus('Nouveau');
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerEmail('');
+    setVehicleBrand('');
+    setVehicleModel('');
+    setVehicleRegistration('');
+    setVehicleYear('');
+    setVehicleMileage('');
+    setLeadDate(today);
+    setAppointmentDate('');
+    setAppointmentTime('');
+    setSellerExpectedPrice('');
+    setSellerNetPrice('');
+    setMandateSigned(false);
+    setVehicleEntered(false);
+    setSaleDone(false);
+    setSalePrice('');
+    setMarginAmount('');
+    setWarrantySold(false);
+    setWarrantyAmount('');
+    setComments('');
+  }
+
+  function openNewLeadForm() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEditLeadForm(lead: LeadItem) {
+    setEditingLead(lead);
+    setYearNumber(String(lead.year_number || currentYear));
+    setMonthNumber(String(lead.month_number || currentMonth));
+    setWeekNumber(String(lead.week_number || ''));
+    setAgencyId(lead.agency_id || lead.agents?.agency_id || '');
+    setAgentId(lead.agent_id || '');
+    setSource(lead.source || 'Call Center');
+    setStatus(lead.status || 'Nouveau');
+    setCustomerName(lead.customer_name || '');
+    setCustomerPhone(lead.customer_phone || '');
+    setCustomerEmail(lead.customer_email || '');
+    setVehicleBrand(lead.vehicle_brand || '');
+    setVehicleModel(lead.vehicle_model || '');
+    setVehicleRegistration(lead.vehicle_registration || '');
+    setVehicleYear(String(lead.vehicle_year ?? ''));
+    setVehicleMileage(String(lead.vehicle_mileage ?? ''));
+    setLeadDate(lead.lead_date || today);
+    setAppointmentDate(lead.appointment_date || '');
+    setAppointmentTime(lead.appointment_time || '');
+    setSellerExpectedPrice(String(lead.seller_expected_price ?? ''));
+    setSellerNetPrice(String(lead.seller_net_price ?? ''));
+    setMandateSigned(Boolean(lead.mandate_signed));
+    setVehicleEntered(Boolean(lead.vehicle_entered));
+    setSaleDone(Boolean(lead.sale_done));
+    setSalePrice(String(lead.sale_price ?? ''));
+    setMarginAmount(String(lead.margin_amount ?? ''));
+    setWarrantySold(Boolean(lead.warranty_sold));
+    setWarrantyAmount(String(lead.warranty_amount ?? ''));
+    setComments(lead.comments || '');
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function saveLead() {
+    if (!customerName.trim()) {
+      alert('Il faut indiquer le nom du client.');
+      return;
+    }
+
+    if (!agentId) {
+      alert('Il faut sélectionner un agent commercial.');
+      return;
+    }
+
+    const selectedAgent = agentOptions.find(agent => Number(agent.id) === Number(agentId));
+    const finalAgencyId = agencyId || selectedAgent?.agency_id || null;
+
+    setSaving(true);
+
+    const payload = {
+      year_number: Number(yearNumber || currentYear),
+      month_number: Number(monthNumber || currentMonth),
+      week_number: weekNumber ? Number(weekNumber) : null,
+      agency_id: finalAgencyId ? Number(finalAgencyId) : null,
+      agent_id: Number(agentId),
+      source,
+      status,
+      customer_name: customerName.trim(),
+      customer_phone: customerPhone.trim() || null,
+      customer_email: customerEmail.trim() || null,
+      vehicle_brand: vehicleBrand.trim() || null,
+      vehicle_model: vehicleModel.trim() || null,
+      vehicle_registration: vehicleRegistration.trim() || null,
+      vehicle_year: vehicleYear ? Number(vehicleYear) : null,
+      vehicle_mileage: vehicleMileage ? Number(vehicleMileage) : null,
+      lead_date: leadDate || null,
+      appointment_date: appointmentDate || null,
+      appointment_time: appointmentTime.trim() || null,
+      seller_expected_price: Number(sellerExpectedPrice || 0),
+      seller_net_price: Number(sellerNetPrice || 0),
+      mandate_signed: mandateSigned,
+      vehicle_entered: vehicleEntered,
+      sale_done: saleDone,
+      sale_price: Number(salePrice || 0),
+      margin_amount: Number(marginAmount || 0),
+      warranty_sold: warrantySold,
+      warranty_amount: Number(warrantyAmount || 0),
+      comments: comments.trim() || null,
+    };
+
+    const { error } = editingLead
+      ? await supabase.from('leads').update(payload).eq('id', editingLead.id)
+      : await supabase.from('leads').insert(payload);
+
+    if (error) {
+      console.error('Erreur sauvegarde lead:', error);
+      alert("Erreur pendant l'enregistrement du lead.");
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadLeads();
+    }
+
+    setSaving(false);
+  }
+
+  async function deleteLead() {
+    if (!editingLead) return;
+
+    const ok = confirm(`Supprimer le lead "${editingLead.customer_name}" ?`);
+    if (!ok) return;
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from('leads')
+      .delete()
+      .eq('id', editingLead.id);
+
+    if (error) {
+      console.error('Erreur suppression lead:', error);
+      alert('Erreur pendant la suppression du lead.');
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadLeads();
+    }
+
+    setSaving(false);
+  }
+
+  function formatDate(value: string | null) {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('fr-FR');
+  }
+
+  const filteredLeads = leads.filter((lead) => {
+    const q = search.toLowerCase().trim();
+
+    if (!q) return true;
+
+    const content = [
+      lead.customer_name,
+      lead.customer_phone,
+      lead.customer_email,
+      lead.vehicle_brand,
+      lead.vehicle_model,
+      lead.vehicle_registration,
+      lead.source,
+      lead.status,
+      lead.agents?.full_name,
+      agencyName(lead.agency_id || lead.agents?.agency_id),
+      lead.comments,
+    ].join(' ').toLowerCase();
+
+    return content.includes(q);
+  });
+
+  const stats = useMemo(() => {
+    const total = filteredLeads.length;
+    const appointments = filteredLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+    const enteredVehicles = filteredLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+    const mandates = filteredLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+    const sales = filteredLeads.filter(lead => lead.sale_done || lead.status === 'Véhicule vendu').length;
+    const warranties = filteredLeads.filter(lead => lead.warranty_sold).length;
+    const margin = filteredLeads.reduce((totalMargin, lead) => totalMargin + Number(lead.margin_amount || 0), 0);
+    const conversionRate = total > 0 ? Math.round((sales / total) * 100) : 0;
+
+    return { total, appointments, enteredVehicles, mandates, sales, warranties, margin, conversionRate };
+  }, [filteredLeads]);
+
+  const sourceStats = useMemo(() => {
+    const map = new Map<string, { source: string; total: number; appointments: number; vehicles: number; sales: number; margin: number; conversionRate: number; }>();
+
+    filteredLeads.forEach((lead) => {
+      const key = lead.source || 'Autre';
+      const current = map.get(key) || { source: key, total: 0, appointments: 0, vehicles: 0, sales: 0, margin: 0, conversionRate: 0 };
+
+      current.total += 1;
+
+      if (['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')) {
+        current.appointments += 1;
+      }
+
+      if (lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')) {
+        current.vehicles += 1;
+      }
+
+      if (lead.sale_done || lead.status === 'Véhicule vendu') {
+        current.sales += 1;
+      }
+
+      current.margin += Number(lead.margin_amount || 0);
+      current.conversionRate = current.total > 0 ? Math.round((current.sales / current.total) * 100) : 0;
+
+      map.set(key, current);
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.sales - a.sales);
+  }, [filteredLeads]);
+
+  return (
+    <div className="section">
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <h3>Leads et rendez-vous</h3>
+            <p className="muted">Suivi des RDV call center, démarchage, visites spontanées et transformations en véhicules rentrés / ventes.</p>
+          </div>
+
+          <button
+            className="btn"
+            onClick={() => {
+              if (showForm && !editingLead) {
+                setShowForm(false);
+              } else {
+                openNewLeadForm();
+              }
+            }}
+          >
+            {showForm && !editingLead ? 'Fermer' : 'Nouveau lead'}
+          </button>
+        </div>
+
+        {showForm && (
+          <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
+            <h4>{editingLead ? 'Modifier le lead' : 'Nouveau lead / RDV'}</h4>
+
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: 10 }}>
+                <input type="number" placeholder="Année" value={yearNumber} onChange={(e) => setYearNumber(e.target.value)} />
+                <input type="number" placeholder="Mois" value={monthNumber} onChange={(e) => setMonthNumber(e.target.value)} />
+                <input type="number" placeholder="Semaine" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 10 }}>
+                <select value={source} onChange={(e) => setSource(e.target.value)}>
+                  {leadSources.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+
+                <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                  {leadStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+
+                <select value={agentId} onChange={(e) => {
+                  const value = e.target.value ? Number(e.target.value) : '';
+                  setAgentId(value);
+                  const selectedAgent = agentOptions.find(agent => Number(agent.id) === Number(value));
+                  if (selectedAgent?.agency_id) setAgencyId(Number(selectedAgent.agency_id));
+                }}>
+                  <option value="">Sélectionner un agent</option>
+                  {agentOptions.map((agent) => (
+                    <option key={agent.id} value={agent.id}>{agent.full_name} — {agencyName(agent.agency_id)}</option>
+                  ))}
+                </select>
+
+                <select value={agencyId} onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">Agence</option>
+                  <option value={1}>Blois</option>
+                  <option value={2}>Tours</option>
+                  <option value={3}>Bourges</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
+                <input placeholder="Nom client" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                <input placeholder="Téléphone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                <input placeholder="Email facultatif" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(130px, 1fr))', gap: 10 }}>
+                <input placeholder="Marque" value={vehicleBrand} onChange={(e) => setVehicleBrand(e.target.value)} />
+                <input placeholder="Modèle" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} />
+                <input placeholder="Immatriculation" value={vehicleRegistration} onChange={(e) => setVehicleRegistration(e.target.value.toUpperCase())} />
+                <input type="number" placeholder="Année" value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} />
+                <input type="number" placeholder="Kilométrage" value={vehicleMileage} onChange={(e) => setVehicleMileage(e.target.value)} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
+                <input type="date" value={leadDate} onChange={(e) => setLeadDate(e.target.value)} />
+                <input type="date" value={appointmentDate} onChange={(e) => setAppointmentDate(e.target.value)} />
+                <input placeholder="Heure RDV ex : 14:30" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
+                <input type="number" placeholder="Prix souhaité vendeur" value={sellerExpectedPrice} onChange={(e) => setSellerExpectedPrice(e.target.value)} />
+                <input type="number" placeholder="Prix net vendeur validé" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
+                <input type="number" placeholder="Prix de vente si vendu" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(150px, 1fr))', gap: 10 }}>
+                <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="checkbox" checked={vehicleEntered} onChange={(e) => setVehicleEntered(e.target.checked)} />
+                  Véhicule rentré
+                </label>
+
+                <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="checkbox" checked={mandateSigned} onChange={(e) => setMandateSigned(e.target.checked)} />
+                  Mandat signé
+                </label>
+
+                <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="checkbox" checked={saleDone} onChange={(e) => setSaleDone(e.target.checked)} />
+                  Véhicule vendu
+                </label>
+
+                <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="checkbox" checked={warrantySold} onChange={(e) => setWarrantySold(e.target.checked)} />
+                  Garantie vendue
+                </label>
+
+                <input type="number" placeholder="Montant garantie" value={warrantyAmount} onChange={(e) => setWarrantyAmount(e.target.value)} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
+                <input type="number" placeholder="Marge réalisée" value={marginAmount} onChange={(e) => setMarginAmount(e.target.value)} />
+                <textarea placeholder="Commentaires / suite à donner / raison du refus..." value={comments} onChange={(e) => setComments(e.target.value)} />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn" onClick={saveLead} disabled={saving}>
+                  {saving ? 'Enregistrement...' : editingLead ? 'Modifier le lead' : 'Enregistrer le lead'}
+                </button>
+
+                {editingLead && <button onClick={deleteLead} disabled={saving}>Supprimer</button>}
+
+                <button onClick={() => { resetForm(); setShowForm(false); }} disabled={saving}>Annuler</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <input className="search" placeholder="Recherche lead, client, téléphone, véhicule, agent, source..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginTop: 14 }} />
+      </div>
+
+      <div className="grid cards3">
+        <div className="card">
+          <h3>Leads</h3>
+          <div className="stat-value">{stats.total}</div>
+          <p className="muted">Total selon la recherche active</p>
+        </div>
+
+        <div className="card">
+          <h3>RDV pris</h3>
+          <div className="stat-value">{stats.appointments}</div>
+          <p className="muted">{stats.enteredVehicles} véhicule(s) rentré(s)</p>
+        </div>
+
+        <div className="card">
+          <h3>Ventes issues des leads</h3>
+          <div className="stat-value">{stats.sales}</div>
+          <p className="muted">Taux transformation : {stats.conversionRate}%</p>
+        </div>
+      </div>
+
+      <div className="grid cards3">
+        <div className="card">
+          <h3>Mandats</h3>
+          <div className="stat-value">{stats.mandates}</div>
+          <p className="muted">Mandats signés depuis les leads</p>
+        </div>
+
+        <div className="card">
+          <h3>Garanties</h3>
+          <div className="stat-value">{stats.warranties}</div>
+          <p className="muted">Garanties vendues depuis les leads</p>
+        </div>
+
+        <div className="card">
+          <h3>Marge générée</h3>
+          <div className="stat-value">{euro(stats.margin)}</div>
+          <p className="muted">Marge totale renseignée</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>Performance par source</h3>
+
+        {sourceStats.length === 0 ? (
+          <p className="muted">Aucune source à afficher.</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Leads</th>
+                <th>RDV</th>
+                <th>Véhicules rentrés</th>
+                <th>Ventes</th>
+                <th>Taux</th>
+                <th>Marge</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {sourceStats.map((item) => (
+                <tr key={item.source}>
+                  <td><strong>{item.source}</strong></td>
+                  <td>{item.total}</td>
+                  <td>{item.appointments}</td>
+                  <td>{item.vehicles}</td>
+                  <td>{item.sales}</td>
+                  <td>{item.conversionRate}%</td>
+                  <td><strong>{euro(item.margin)}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h3>Liste des leads</h3>
+
+        {loading && <p className="muted">Chargement des leads...</p>}
+        {!loading && filteredLeads.length === 0 && <p className="muted">Aucun lead trouvé.</p>}
+
+        {!loading && filteredLeads.length > 0 && (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Source</th>
+                <th>Agent</th>
+                <th>Statut</th>
+                <th>Véhicule</th>
+                <th>RDV</th>
+                <th>Résultat</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filteredLeads.map((lead) => (
+                <tr key={lead.id} onClick={() => openEditLeadForm(lead)} style={{ cursor: 'pointer' }} title="Cliquer pour modifier le lead">
+                  <td>
+                    <strong>{lead.customer_name || '-'}</strong>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {lead.customer_phone || ''}
+                      {lead.customer_phone && lead.customer_email ? ' — ' : ''}
+                      {lead.customer_email || ''}
+                    </div>
+                  </td>
+                  <td>{lead.source || '-'}</td>
+                  <td>
+                    {lead.agents?.full_name || '-'}
+                    <div className="muted" style={{ fontSize: 12 }}>{agencyName(lead.agency_id || lead.agents?.agency_id)}</div>
+                  </td>
+                  <td><span className="badge">{lead.status || '-'}</span></td>
+                  <td>
+                    <strong>{[lead.vehicle_brand, lead.vehicle_model].filter(Boolean).join(' ') || '-'}</strong>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {lead.vehicle_registration || ''}
+                      {lead.vehicle_mileage ? ` — ${lead.vehicle_mileage.toLocaleString('fr-FR')} km` : ''}
+                    </div>
+                  </td>
+                  <td>
+                    {formatDate(lead.appointment_date)}
+                    {lead.appointment_time && <div className="muted" style={{ fontSize: 12 }}>{lead.appointment_time}</div>}
+                  </td>
+                  <td>
+                    {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Rentré' : lead.mandate_signed ? 'Mandat signé' : '-'}
+                    {(lead.margin_amount || lead.warranty_sold) && (
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {lead.margin_amount ? `Marge ${euro(Number(lead.margin_amount))}` : ''}
+                        {lead.margin_amount && lead.warranty_sold ? ' — ' : ''}
+                        {lead.warranty_sold ? 'Garantie' : ''}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 export function Ventes() {
   const today = new Date().toISOString().slice(0, 10);
 
