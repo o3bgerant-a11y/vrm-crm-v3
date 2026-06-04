@@ -321,8 +321,12 @@ export default function Home() {
         </div>
 
         {active === 'dashboard' && <Dashboard />}
-        {active === 'planning' && <Planning />}
-
+        {active === 'planning' && (
+  <Planning
+    currentAgent={currentAgent}
+    isResponsable={isResponsable}
+  />
+)}
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
         {active === 'leads' && <Leads />}
