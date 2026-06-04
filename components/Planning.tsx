@@ -35,6 +35,34 @@ type PlanningEvent = {
   color: string | null;
 };
 
+type CurrentAgentForPlanning = {
+  id: number;
+  full_name: string;
+  agency_id: number | null;
+  account_type: string | null;
+};
+
+function getPlanningAgencyName(agencyId: number | null) {
+  if (Number(agencyId) === 1) return 'Blois';
+  if (Number(agencyId) === 2) return 'Tours';
+  if (Number(agencyId) === 3) return 'Bourges';
+  return 'Agence';
+}
+
+function getPlanningAgencyIcon(agencyId: number | null) {
+  if (Number(agencyId) === 1) return '🟢';
+  if (Number(agencyId) === 2) return '🔵';
+  if (Number(agencyId) === 3) return '🟠';
+  return '🔴';
+}
+
+function getPlanningAgencyDescription(agencyId: number | null) {
+  if (Number(agencyId) === 1) return 'Agenda partagé des agents de Blois.';
+  if (Number(agencyId) === 2) return 'Agenda partagé des agents de Tours.';
+  if (Number(agencyId) === 3) return 'Agenda partagé des agents de Bourges.';
+  return 'Agenda partagé de l’agence.';
+}
+
 function getMonday(date: Date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -121,8 +149,17 @@ function getEventHeight(event: PlanningEvent) {
   return Math.max(44, Math.round((minutes / 60) * HOUR_HEIGHT));
 }
 
-export default function Planning() {
+export default function Planning({
+  currentAgent = null,
+  isResponsable = true,
+}: {
+  currentAgent?: CurrentAgentForPlanning | null;
+  isResponsable?: boolean;
+} = {}) {
   const today = new Date();
+  const responsableMode = isResponsable === true;
+  const agentAgencyId = currentAgent?.agency_id ?? null;
+  const agentAgencyName = getPlanningAgencyName(agentAgencyId);
 
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
@@ -140,12 +177,20 @@ export default function Planning() {
   const [formDate, setFormDate] = useState(formatDateForInput(today));
   const [formStartTime, setFormStartTime] = useState('09:00');
   const [formEndTime, setFormEndTime] = useState('10:00');
-  const [formAgencyId, setFormAgencyId] = useState<number | null>(1);
+  const [formAgencyId, setFormAgencyId] = useState<number | null>(responsableMode ? 1 : agentAgencyId);
 
   const weekStart = useMemo(() => getMonday(new Date(selectedDate)), [selectedDate]);
   const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
   const weekDays = useMemo(() => dayNames.map((_, i) => addDays(weekStart, i)), [weekStart]);
   const weekNumber = getWeekNumber(weekStart);
+
+  const visibleEvents = useMemo(() => {
+    if (responsableMode) return events;
+
+    if (!agentAgencyId) return [];
+
+    return events.filter((event) => Number(event.agency_id) === Number(agentAgencyId));
+  }, [events, responsableMode, agentAgencyId]);
 
   async function loadEvents() {
     setLoading(true);
@@ -181,7 +226,7 @@ export default function Planning() {
     setFormDate(selectedDate);
     setFormStartTime('09:00');
     setFormEndTime('10:00');
-    setFormAgencyId(1);
+    setFormAgencyId(responsableMode ? 1 : agentAgencyId);
   }
 
   function openNewEventForm() {
@@ -254,8 +299,8 @@ export default function Planning() {
       description: formDescription || null,
       start_date: startDate,
       end_date: endDate,
-      agency_id: formAgencyId,
-      color: agencyColor(formAgencyId),
+      agency_id: responsableMode ? formAgencyId : agentAgencyId,
+      color: agencyColor(responsableMode ? formAgencyId : agentAgencyId),
     };
 
     const { error } = editingEvent
@@ -309,7 +354,7 @@ export default function Planning() {
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
-          <h3>📅 Planning Benoît</h3>
+          <h3>{responsableMode ? '📅 Planning Benoît + agendas agences' : `📅 Agenda Agence ${agentAgencyName}`}</h3>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
             <button onClick={previousWeek}>⬅️ Semaine précédente</button>
@@ -317,6 +362,12 @@ export default function Planning() {
             <button onClick={nextWeek}>Semaine suivante ➡️</button>
             <button onClick={openNewEventForm}>➕ Nouveau rendez-vous</button>
           </div>
+
+          <p className="muted">
+            {responsableMode
+              ? 'Vue Responsable : ton planning personnel et les agendas des agences.'
+              : `${getPlanningAgencyDescription(agentAgencyId)} Tous les agents de cette agence voient le même agenda.`}
+          </p>
 
           <p className="muted">
             Semaine {weekNumber} — du {weekStart.toLocaleDateString('fr-FR')} au {addDays(weekStart, 6).toLocaleDateString('fr-FR')}
@@ -348,6 +399,37 @@ export default function Planning() {
           />
         </div>
       </div>
+
+      {responsableMode ? (
+        <div className="grid cards3" style={{ marginTop: 12 }}>
+          <div className="item">
+            <strong>🔴 Planning Benoît</strong>
+            <p className="muted">Tes rendez-vous personnels et Direction.</p>
+          </div>
+
+          <div className="item">
+            <strong>🟢 Agenda Blois</strong>
+            <p className="muted">Agenda partagé des agents de Blois.</p>
+          </div>
+
+          <div className="item">
+            <strong>🔵 Agenda Tours</strong>
+            <p className="muted">Agenda partagé des agents de Tours.</p>
+          </div>
+
+          <div className="item">
+            <strong>🟠 Agenda Bourges</strong>
+            <p className="muted">Agenda partagé des agents de Bourges.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="card" style={{ marginTop: 12 }}>
+          <h4>{getPlanningAgencyIcon(agentAgencyId)} Agenda partagé {agentAgencyName}</h4>
+          <p className="muted">
+            Cet onglet remplace le Planning Benoît pour les agents. Il affichera uniquement les rendez-vous de l’agence {agentAgencyName}.
+          </p>
+        </div>
+      )}
 
       {showForm && (
         <div className="card" style={{ marginTop: 12, marginBottom: 12 }}>
@@ -385,15 +467,22 @@ export default function Planning() {
                 ))}
               </select>
 
-              <select
-                value={formAgencyId ?? ''}
-                onChange={(e) => setFormAgencyId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="1">Blois</option>
-                <option value="2">Tours</option>
-                <option value="3">Bourges</option>
-                <option value="">Personnel</option>
-              </select>
+              {responsableMode ? (
+                <select
+                  value={formAgencyId ?? ''}
+                  onChange={(e) => setFormAgencyId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="1">Blois</option>
+                  <option value="2">Tours</option>
+                  <option value="3">Bourges</option>
+                  <option value="">Personnel / Direction</option>
+                </select>
+              ) : (
+                <div className="item">
+                  <span className="muted">Agenda agence</span>
+                  <strong>{getPlanningAgencyIcon(agentAgencyId)} {agentAgencyName}</strong>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -422,7 +511,7 @@ export default function Planning() {
 
       {loading && <p className="muted">Chargement du planning...</p>}
 
-      {!loading && events.length === 0 && (
+      {!loading && visibleEvents.length === 0 && (
         <p className="muted">Aucun événement enregistré sur cette semaine.</p>
       )}
 
@@ -469,7 +558,7 @@ export default function Planning() {
           </div>
 
           {weekDays.map((date, dayIndex) => {
-            const dayEvents = events.filter((event) => getDayIndex(event.start_date, weekStart) === dayIndex);
+            const dayEvents = visibleEvents.filter((event) => getDayIndex(event.start_date, weekStart) === dayIndex);
 
             return (
               <div
