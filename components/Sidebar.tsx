@@ -11,7 +11,8 @@ import {
   Settings,
   ShieldCheck,
   Store,
-  Users
+  Users,
+  PhoneCall
 } from 'lucide-react';
 
 const items = [
@@ -19,6 +20,7 @@ const items = [
   ['planning', 'Planning Benoît', CalendarDays, 'all'],
   ['agences', 'Agences', Store, 'responsable'],
   ['agents', 'Agents commerciaux', Users, 'responsable'],
+  ['leads', 'Leads', PhoneCall, 'all'],
   ['ventes', 'Ventes', Car, 'all'],
   ['garanties', 'Garanties', ShieldCheck, 'all'],
   ['messages', 'Messages Direction', Megaphone, 'all'],
