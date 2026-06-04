@@ -143,6 +143,7 @@ export function Agences() {
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [sales, setSales] = useState<VehicleSale[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedAgencyId, setSelectedAgencyId] = useState<number | null>(null);
 
   async function loadAgenciesPage() {
     setLoading(true);
@@ -184,6 +185,11 @@ export function Agences() {
     loadAgenciesPage();
   }, []);
 
+  function formatDate(value: string | null) {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('fr-FR');
+  }
+
   const agencyRows = useMemo(() => {
     const base = [
       { id: 1, agency: 'Blois', agents: 0, sales: 0, ca: 0, margin: 0, warranties: 0 },
@@ -212,14 +218,209 @@ export function Agences() {
       .map((row) => ({
         ...row,
         warrantyRate: row.sales > 0 ? Math.round((row.warranties / row.sales) * 100) : 0,
+        averageMargin: row.sales > 0 ? Math.round(row.margin / row.sales) : 0,
       }))
       .sort((a, b) => b.margin - a.margin);
   }, [agentsList, sales]);
+
+  const selectedAgency = selectedAgencyId
+    ? agencyRows.find(agency => Number(agency.id) === Number(selectedAgencyId)) || null
+    : null;
+
+  const selectedAgencyAgents = selectedAgencyId
+    ? agentsList.filter(agent => Number(agent.agency_id) === Number(selectedAgencyId))
+    : [];
+
+  const selectedAgencySales = selectedAgencyId
+    ? sales.filter(sale => Number(sale.agents?.agency_id) === Number(selectedAgencyId))
+    : [];
+
+  const selectedAgencyAgentRows = useMemo(() => {
+    if (!selectedAgencyId) return [];
+
+    return selectedAgencyAgents
+      .map((agent) => {
+        const agentSales = selectedAgencySales.filter(sale => Number(sale.agent_id) === Number(agent.id));
+        const stats = calculateStats(agentSales);
+
+        return {
+          id: agent.id,
+          name: agent.full_name,
+          role: agent.role || 'Agent commercial',
+          sales: stats.salesCount,
+          ca: stats.ca,
+          margin: stats.margin,
+          warranties: stats.warranties,
+          warrantyRate: stats.warrantyRate,
+          averageMargin: stats.salesCount > 0 ? Math.round(stats.margin / stats.salesCount) : 0,
+        };
+      })
+      .sort((a, b) => b.margin - a.margin)
+      .map((agent, index) => ({
+        ...agent,
+        rank: index + 1,
+      }));
+  }, [selectedAgencyId, selectedAgencyAgents, selectedAgencySales]);
 
   if (loading) {
     return (
       <div className="card">
         <p className="muted">Chargement des agences...</p>
+      </div>
+    );
+  }
+
+  if (selectedAgency) {
+    return (
+      <div className="section">
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <h3>Comparatif agence : {selectedAgency.agency}</h3>
+              <p className="muted">
+                Vue détaillée de l'agence avec agents, ventes, marges, garanties et classement interne.
+              </p>
+            </div>
+
+            <button className="btn" onClick={() => setSelectedAgencyId(null)}>
+              Retour aux agences
+            </button>
+          </div>
+        </div>
+
+        <div className="grid cards3">
+          <div className="card">
+            <h3>CA total</h3>
+            <div className="stat-value">{euro(selectedAgency.ca)}</div>
+            <p className="muted">{selectedAgency.sales} vente(s) enregistrée(s)</p>
+          </div>
+
+          <div className="card">
+            <h3>Marge totale</h3>
+            <div className="stat-value">{euro(selectedAgency.margin)}</div>
+            <p className="muted">Marge moyenne : {euro(selectedAgency.averageMargin)}</p>
+          </div>
+
+          <div className="card">
+            <h3>Garanties</h3>
+            <div className="stat-value">{selectedAgency.warranties}</div>
+            <p className="muted">Taux garantie : {selectedAgency.warrantyRate}%</p>
+          </div>
+        </div>
+
+        <div className="grid cards3">
+          <div className="card">
+            <h3>Agents</h3>
+            <div className="stat-value">{selectedAgency.agents}</div>
+            <p className="muted">Agent(s) rattaché(s) à {selectedAgency.agency}</p>
+          </div>
+
+          <div className="card">
+            <h3>Classement agence</h3>
+            <div className="stat-value">#{agencyRows.findIndex(item => item.id === selectedAgency.id) + 1}</div>
+            <p className="muted">Classement toutes agences par marge</p>
+          </div>
+
+          <div className="card">
+            <h3>Meilleur agent</h3>
+            <div className="stat-value">
+              {selectedAgencyAgentRows[0] ? selectedAgencyAgentRows[0].name : '-'}
+            </div>
+            <p className="muted">
+              {selectedAgencyAgentRows[0]
+                ? `${selectedAgencyAgentRows[0].sales} vente(s) — ${euro(selectedAgencyAgentRows[0].margin)} de marge`
+                : 'Aucune donnée agent pour le moment'}
+            </p>
+          </div>
+        </div>
+
+        <div className="card">
+          <h3>Classement des agents de {selectedAgency.agency}</h3>
+
+          {selectedAgencyAgentRows.length === 0 ? (
+            <p className="muted">Aucun agent rattaché à cette agence pour le moment.</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Rang</th>
+                  <th>Agent</th>
+                  <th>Ventes</th>
+                  <th>CA</th>
+                  <th>Marge</th>
+                  <th>Marge moyenne</th>
+                  <th>Garanties</th>
+                  <th>Taux garantie</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {selectedAgencyAgentRows.map((agent) => (
+                  <tr key={agent.id}>
+                    <td><strong>{agent.rank === 1 ? '👑 ' : ''}#{agent.rank}</strong></td>
+                    <td>
+                      <strong>{agent.name}</strong>
+                      <div className="muted" style={{ fontSize: 12 }}>{agent.role}</div>
+                    </td>
+                    <td>{agent.sales}</td>
+                    <td>{euro(agent.ca)}</td>
+                    <td><strong>{euro(agent.margin)}</strong></td>
+                    <td>{euro(agent.averageMargin)}</td>
+                    <td>{agent.warranties}</td>
+                    <td>{agent.warrantyRate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="card">
+          <h3>Détail des ventes de {selectedAgency.agency}</h3>
+
+          {selectedAgencySales.length === 0 ? (
+            <p className="muted">Aucune vente enregistrée pour cette agence.</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Véhicule</th>
+                  <th>Agent</th>
+                  <th>Prix vente</th>
+                  <th>Marge</th>
+                  <th>Garantie</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {selectedAgencySales.map((sale) => (
+                  <tr key={sale.id}>
+                    <td>{formatDate(sale.sale_date)}</td>
+                    <td>
+                      <strong>{sale.vehicle_name || '-'}</strong>
+                      {(sale.registration || sale.vin) && (
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          {sale.registration ? `Immat: ${sale.registration}` : ''}
+                          {sale.registration && sale.vin ? ' — ' : ''}
+                          {sale.vin ? `VIN: ${sale.vin}` : ''}
+                        </div>
+                      )}
+                    </td>
+                    <td>{sale.agents?.full_name || '-'}</td>
+                    <td>{euro(Number(sale.sale_price || 0))}</td>
+                    <td><strong>{euro(Number(sale.margin_amount || 0))}</strong></td>
+                    <td>
+                      {sale.warranty_sold
+                        ? `${sale.warranty_type || 'Oui'}${sale.warranty_amount ? ` — ${euro(Number(sale.warranty_amount))}` : ''}`
+                        : 'Non'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     );
   }
@@ -236,7 +437,9 @@ export function Agences() {
           <p>Marge : <strong>{euro(agency.margin)}</strong></p>
           <p>Garanties : <strong>{agency.warranties}</strong></p>
           <p>Taux garantie : <strong>{agency.warrantyRate}%</strong></p>
-          <button className="btn">Voir comparatif</button>
+          <button className="btn" onClick={() => setSelectedAgencyId(agency.id)}>
+            Voir comparatif
+          </button>
         </div>
       ))}
     </div>
