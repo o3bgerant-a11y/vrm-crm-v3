@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import {
   Agences,
   Agents,
+  Leads,
   Ventes,
   Garanties,
   Messages,
@@ -31,6 +32,7 @@ const titles: Record<string, string> = {
   planning: 'Planning Benoît',
   agences: 'Agences',
   agents: 'Agents commerciaux',
+  leads: 'Leads',
   ventes: 'Ventes véhicules',
   garanties: 'Garanties',
   messages: 'Messages Direction',
@@ -323,6 +325,7 @@ export default function Home() {
 
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
+        {active === 'leads' && <Leads />}
         {active === 'ventes' && <Ventes />}
         {active === 'garanties' && <Garanties />}
         {active === 'messages' && (
