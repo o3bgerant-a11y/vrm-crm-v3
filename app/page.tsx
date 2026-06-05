@@ -10,6 +10,7 @@ import {
   Agences,
   Agents,
   Leads,
+  RapportSemaine,
   Ventes,
   Garanties,
   Messages,
@@ -33,6 +34,7 @@ const titles: Record<string, string> = {
   agences: 'Agences',
   agents: 'Agents commerciaux',
   leads: 'Leads',
+  'rapport-semaine': 'Rapport semaine',
   ventes: 'Ventes véhicules',
   garanties: 'Garanties',
   messages: 'Messages Direction',
@@ -330,6 +332,7 @@ export default function Home() {
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
         {active === 'leads' && <Leads />}
+        {active === 'rapport-semaine' && <RapportSemaine />}
         {active === 'ventes' && <Ventes />}
         {active === 'garanties' && <Garanties />}
         {active === 'messages' && (
