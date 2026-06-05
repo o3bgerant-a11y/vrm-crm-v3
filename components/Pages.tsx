@@ -1639,6 +1639,47 @@ export function RapportSemaine({
     return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
   }
 
+  function getMondayForWeekLabel(date: Date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function formatWeekDateLabel(date: Date) {
+    return date.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+    });
+  }
+
+  function getWeekOptionsForMonth(year: number, month: number) {
+    const firstDayOfMonth = new Date(year, month - 1, 1);
+    const lastDayOfMonth = new Date(year, month, 0);
+    const firstMonday = getMondayForWeekLabel(firstDayOfMonth);
+    const options: { value: string; label: string }[] = [];
+    const seen = new Set<number>();
+
+    for (let date = new Date(firstMonday); date <= lastDayOfMonth; date.setDate(date.getDate() + 7)) {
+      const weekNumber = getWeekNumberFromDate(date);
+      if (seen.has(weekNumber)) continue;
+      seen.add(weekNumber);
+
+      const weekStart = new Date(date);
+      const weekEnd = new Date(date);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      options.push({
+        value: String(weekNumber),
+        label: `Semaine ${weekNumber} — du ${formatWeekDateLabel(weekStart)} au ${formatWeekDateLabel(weekEnd)}`,
+      });
+    }
+
+    return options;
+  }
+
   const currentWeek = getWeekNumberFromDate(now);
   const responsableMode = isResponsable === true && currentAgent?.account_type === 'responsable';
 
@@ -1654,6 +1695,18 @@ export function RapportSemaine({
   const [selectedWeek, setSelectedWeek] = useState(String(currentWeek));
   const [selectedAgency, setSelectedAgency] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
+
+  const weekOptions = useMemo(() => {
+    return getWeekOptionsForMonth(Number(selectedYear || currentYear), Number(selectedMonth || currentMonth));
+  }, [selectedYear, selectedMonth]);
+
+  useEffect(() => {
+    if (weekOptions.length === 0) return;
+    const weekExists = weekOptions.some(option => option.value === selectedWeek);
+    if (!weekExists) {
+      setSelectedWeek(weekOptions[0].value);
+    }
+  }, [weekOptions, selectedWeek]);
 
   const [summary, setSummary] = useState('');
   const [actionsDone, setActionsDone] = useState<string[]>([]);
@@ -1919,8 +1972,25 @@ export function RapportSemaine({
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', gap: 10, marginTop: 12 }}>
           <input type="number" placeholder="Année" value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} />
-          <input type="number" placeholder="Mois" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} />
-          <input type="number" placeholder="Semaine" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} />
+          <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+            <option value="1">Janvier</option>
+            <option value="2">Février</option>
+            <option value="3">Mars</option>
+            <option value="4">Avril</option>
+            <option value="5">Mai</option>
+            <option value="6">Juin</option>
+            <option value="7">Juillet</option>
+            <option value="8">Août</option>
+            <option value="9">Septembre</option>
+            <option value="10">Octobre</option>
+            <option value="11">Novembre</option>
+            <option value="12">Décembre</option>
+          </select>
+          <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
+            {weekOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
 
           {responsableMode && (
             <select value={selectedAgency} onChange={(e) => {
