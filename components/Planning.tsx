@@ -17,6 +17,7 @@ const hours = [
 const START_HOUR = 7;
 const END_HOUR = 20;
 const HOUR_HEIGHT = 76;
+const GOOGLE_BLOIS_EMBED_URL = 'https://calendar.google.com/calendar/embed?src=blois%40vroommarket.fr&ctz=Europe%2FParis&mode=WEEK';
 
 const timeSlots = Array.from({ length: 53 }, (_, i) => {
   const totalMinutes = 7 * 60 + i * 15;
@@ -61,6 +62,41 @@ function getPlanningAgencyDescription(agencyId: number | null) {
   if (Number(agencyId) === 2) return 'Agenda partagé des agents de Tours.';
   if (Number(agencyId) === 3) return 'Agenda partagé des agents de Bourges.';
   return 'Agenda partagé de l’agence.';
+}
+
+function GoogleBloisCalendar() {
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div>
+          <h4>🟢 Agenda Google VM BLOIS</h4>
+          <p className="muted">Affichage en lecture seule de l’agenda Google existant : blois@vroommarket.fr.</p>
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 12,
+          borderRadius: 16,
+          overflow: 'hidden',
+          border: '1px solid rgba(148, 163, 184, 0.25)',
+          background: 'rgba(15, 23, 42, 0.35)'
+        }}
+      >
+        <iframe
+          title="Agenda Google VM BLOIS"
+          src={GOOGLE_BLOIS_EMBED_URL}
+          style={{
+            border: 0,
+            width: '100%',
+            height: 720,
+            display: 'block',
+            background: '#ffffff'
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function getMonday(date: Date) {
@@ -408,18 +444,18 @@ export default function Planning({
           </div>
 
           <div className="item">
-            <strong>🟢 Agenda Blois</strong>
-            <p className="muted">Agenda partagé des agents de Blois.</p>
+            <strong>🟢 Agenda Google Blois</strong>
+            <p className="muted">Agenda Google VM BLOIS intégré en lecture seule.</p>
           </div>
 
           <div className="item">
             <strong>🔵 Agenda Tours</strong>
-            <p className="muted">Agenda partagé des agents de Tours.</p>
+            <p className="muted">À configurer quand l’agenda Google Tours existera.</p>
           </div>
 
           <div className="item">
             <strong>🟠 Agenda Bourges</strong>
-            <p className="muted">Agenda partagé des agents de Bourges.</p>
+            <p className="muted">À configurer quand l’agenda Google Bourges existera.</p>
           </div>
         </div>
       ) : (
@@ -428,6 +464,17 @@ export default function Planning({
           <p className="muted">
             Cet onglet remplace le Planning Benoît pour les agents. Il affichera uniquement les rendez-vous de l’agence {agentAgencyName}.
           </p>
+        </div>
+      )}
+
+      {(responsableMode || Number(agentAgencyId) === 1) && (
+        <GoogleBloisCalendar />
+      )}
+
+      {!responsableMode && Number(agentAgencyId) !== 1 && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <h4>{getPlanningAgencyIcon(agentAgencyId)} Agenda Google {agentAgencyName}</h4>
+          <p className="muted">L’agenda Google de cette agence n’est pas encore configuré. Pour le moment, seul l’agenda Google VM BLOIS est intégré.</p>
         </div>
       )}
 
