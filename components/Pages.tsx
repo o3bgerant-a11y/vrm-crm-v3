@@ -130,6 +130,21 @@ type LeadItem = {
   } | null;
 };
 
+type WeeklyReport = {
+  id: number;
+  agent_id: number | null;
+  year_number: number;
+  month_number: number;
+  week_number: number;
+  summary: string | null;
+  actions_done: string | null;
+  next_week_objectives: string | null;
+  comments: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+
 
 function saleDateToDate(value: string | null) {
   if (!value) return null;
@@ -1586,6 +1601,414 @@ export function Leads() {
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+
+export function RapportSemaine({
+  currentAgent = null,
+  isResponsable = true,
+}: {
+  currentAgent?: CurrentAgentForPages | null;
+  isResponsable?: boolean;
+} = {}) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  function getWeekNumberFromDate(date: Date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  }
+
+  const currentWeek = getWeekNumberFromDate(now);
+  const responsableMode = isResponsable === true && currentAgent?.account_type === 'responsable';
+
+  const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
+  const [leadsList, setLeadsList] = useState<LeadItem[]>([]);
+  const [salesList, setSalesList] = useState<VehicleSale[]>([]);
+  const [reportsList, setReportsList] = useState<WeeklyReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const [selectedMonth, setSelectedMonth] = useState(String(currentMonth));
+  const [selectedWeek, setSelectedWeek] = useState(String(currentWeek));
+  const [selectedAgency, setSelectedAgency] = useState<string>('all');
+  const [selectedAgent, setSelectedAgent] = useState<string>('all');
+
+  const [summary, setSummary] = useState('');
+  const [actionsDone, setActionsDone] = useState<string[]>([]);
+  const [nextWeekObjectives, setNextWeekObjectives] = useState('');
+  const [comments, setComments] = useState('');
+
+  const actionChoices = [
+    'Démarchage téléphonique',
+    'Relances clients',
+    'Publications réseaux sociaux',
+    'Visites / RDV clients',
+    'Prospection terrain',
+    'Suivi administratif',
+  ];
+
+  async function loadWeeklyPage() {
+    setLoading(true);
+
+    const { data: agentsData, error: agentsError } = await supabase
+      .from('agents')
+      .select('id, full_name, agency_id')
+      .order('full_name', { ascending: true });
+
+    const { data: leadsData, error: leadsError } = await supabase
+      .from('leads')
+      .select('*, agents (full_name, agency_id)')
+      .order('id', { ascending: false });
+
+    const { data: salesData, error: salesError } = await supabase
+      .from('vehicle_sales')
+      .select(`
+        *,
+        agents!vehicle_sales_agent_id_fkey (
+          full_name,
+          agency_id
+        )
+      `)
+      .order('id', { ascending: false });
+
+    const { data: reportsData, error: reportsError } = await supabase
+      .from('weekly_reports')
+      .select('*')
+      .order('id', { ascending: false });
+
+    if (agentsError) {
+      console.error('Erreur chargement agents rapport semaine:', agentsError);
+      setAgentsList([]);
+    } else {
+      setAgentsList((agentsData || []) as AgentOption[]);
+    }
+
+    if (leadsError) {
+      console.error('Erreur chargement leads rapport semaine:', leadsError);
+      setLeadsList([]);
+    } else {
+      setLeadsList((leadsData || []) as LeadItem[]);
+    }
+
+    if (salesError) {
+      console.error('Erreur chargement ventes rapport semaine:', salesError);
+      setSalesList([]);
+    } else {
+      setSalesList((salesData || []) as VehicleSale[]);
+    }
+
+    if (reportsError) {
+      console.error('Erreur chargement rapports semaine:', reportsError);
+      setReportsList([]);
+    } else {
+      setReportsList((reportsData || []) as WeeklyReport[]);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadWeeklyPage();
+  }, []);
+
+  useEffect(() => {
+    if (!responsableMode && currentAgent?.id) {
+      setSelectedAgent(String(currentAgent.id));
+      if (currentAgent.agency_id) setSelectedAgency(String(currentAgent.agency_id));
+    }
+  }, [responsableMode, currentAgent?.id, currentAgent?.agency_id]);
+
+  const availableAgents = useMemo(() => {
+    if (selectedAgency === 'all') return agentsList;
+    return agentsList.filter(agent => Number(agent.agency_id) === Number(selectedAgency));
+  }, [agentsList, selectedAgency]);
+
+  const selectedReport = useMemo(() => {
+    if (selectedAgent === 'all') return null;
+
+    return reportsList.find(report => (
+      Number(report.agent_id) === Number(selectedAgent)
+      && Number(report.year_number) === Number(selectedYear)
+      && Number(report.month_number) === Number(selectedMonth)
+      && Number(report.week_number) === Number(selectedWeek)
+    )) || null;
+  }, [reportsList, selectedAgent, selectedYear, selectedMonth, selectedWeek]);
+
+  useEffect(() => {
+    if (selectedReport) {
+      setSummary(selectedReport.summary || '');
+      setActionsDone(selectedReport.actions_done ? selectedReport.actions_done.split(' | ').filter(Boolean) : []);
+      setNextWeekObjectives(selectedReport.next_week_objectives || '');
+      setComments(selectedReport.comments || '');
+    } else {
+      setSummary('');
+      setActionsDone([]);
+      setNextWeekObjectives('');
+      setComments('');
+    }
+  }, [selectedReport?.id, selectedAgent, selectedYear, selectedMonth, selectedWeek]);
+
+  function saleMatchesPeriod(sale: VehicleSale) {
+    const date = saleDateToDate(sale.sale_date);
+    if (!date) return false;
+
+    return (
+      date.getFullYear() === Number(selectedYear)
+      && date.getMonth() + 1 === Number(selectedMonth)
+      && getWeekNumberFromDate(date) === Number(selectedWeek)
+    );
+  }
+
+  function leadMatchesFilters(lead: LeadItem) {
+    const leadAgencyId = lead.agency_id || lead.agents?.agency_id || null;
+
+    if (Number(lead.year_number || 0) !== Number(selectedYear)) return false;
+    if (Number(lead.month_number || 0) !== Number(selectedMonth)) return false;
+    if (Number(lead.week_number || 0) !== Number(selectedWeek)) return false;
+
+    if (selectedAgency !== 'all' && Number(leadAgencyId) !== Number(selectedAgency)) return false;
+    if (selectedAgent !== 'all' && Number(lead.agent_id) !== Number(selectedAgent)) return false;
+
+    if (!responsableMode && currentAgent?.id && Number(lead.agent_id) !== Number(currentAgent.id)) return false;
+
+    return true;
+  }
+
+  function saleMatchesFilters(sale: VehicleSale) {
+    const saleAgencyId = sale.agents?.agency_id || null;
+
+    if (!saleMatchesPeriod(sale)) return false;
+    if (selectedAgency !== 'all' && Number(saleAgencyId) !== Number(selectedAgency)) return false;
+    if (selectedAgent !== 'all' && Number(sale.agent_id) !== Number(selectedAgent)) return false;
+
+    if (!responsableMode && currentAgent?.id && Number(sale.agent_id) !== Number(currentAgent.id)) return false;
+
+    return true;
+  }
+
+  const filteredLeads = useMemo(() => leadsList.filter(leadMatchesFilters), [leadsList, selectedYear, selectedMonth, selectedWeek, selectedAgency, selectedAgent, responsableMode, currentAgent?.id]);
+  const filteredSales = useMemo(() => salesList.filter(saleMatchesFilters), [salesList, selectedYear, selectedMonth, selectedWeek, selectedAgency, selectedAgent, responsableMode, currentAgent?.id]);
+
+  const weeklyStats = useMemo(() => {
+    const leads = filteredLeads.length;
+    const rdv = filteredLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+    const vehicles = filteredLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+    const mandates = filteredLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+    const sales = filteredSales.length;
+    const warranties = filteredSales.filter(sale => sale.warranty_sold).length;
+    const ca = filteredSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
+    const margin = filteredSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
+    const conversionRate = leads > 0 ? Math.round((sales / leads) * 100) : 0;
+
+    return { leads, rdv, vehicles, mandates, sales, warranties, ca, margin, conversionRate };
+  }, [filteredLeads, filteredSales]);
+
+  const agentRows = useMemo(() => {
+    return availableAgents.map((agent) => {
+      const agentLeads = filteredLeads.filter(lead => Number(lead.agent_id) === Number(agent.id));
+      const agentSales = filteredSales.filter(sale => Number(sale.agent_id) === Number(agent.id));
+      const agentReport = reportsList.find(report => (
+        Number(report.agent_id) === Number(agent.id)
+        && Number(report.year_number) === Number(selectedYear)
+        && Number(report.month_number) === Number(selectedMonth)
+        && Number(report.week_number) === Number(selectedWeek)
+      ));
+
+      const ca = agentSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
+      const margin = agentSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
+      const warranties = agentSales.filter(sale => sale.warranty_sold).length;
+      const sales = agentSales.length;
+      const conversionRate = agentLeads.length > 0 ? Math.round((sales / agentLeads.length) * 100) : 0;
+
+      return {
+        agent,
+        leads: agentLeads.length,
+        rdv: agentLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
+        vehicles: agentLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
+        mandates: agentLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
+        sales,
+        warranties,
+        ca,
+        margin,
+        conversionRate,
+        report: agentReport,
+      };
+    }).filter(row => selectedAgent === 'all' || Number(row.agent.id) === Number(selectedAgent));
+  }, [availableAgents, filteredLeads, filteredSales, reportsList, selectedYear, selectedMonth, selectedWeek, selectedAgent]);
+
+  function toggleAction(action: string) {
+    setActionsDone((current) => (
+      current.includes(action)
+        ? current.filter(item => item !== action)
+        : [...current, action]
+    ));
+  }
+
+  async function saveWeeklyReport() {
+    if (selectedAgent === 'all') {
+      alert('Sélectionne un agent précis pour enregistrer son résumé de semaine.');
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      agent_id: Number(selectedAgent),
+      year_number: Number(selectedYear),
+      month_number: Number(selectedMonth),
+      week_number: Number(selectedWeek),
+      summary: summary.trim() || null,
+      actions_done: actionsDone.join(' | ') || null,
+      next_week_objectives: nextWeekObjectives.trim() || null,
+      comments: comments.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = selectedReport
+      ? await supabase.from('weekly_reports').update(payload).eq('id', selectedReport.id)
+      : await supabase.from('weekly_reports').insert(payload);
+
+    if (error) {
+      console.error('Erreur sauvegarde rapport semaine:', error);
+      alert('Erreur pendant l’enregistrement du rapport semaine.');
+    } else {
+      await loadWeeklyPage();
+      alert('Rapport semaine enregistré.');
+    }
+
+    setSaving(false);
+  }
+
+  return (
+    <div className="section">
+      <div className="card">
+        <h3>Rapport semaine</h3>
+        <p className="muted">
+          Les chiffres sont calculés automatiquement depuis les leads et les ventes. L’agent ajoute seulement son résumé, ses actions et ses objectifs.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', gap: 10, marginTop: 12 }}>
+          <input type="number" placeholder="Année" value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} />
+          <input type="number" placeholder="Mois" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} />
+          <input type="number" placeholder="Semaine" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} />
+
+          {responsableMode && (
+            <select value={selectedAgency} onChange={(e) => {
+              setSelectedAgency(e.target.value);
+              setSelectedAgent('all');
+            }}>
+              <option value="all">Toutes les agences</option>
+              <option value="1">Blois</option>
+              <option value="2">Tours</option>
+              <option value="3">Bourges</option>
+            </select>
+          )}
+
+          <select value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)} disabled={!responsableMode && Boolean(currentAgent?.id)}>
+            {responsableMode && <option value="all">Tous les agents</option>}
+            {availableAgents.map((agent) => (
+              <option key={agent.id} value={agent.id}>{agent.full_name} — {agencyName(agent.agency_id)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {loading && <div className="card"><p className="muted">Chargement du rapport semaine...</p></div>}
+
+      {!loading && (
+        <>
+          <div className="grid cards3">
+            <div className="card"><h3>Leads</h3><div className="stat-value">{weeklyStats.leads}</div><p className="muted">Créés sur la semaine</p></div>
+            <div className="card"><h3>RDV</h3><div className="stat-value">{weeklyStats.rdv}</div><p className="muted">RDV pris ou effectués</p></div>
+            <div className="card"><h3>Véhicules rentrés</h3><div className="stat-value">{weeklyStats.vehicles}</div><p className="muted">Depuis les leads</p></div>
+          </div>
+
+          <div className="grid cards3">
+            <div className="card"><h3>Mandats</h3><div className="stat-value">{weeklyStats.mandates}</div><p className="muted">Mandats signés</p></div>
+            <div className="card"><h3>Ventes</h3><div className="stat-value">{weeklyStats.sales}</div><p className="muted">CA : {euro(weeklyStats.ca)}</p></div>
+            <div className="card"><h3>Marge</h3><div className="stat-value">{euro(weeklyStats.margin)}</div><p className="muted">Transformation : {weeklyStats.conversionRate}%</p></div>
+          </div>
+
+          <div className="card">
+            <h3>Résumé agent</h3>
+            <p className="muted">À remplir uniquement pour un agent précis. Les chiffres au-dessus restent automatiques.</p>
+
+            <div style={{ display: 'grid', gap: 10 }}>
+              <textarea placeholder="Résumé de la semaine..." value={summary} onChange={(e) => setSummary(e.target.value)} disabled={selectedAgent === 'all'} />
+
+              <div className="item">
+                <strong>Actions réalisées</strong>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 8, marginTop: 8 }}>
+                  {actionChoices.map((action) => (
+                    <label key={action} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input type="checkbox" checked={actionsDone.includes(action)} onChange={() => toggleAction(action)} disabled={selectedAgent === 'all'} />
+                      {action}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <textarea placeholder="Objectifs de la semaine prochaine..." value={nextWeekObjectives} onChange={(e) => setNextWeekObjectives(e.target.value)} disabled={selectedAgent === 'all'} />
+              <textarea placeholder="Commentaire Responsable / remarques internes..." value={comments} onChange={(e) => setComments(e.target.value)} disabled={selectedAgent === 'all'} />
+
+              <button className="btn" onClick={saveWeeklyReport} disabled={saving || selectedAgent === 'all'}>
+                {saving ? 'Enregistrement...' : selectedReport ? 'Modifier le rapport semaine' : 'Enregistrer le rapport semaine'}
+              </button>
+            </div>
+          </div>
+
+          {responsableMode && (
+            <div className="card">
+              <h3>Vue Responsable par agent</h3>
+              <p className="muted">Trié selon les filtres année / mois / semaine / agence / agent.</p>
+
+              {agentRows.length === 0 ? (
+                <p className="muted">Aucun agent à afficher pour ces filtres.</p>
+              ) : (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Agent</th>
+                      <th>Agence</th>
+                      <th>Leads</th>
+                      <th>RDV</th>
+                      <th>Rentrées</th>
+                      <th>Mandats</th>
+                      <th>Ventes</th>
+                      <th>Marge</th>
+                      <th>Résumé</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {agentRows.map((row) => (
+                      <tr key={row.agent.id}>
+                        <td><strong>{row.agent.full_name}</strong></td>
+                        <td><span className="badge">{agencyName(row.agent.agency_id)}</span></td>
+                        <td>{row.leads}</td>
+                        <td>{row.rdv}</td>
+                        <td>{row.vehicles}</td>
+                        <td>{row.mandates}</td>
+                        <td>{row.sales}</td>
+                        <td><strong>{euro(row.margin)}</strong></td>
+                        <td>{row.report?.summary ? '✅ Rempli' : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
