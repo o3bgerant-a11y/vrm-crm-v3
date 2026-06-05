@@ -332,7 +332,12 @@ export default function Home() {
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
         {active === 'leads' && <Leads />}
-        {active === 'rapport-semaine' && <RapportSemaine />}
+        {active === 'rapport-semaine' && (
+          <RapportSemaine
+            currentAgent={currentAgent}
+            isResponsable={isResponsable}
+          />
+        )}
         {active === 'ventes' && <Ventes />}
         {active === 'garanties' && <Garanties />}
         {active === 'messages' && (
