@@ -1792,8 +1792,9 @@ export function RapportSemaine({
     if (selectedReport) {
       setSummary(reportSummary(selectedReport));
       const actionText = reportActions(selectedReport);
-      setActionsDone(actionText ? actionText.split('
-').filter(Boolean) : []);
+      setActionsDone(
+  actionText ? actionText.split('\n').filter(Boolean) : []
+);
       setNextWeekObjectives(reportObjectives(selectedReport));
       setComments(selectedReport.comments || '');
     } else {
