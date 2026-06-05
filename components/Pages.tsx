@@ -912,6 +912,12 @@ export function Leads() {
   const leadSources = ['Call Center', 'Démarchage Agent', 'Visite spontanée', 'Leboncoin', 'Facebook', 'Google', 'Recommandation', 'Passage agence', 'Autre'];
   const leadStatuses = ['Nouveau', 'RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu', 'À relancer', 'Perdu', 'Refusé'];
 
+  const calculatedLeadMargin = useMemo(() => {
+    const sale = Number(salePrice || 0);
+    const seller = Number(sellerNetPrice || 0);
+    return sale - seller;
+  }, [salePrice, sellerNetPrice]);
+
   async function loadAgents() {
     const { data, error } = await supabase
       .from('agents')
@@ -1020,6 +1026,83 @@ export function Leads() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  async function createOrUpdateSaleFromLead(savedLead: LeadItem, finalAgencyId: number | null, finalMarginAmount: number) {
+    if (!saleDone) return;
+
+    const leadId = savedLead?.id || editingLead?.id;
+
+    if (!leadId) {
+      alert('Lead enregistré, mais la vente automatique n’a pas pu être créée car l’identifiant du lead est introuvable.');
+      return;
+    }
+
+    const marker = `Lead #${leadId}`;
+    const vehicleName = [vehicleBrand.trim(), vehicleModel.trim()].filter(Boolean).join(' ') || `Véhicule ${marker}`;
+    const saleValue = Number(salePrice || 0);
+    const sellerValue = Number(sellerNetPrice || 0);
+    const warrantyValue = Number(warrantyAmount || 0);
+
+    const saleComments = [
+      comments.trim(),
+      `Créée automatiquement depuis ${marker}`,
+      customerName.trim() ? `Client lead : ${customerName.trim()}` : '',
+      customerPhone.trim() ? `Téléphone lead : ${customerPhone.trim()}` : '',
+      source ? `Source lead : ${source}` : '',
+    ].filter(Boolean).join('\n');
+
+    const salePayload = {
+      agent_id: Number(agentId),
+      weekly_report_id: 1,
+      sale_date: appointmentDate || leadDate || today,
+      vehicle_name: vehicleName,
+      vehicle_photo_url: null,
+      seller_price: sellerValue,
+      sale_price: saleValue,
+      margin_amount: finalMarginAmount,
+      warranty_sold: warrantySold,
+      warranty_type: warrantySold ? 'Garantie vendue depuis lead' : null,
+      warranty_amount: warrantySold ? warrantyValue : 0,
+      registration: vehicleRegistration.trim() || null,
+      vin: null,
+      comments: saleComments,
+    };
+
+    const { data: existingSales, error: existingError } = await supabase
+      .from('vehicle_sales')
+      .select('id')
+      .ilike('comments', `%${marker}%`)
+      .limit(1);
+
+    if (existingError) {
+      console.error('Erreur recherche vente liée au lead:', existingError);
+      alert('Lead enregistré, mais la vérification de vente liée a échoué. La vente n’a pas été créée pour éviter un doublon.');
+      return;
+    }
+
+    if (existingSales && existingSales.length > 0) {
+      const { error: updateSaleError } = await supabase
+        .from('vehicle_sales')
+        .update(salePayload)
+        .eq('id', existingSales[0].id);
+
+      if (updateSaleError) {
+        console.error('Erreur mise à jour vente depuis lead:', updateSaleError);
+        alert('Lead enregistré, mais erreur pendant la mise à jour de la vente liée.');
+      }
+
+      return;
+    }
+
+    const { error: insertSaleError } = await supabase
+      .from('vehicle_sales')
+      .insert(salePayload);
+
+    if (insertSaleError) {
+      console.error('Erreur création vente depuis lead:', insertSaleError);
+      alert('Lead enregistré, mais erreur pendant la création automatique de la vente.');
+    }
+  }
+
   async function saveLead() {
     if (!customerName.trim()) {
       alert('Il faut indiquer le nom du client.');
@@ -1031,8 +1114,16 @@ export function Leads() {
       return;
     }
 
+    if (saleDone && (!sellerNetPrice || !salePrice)) {
+      alert('Pour transformer le lead en vente, il faut indiquer le prix net vendeur et le prix de vente.');
+      return;
+    }
+
     const selectedAgent = agentOptions.find(agent => Number(agent.id) === Number(agentId));
     const finalAgencyId = agencyId || selectedAgent?.agency_id || null;
+    const finalMarginAmount = saleDone
+      ? (marginAmount ? Number(marginAmount) : calculatedLeadMargin)
+      : Number(marginAmount || 0);
 
     setSaving(true);
 
@@ -1043,7 +1134,7 @@ export function Leads() {
       agency_id: finalAgencyId ? Number(finalAgencyId) : null,
       agent_id: Number(agentId),
       source,
-      status,
+      status: saleDone ? 'Véhicule vendu' : status,
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim() || null,
       customer_email: customerEmail.trim() || null,
@@ -1057,29 +1148,32 @@ export function Leads() {
       appointment_time: appointmentTime.trim() || null,
       seller_expected_price: Number(sellerExpectedPrice || 0),
       seller_net_price: Number(sellerNetPrice || 0),
-      mandate_signed: mandateSigned,
-      vehicle_entered: vehicleEntered,
+      mandate_signed: saleDone ? true : mandateSigned,
+      vehicle_entered: saleDone ? true : vehicleEntered,
       sale_done: saleDone,
       sale_price: Number(salePrice || 0),
-      margin_amount: Number(marginAmount || 0),
+      margin_amount: finalMarginAmount,
       warranty_sold: warrantySold,
       warranty_amount: Number(warrantyAmount || 0),
       comments: comments.trim() || null,
     };
 
-    const { error } = editingLead
-      ? await supabase.from('leads').update(payload).eq('id', editingLead.id)
-      : await supabase.from('leads').insert(payload);
+    const response = editingLead
+      ? await supabase.from('leads').update(payload).eq('id', editingLead.id).select('*').single()
+      : await supabase.from('leads').insert(payload).select('*').single();
 
-    if (error) {
-      console.error('Erreur sauvegarde lead:', error);
+    if (response.error) {
+      console.error('Erreur sauvegarde lead:', response.error);
       alert("Erreur pendant l'enregistrement du lead.");
-    } else {
-      resetForm();
-      setShowForm(false);
-      await loadLeads();
+      setSaving(false);
+      return;
     }
 
+    await createOrUpdateSaleFromLead(response.data as LeadItem, finalAgencyId ? Number(finalAgencyId) : null, finalMarginAmount);
+
+    resetForm();
+    setShowForm(false);
+    await loadLeads();
     setSaving(false);
   }
 
@@ -1184,7 +1278,7 @@ export function Leads() {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <h3>Leads et rendez-vous</h3>
-            <p className="muted">Suivi des RDV call center, démarchage, visites spontanées et transformations en véhicules rentrés / ventes.</p>
+            <p className="muted">Le lead devient la base de travail : recherche par plaque/modèle, puis transformation automatique en vente quand le véhicule est vendu.</p>
           </div>
 
           <button
@@ -1206,10 +1300,20 @@ export function Leads() {
             <h4>{editingLead ? 'Modifier le lead' : 'Nouveau lead / RDV'}</h4>
 
             <div style={{ display: 'grid', gap: 10 }}>
+              <div className="item">
+                <strong>1. Informations semaine</strong>
+                <p className="muted">Ces informations permettront de ressortir automatiquement les leads dans le futur rapport de semaine.</p>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: 10 }}>
                 <input type="number" placeholder="Année" value={yearNumber} onChange={(e) => setYearNumber(e.target.value)} />
                 <input type="number" placeholder="Mois" value={monthNumber} onChange={(e) => setMonthNumber(e.target.value)} />
                 <input type="number" placeholder="Semaine" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} />
+              </div>
+
+              <div className="item">
+                <strong>2. Source, agent et statut</strong>
+                <p className="muted">Le statut passera automatiquement en Véhicule vendu si la case vente est cochée.</p>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 10 }}>
@@ -1217,7 +1321,7 @@ export function Leads() {
                   {leadSources.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
 
-                <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={saleDone}>
                   {leadStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
 
@@ -1241,10 +1345,19 @@ export function Leads() {
                 </select>
               </div>
 
+              <div className="item">
+                <strong>3. Client</strong>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
                 <input placeholder="Nom client" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
                 <input placeholder="Téléphone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
                 <input placeholder="Email facultatif" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+              </div>
+
+              <div className="item">
+                <strong>4. Véhicule</strong>
+                <p className="muted">Ces champs servent aussi à retrouver le lead rapidement par recherche : plaque, marque, modèle, client.</p>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(130px, 1fr))', gap: 10 }}>
@@ -1261,18 +1374,20 @@ export function Leads() {
                 <input placeholder="Heure RDV ex : 14:30" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-                <input type="number" placeholder="Prix souhaité vendeur" value={sellerExpectedPrice} onChange={(e) => setSellerExpectedPrice(e.target.value)} />
-                <input type="number" placeholder="Prix net vendeur validé" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
-                <input type="number" placeholder="Prix de vente si vendu" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+              <div className="item">
+                <strong>5. Mandat / entrée véhicule</strong>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(150px, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
+                <input type="number" placeholder="Prix souhaité vendeur" value={sellerExpectedPrice} onChange={(e) => setSellerExpectedPrice(e.target.value)} />
+                <input type="number" placeholder="Prix net vendeur / prix acheté" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
                 <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="checkbox" checked={vehicleEntered} onChange={(e) => setVehicleEntered(e.target.checked)} />
                   Véhicule rentré
                 </label>
+              </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
                 <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="checkbox" checked={mandateSigned} onChange={(e) => setMandateSigned(e.target.checked)} />
                   Mandat signé
@@ -1280,21 +1395,40 @@ export function Leads() {
 
                 <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="checkbox" checked={saleDone} onChange={(e) => setSaleDone(e.target.checked)} />
-                  Véhicule vendu
+                  Véhicule vendu — créer / mettre à jour automatiquement la vente
                 </label>
-
-                <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="checkbox" checked={warrantySold} onChange={(e) => setWarrantySold(e.target.checked)} />
-                  Garantie vendue
-                </label>
-
-                <input type="number" placeholder="Montant garantie" value={warrantyAmount} onChange={(e) => setWarrantyAmount(e.target.value)} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
-                <input type="number" placeholder="Marge réalisée" value={marginAmount} onChange={(e) => setMarginAmount(e.target.value)} />
-                <textarea placeholder="Commentaires / suite à donner / raison du refus..." value={comments} onChange={(e) => setComments(e.target.value)} />
-              </div>
+              {saleDone && (
+                <div className="card" style={{ border: '1px solid rgba(34, 197, 94, 0.35)' }}>
+                  <h4>✅ Transformation automatique en vente</h4>
+                  <p className="muted">
+                    En enregistrant ce lead, le CRM créera ou mettra à jour une vente dans l’onglet Ventes avec le même agent, véhicule, plaque, prix, marge et garantie.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
+                    <input type="number" placeholder="Prix net vendeur / prix acheté" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
+                    <input type="number" placeholder="Prix de vente" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+                    <div className="item">
+                      <span className="muted">Marge calculée</span>
+                      <div style={{ fontSize: 22, fontWeight: 800 }}>{euro(calculatedLeadMargin)}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10, marginTop: 10 }}>
+                    <input type="number" placeholder="Marge forcée facultative" value={marginAmount} onChange={(e) => setMarginAmount(e.target.value)} />
+
+                    <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input type="checkbox" checked={warrantySold} onChange={(e) => setWarrantySold(e.target.checked)} />
+                      Garantie vendue
+                    </label>
+
+                    <input type="number" placeholder="Montant garantie" value={warrantyAmount} onChange={(e) => setWarrantyAmount(e.target.value)} />
+                  </div>
+                </div>
+              )}
+
+              <textarea placeholder="Commentaires / suite à donner / raison du refus..." value={comments} onChange={(e) => setComments(e.target.value)} />
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="btn" onClick={saveLead} disabled={saving}>
@@ -1309,7 +1443,7 @@ export function Leads() {
           </div>
         )}
 
-        <input className="search" placeholder="Recherche lead, client, téléphone, véhicule, agent, source..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginTop: 14 }} />
+        <input className="search" placeholder="Recherche plaque, modèle, marque, client, téléphone, agent, source..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginTop: 14 }} />
       </div>
 
       <div className="grid cards3">
@@ -1455,7 +1589,6 @@ export function Leads() {
     </div>
   );
 }
-
 
 export function Ventes() {
   const today = new Date().toISOString().slice(0, 10);
