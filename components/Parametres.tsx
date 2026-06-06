@@ -34,6 +34,9 @@ export default function Parametres() {
   const [password, setPassword] = useState('');
   const [agencyId, setAgencyId] = useState<number | ''>('');
 
+  const [resettingProfile, setResettingProfile] = useState<Profile | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
   async function loadProfiles() {
     setLoading(true);
 
@@ -72,6 +75,32 @@ export default function Parametres() {
     }
 
     setPassword(generated);
+  }
+
+  function createTemporaryPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!?#';
+    let generated = '';
+
+    for (let i = 0; i < 10; i++) {
+      generated += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    return generated;
+  }
+
+  function openResetPassword(profile: Profile) {
+    if (profile.role === 'patron' || profile.role === 'responsable') {
+      alert('Le mot de passe du compte Responsable ne peut pas être modifié ici.');
+      return;
+    }
+
+    setResettingProfile(profile);
+    setNewPassword(createTemporaryPassword());
+  }
+
+  function closeResetPassword() {
+    setResettingProfile(null);
+    setNewPassword('');
   }
 
   async function createAgent() {
@@ -188,6 +217,58 @@ export default function Parametres() {
     setSaving(false);
   }
 
+  async function resetAgentPassword() {
+    if (!resettingProfile) return;
+
+    if (!newPassword.trim()) {
+      alert('Il faut indiquer un nouveau mot de passe.');
+      return;
+    }
+
+    if (newPassword.trim().length < 6) {
+      alert('Le mot de passe doit faire au moins 6 caractères.');
+      return;
+    }
+
+    const ok = confirm(`Réinitialiser le mot de passe de ${resettingProfile.full_name} ?`);
+    if (!ok) return;
+
+    setSaving(true);
+
+    try {
+      const response = await fetch('/api/reset-agent-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profile_id: resettingProfile.id,
+          new_password: newPassword.trim(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || 'Erreur pendant la réinitialisation du mot de passe.');
+        setSaving(false);
+        return;
+      }
+
+      alert(
+        `Mot de passe réinitialisé avec succès.\n\nAgent : ${resettingProfile.full_name}\nEmail : ${resettingProfile.email || '-'}\nNouveau mot de passe temporaire : ${newPassword.trim()}\n\nTransmets ce mot de passe à l'agent. Il pourra ensuite le personnaliser.`
+      );
+
+      closeResetPassword();
+      await loadProfiles();
+    } catch (error) {
+      console.error(error);
+      alert('Erreur serveur pendant la réinitialisation du mot de passe.');
+    }
+
+    setSaving(false);
+  }
+
   function statusLabel(status: string) {
     if (status === 'active') return 'Actif';
     if (status === 'blocked') return 'Bloqué';
@@ -292,6 +373,52 @@ export default function Parametres() {
         </div>
       )}
 
+      {resettingProfile && (
+        <div className="card">
+          <h3>🔑 Réinitialiser le mot de passe</h3>
+
+          <p className="muted">
+            Agent : <strong>{resettingProfile.full_name}</strong> — {resettingProfile.email || '-'}
+          </p>
+
+          <div style={{ display: 'grid', gap: 10, marginTop: 15 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
+              <input
+                placeholder="Nouveau mot de passe temporaire"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+
+              <button
+                type="button"
+                onClick={() => setNewPassword(createTemporaryPassword())}
+                disabled={saving}
+              >
+                Générer
+              </button>
+            </div>
+
+            <div className="item">
+              <strong>Important</strong>
+              <p className="muted" style={{ marginTop: 5 }}>
+                Le nouveau mot de passe sera affiché une seule fois après validation.
+                Transmets-le à l'agent, puis demande-lui de le personnaliser depuis son espace.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn" onClick={resetAgentPassword} disabled={saving}>
+                {saving ? 'Réinitialisation...' : 'Réinitialiser le mot de passe'}
+              </button>
+
+              <button onClick={closeResetPassword} disabled={saving}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <h3>Comptes CRM</h3>
 
@@ -372,6 +499,15 @@ export default function Parametres() {
                             disabled={saving}
                           >
                             Archiver
+                          </button>
+                        )}
+
+                        {profile.status !== 'archived' && (
+                          <button
+                            onClick={() => openResetPassword(profile)}
+                            disabled={saving}
+                          >
+                            🔑 Réinitialiser MDP
                           </button>
                         )}
 
