@@ -8,10 +8,10 @@ type Profile = {
   full_name: string;
   email: string | null;
   role: string | null;
-  account_type?: string | null;
   status: string | null;
   agency_id: number | null;
   auth_user_id?: string | null;
+  is_admin?: boolean | null;
 };
 
 const agencyName = (agencyId: any) => {
@@ -47,9 +47,9 @@ export default function Parametres() {
   const [changingMyPassword, setChangingMyPassword] = useState(false);
 
   const isResponsable =
-    currentProfile?.account_type === 'responsable' ||
-    currentProfile?.role === 'responsable' ||
-    currentProfile?.role === 'patron';
+    currentProfile?.is_admin === true ||
+    currentProfile?.role === 'patron' ||
+    currentProfile?.role === 'responsable';
 
   async function loadCurrentProfileAndProfiles() {
     setLoading(true);
@@ -69,7 +69,7 @@ export default function Parametres() {
     const { data: myProfileData, error: myProfileError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('auth_user_id', userData.user.id)
+      .eq('user_id', userData.user.id)
       .maybeSingle();
 
     if (myProfileError) {
@@ -84,9 +84,9 @@ export default function Parametres() {
     setCurrentProfile(profile);
 
     const responsable =
-      profile?.account_type === 'responsable' ||
-      profile?.role === 'responsable' ||
-      profile?.role === 'patron';
+      profile?.is_admin === true ||
+      profile?.role === 'patron' ||
+      profile?.role === 'responsable';
 
     if (!responsable) {
       setProfiles([]);
@@ -145,7 +145,7 @@ export default function Parametres() {
   function openResetPassword(profile: Profile) {
     if (!isResponsable) return;
 
-    if (profile.role === 'patron' || profile.role === 'responsable' || profile.account_type === 'responsable') {
+    if (profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true) {
       alert('Le mot de passe du compte Responsable ne peut pas être modifié ici.');
       return;
     }
@@ -224,8 +224,8 @@ export default function Parametres() {
   async function updateAccount(profile: Profile, action: 'block' | 'activate' | 'archive') {
     if (!isResponsable) return;
 
-    if (profile.role === 'patron') {
-      alert('Le compte Patron ne peut pas être modifié ici.');
+    if (profile.role === 'patron' || profile.is_admin === true) {
+      alert('Le compte Responsable ne peut pas être modifié ici.');
       return;
     }
 
@@ -633,7 +633,7 @@ export default function Parametres() {
                     </td>
 
                     <td>
-                      {profile.role || profile.account_type || '-'}
+                      {profile.role || '-'}
                     </td>
 
                     <td>
@@ -645,7 +645,7 @@ export default function Parametres() {
                     </td>
 
                     <td>
-                      {profile.role === 'patron' || profile.account_type === 'responsable' ? (
+                      {profile.role === 'patron' || profile.is_admin === true ? (
                         <span className="muted">Compte Responsable</span>
                       ) : (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
