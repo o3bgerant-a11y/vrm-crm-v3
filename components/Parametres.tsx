@@ -37,6 +37,11 @@ export default function Parametres() {
   const [resettingProfile, setResettingProfile] = useState<Profile | null>(null);
   const [newPassword, setNewPassword] = useState('');
 
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [myNewPassword, setMyNewPassword] = useState('');
+  const [myConfirmPassword, setMyConfirmPassword] = useState('');
+  const [changingMyPassword, setChangingMyPassword] = useState(false);
+
   async function loadProfiles() {
     setLoading(true);
 
@@ -57,6 +62,10 @@ export default function Parametres() {
 
   useEffect(() => {
     loadProfiles();
+
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email || null);
+    });
   }, []);
 
   function resetForm() {
@@ -269,6 +278,43 @@ export default function Parametres() {
     setSaving(false);
   }
 
+  async function changeMyPassword() {
+    if (!myNewPassword.trim() || !myConfirmPassword.trim()) {
+      alert('Il faut indiquer et confirmer le nouveau mot de passe.');
+      return;
+    }
+
+    if (myNewPassword.trim().length < 6) {
+      alert('Le mot de passe doit faire au moins 6 caractères.');
+      return;
+    }
+
+    if (myNewPassword.trim() !== myConfirmPassword.trim()) {
+      alert('Les deux mots de passe ne sont pas identiques.');
+      return;
+    }
+
+    const ok = confirm('Modifier ton mot de passe de connexion CRM ?');
+    if (!ok) return;
+
+    setChangingMyPassword(true);
+
+    const { error } = await supabase.auth.updateUser({
+      password: myNewPassword.trim(),
+    });
+
+    if (error) {
+      console.error('Erreur modification mot de passe personnel:', error);
+      alert(error.message || 'Erreur pendant la modification du mot de passe.');
+    } else {
+      alert('Mot de passe modifié avec succès. Utilise ce nouveau mot de passe à ta prochaine connexion.');
+      setMyNewPassword('');
+      setMyConfirmPassword('');
+    }
+
+    setChangingMyPassword(false);
+  }
+
   function statusLabel(status: string) {
     if (status === 'active') return 'Actif';
     if (status === 'blocked') return 'Bloqué';
@@ -300,6 +346,53 @@ export default function Parametres() {
           >
             {showForm ? 'Fermer le formulaire' : '➕ Créer un agent'}
           </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>👤 Mon compte</h3>
+
+        <p className="muted">
+          {currentUserEmail ? `Connecté avec : ${currentUserEmail}` : 'Compte CRM connecté.'}
+        </p>
+
+        <div style={{ display: 'grid', gap: 10, marginTop: 15 }}>
+          <input
+            type="password"
+            placeholder="Nouveau mot de passe"
+            value={myNewPassword}
+            onChange={(e) => setMyNewPassword(e.target.value)}
+          />
+
+          <input
+            type="password"
+            placeholder="Confirmer le nouveau mot de passe"
+            value={myConfirmPassword}
+            onChange={(e) => setMyConfirmPassword(e.target.value)}
+          />
+
+          <div className="item">
+            <strong>Important</strong>
+            <p className="muted" style={{ marginTop: 5 }}>
+              Ce changement modifie uniquement ton propre mot de passe. Les agents peuvent donc personnaliser leur accès sans passer par le Responsable.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn" onClick={changeMyPassword} disabled={changingMyPassword || saving}>
+              {changingMyPassword ? 'Modification...' : '🔑 Modifier mon mot de passe'}
+            </button>
+
+            <button
+              onClick={() => {
+                setMyNewPassword('');
+                setMyConfirmPassword('');
+              }}
+              disabled={changingMyPassword}
+            >
+              Effacer
+            </button>
+          </div>
         </div>
       </div>
 
