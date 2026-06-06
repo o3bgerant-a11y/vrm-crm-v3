@@ -28,7 +28,7 @@ const items = [
   ['messages', 'Messages Direction', Megaphone, 'all'],
   ['documents', 'Documents', FileText, 'all'],
   ['stats', 'Statistiques', BarChart3, 'all'],
-  ['parametres', 'Paramètres', Settings, 'responsable'],
+  ['parametres', 'Paramètres', Settings, 'all'],
 ] as const;
 
 export default function Sidebar({
