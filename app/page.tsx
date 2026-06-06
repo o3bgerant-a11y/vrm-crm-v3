@@ -354,7 +354,7 @@ export default function Home() {
           />
         )}
         {active === 'stats' && <Stats />}
-        {active === 'parametres' && <Parametres isResponsable={isResponsable} />}
+        {active === 'parametres' && <Parametres />}
       </main>
     </div>
   );
