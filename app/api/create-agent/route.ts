@@ -15,11 +15,21 @@ export async function POST(request: Request) {
       email,
       password,
       agency_id,
+      account_type = 'agent',
     } = body;
 
-    if (!full_name || !email || !password || !agency_id) {
+    const cleanAccountType = account_type === 'responsable' ? 'responsable' : 'agent';
+
+    if (!full_name || !email || !password) {
       return NextResponse.json(
-        { error: 'Nom, email, mot de passe et agence obligatoires.' },
+        { error: 'Nom, email et mot de passe obligatoires.' },
+        { status: 400 }
+      );
+    }
+
+    if (cleanAccountType === 'agent' && !agency_id) {
+      return NextResponse.json(
+        { error: "L'agence est obligatoire pour un agent commercial." },
         { status: 400 }
       );
     }
@@ -32,7 +42,7 @@ export async function POST(request: Request) {
       email_confirm: true,
       user_metadata: {
         full_name,
-        role: 'agent',
+        role: cleanAccountType,
       },
     });
 
@@ -44,6 +54,49 @@ export async function POST(request: Request) {
     }
 
     const userId = authData.user.id;
+
+    if (cleanAccountType === 'responsable') {
+      const { data: profileData, error: profileError } = await adminSupabase
+        .from('profiles')
+        .insert({
+          user_id: userId,
+          full_name,
+          email: cleanEmail,
+          role: 'responsable',
+          agency_id: null,
+          agent_id: null,
+          status: 'active',
+          must_change_password: true,
+          is_admin: true,
+        })
+        .select('id')
+        .single();
+
+      if (profileError || !profileData) {
+        await adminSupabase.auth.admin.deleteUser(userId);
+
+        return NextResponse.json(
+          { error: profileError?.message || "Erreur pendant la création du profil Responsable." },
+          { status: 400 }
+        );
+      }
+
+      await adminSupabase
+        .from('user_accounts')
+        .insert({
+          profile_id: profileData.id,
+          email: cleanEmail,
+          status: 'active',
+        });
+
+      return NextResponse.json({
+        success: true,
+        profile_id: profileData.id,
+        auth_user_id: userId,
+        account_type: 'responsable',
+        message: 'Responsable créé avec succès.',
+      });
+    }
 
     const { data: agentData, error: agentError } = await adminSupabase
       .from('agents')
@@ -117,6 +170,7 @@ export async function POST(request: Request) {
       agent_id: agentData.id,
       profile_id: profileData.id,
       auth_user_id: userId,
+      account_type: 'agent',
       message: 'Agent créé avec succès.',
     });
   } catch (error: any) {
