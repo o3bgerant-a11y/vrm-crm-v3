@@ -24,8 +24,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const cleanEmail = String(email).trim().toLowerCase();
+
     const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
-      email,
+      email: cleanEmail,
       password,
       email_confirm: true,
       user_metadata: {
@@ -47,7 +49,11 @@ export async function POST(request: Request) {
       .from('agents')
       .insert({
         full_name,
+        email: cleanEmail,
         agency_id: Number(agency_id),
+        role: 'agent',
+        account_type: 'agent',
+        auth_user_id: userId,
       })
       .select('id')
       .single();
@@ -66,7 +72,7 @@ export async function POST(request: Request) {
       .insert({
         user_id: userId,
         full_name,
-        email,
+        email: cleanEmail,
         role: 'agent',
         agency_id: Number(agency_id),
         agent_id: agentData.id,
@@ -91,6 +97,10 @@ export async function POST(request: Request) {
       .from('agents')
       .update({
         profile_id: profileData.id,
+        auth_user_id: userId,
+        email: cleanEmail,
+        role: 'agent',
+        account_type: 'agent',
       })
       .eq('id', agentData.id);
 
@@ -98,7 +108,7 @@ export async function POST(request: Request) {
       .from('user_accounts')
       .insert({
         profile_id: profileData.id,
-        email,
+        email: cleanEmail,
         status: 'active',
       });
 
@@ -106,6 +116,7 @@ export async function POST(request: Request) {
       success: true,
       agent_id: agentData.id,
       profile_id: profileData.id,
+      auth_user_id: userId,
       message: 'Agent créé avec succès.',
     });
   } catch (error: any) {
