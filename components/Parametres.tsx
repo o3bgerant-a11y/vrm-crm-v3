@@ -10,7 +10,9 @@ type Profile = {
   role: string | null;
   status: string | null;
   agency_id: number | null;
+  user_id?: string | null;
   auth_user_id?: string | null;
+  agent_id?: number | null;
   is_admin?: boolean | null;
 };
 
@@ -386,6 +388,10 @@ export default function Parametres() {
     return status || '-';
   }
 
+  function isProtectedProfile(profile: Profile) {
+    return profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true;
+  }
+
   if (loading) {
     return (
       <div className="section">
@@ -633,89 +639,97 @@ export default function Parametres() {
               </thead>
 
               <tbody>
-                {profiles.map(profile => (
-                  <tr key={profile.id}>
-                    <td>
-                      <strong>{profile.full_name}</strong>
-                    </td>
+                {profiles.map(profile => {
+                  const protectedProfile = isProtectedProfile(profile);
 
-                    <td>
-                      {profile.email || '-'}
-                    </td>
+                  return (
+                    <tr key={profile.id}>
+                      <td>
+                        <strong>{profile.full_name}</strong>
+                      </td>
 
-                    <td>
-                      {profile.role || '-'}
-                    </td>
+                      <td>
+                        {profile.email || '-'}
+                      </td>
 
-                    <td>
-                      {agencyName(profile.agency_id)}
-                    </td>
+                      <td>
+                        {profile.role || '-'}
+                      </td>
 
-                    <td>
-                      <strong>{statusLabel(profile.status)}</strong>
-                    </td>
+                      <td>
+                        {agencyName(profile.agency_id)}
+                      </td>
 
-                    <td>
-                      {profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true ? (
-                        <span className="muted">Compte Responsable</span>
-                      ) : (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {profile.status !== 'blocked' && profile.status !== 'archived' && (
+                      <td>
+                        <strong>{statusLabel(profile.status)}</strong>
+                      </td>
+
+                      <td>
+                        {protectedProfile ? (
+                          <span className="muted">Compte Responsable</span>
+                        ) : (
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              {profile.status !== 'blocked' && profile.status !== 'archived' && (
+                                <button
+                                  onClick={() => updateAccount(profile, 'block')}
+                                  disabled={saving}
+                                >
+                                  Bloquer
+                                </button>
+                              )}
+
+                              {profile.status === 'blocked' && (
+                                <button
+                                  onClick={() => updateAccount(profile, 'activate')}
+                                  disabled={saving}
+                                >
+                                  Réactiver
+                                </button>
+                              )}
+
+                              {profile.status !== 'archived' && (
+                                <button
+                                  onClick={() => updateAccount(profile, 'archive')}
+                                  disabled={saving}
+                                >
+                                  Archiver
+                                </button>
+                              )}
+
+                              {profile.status !== 'archived' && (
+                                <button
+                                  onClick={() => openResetPassword(profile)}
+                                  disabled={saving}
+                                >
+                                  🔑 Réinitialiser MDP
+                                </button>
+                              )}
+
+                              {profile.status === 'archived' && (
+                                <span className="muted">Archivé</span>
+                              )}
+                            </div>
+
                             <button
-                              onClick={() => updateAccount(profile, 'block')}
+                              onClick={() => updateAccount(profile, 'delete')}
                               disabled={saving}
+                              style={{
+                                background: '#dc2626',
+                                color: '#ffffff',
+                                borderColor: '#dc2626',
+                                width: 'fit-content',
+                                fontWeight: 800,
+                              }}
                             >
-                              Bloquer
+                              🗑️ Supprimer définitivement
                             </button>
-                          )}
-
-                          {profile.status === 'blocked' && (
-                            <button
-                              onClick={() => updateAccount(profile, 'activate')}
-                              disabled={saving}
-                            >
-                              Réactiver
-                            </button>
-                          )}
-
-                          {profile.status !== 'archived' && (
-                            <button
-                              onClick={() => updateAccount(profile, 'archive')}
-                              disabled={saving}
-                            >
-                              Archiver
-                            </button>
-                          )}
-
-                          {profile.status !== 'archived' && (
-                            <button
-                              onClick={() => openResetPassword(profile)}
-                              disabled={saving}
-                            >
-                              🔑 Réinitialiser MDP
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() => updateAccount(profile, 'delete')}
-                            disabled={saving}
-                            style={{
-                              background: '#dc2626',
-                              color: '#ffffff',
-                              borderColor: '#dc2626',
-                            }}
-                          >
-                            🗑️ Supprimer
-                          </button>
-
-                          {profile.status === 'archived' && (
-                            <span className="muted">Archivé</span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
