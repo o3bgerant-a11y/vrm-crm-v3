@@ -36,6 +36,7 @@ export default function Parametres() {
 
   const [showForm, setShowForm] = useState(false);
 
+  const [accountType, setAccountType] = useState<'agent' | 'responsable'>('agent');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -116,6 +117,7 @@ export default function Parametres() {
   }, []);
 
   function resetForm() {
+    setAccountType('agent');
     setFullName('');
     setEmail('');
     setPassword('');
@@ -161,11 +163,11 @@ export default function Parametres() {
     setNewPassword('');
   }
 
-  async function createAgent() {
+  async function createAccount() {
     if (!isResponsable) return;
 
     if (!fullName.trim()) {
-      alert("Il faut indiquer le nom de l'agent.");
+      alert("Il faut indiquer le nom du compte.");
       return;
     }
 
@@ -179,7 +181,7 @@ export default function Parametres() {
       return;
     }
 
-    if (!agencyId) {
+    if (accountType === 'agent' && !agencyId) {
       alert("Il faut sélectionner l'agence de l'agent.");
       return;
     }
@@ -196,20 +198,23 @@ export default function Parametres() {
           full_name: fullName.trim(),
           email: email.trim().toLowerCase(),
           password: password.trim(),
-          agency_id: Number(agencyId),
+          agency_id: accountType === 'agent' ? Number(agencyId) : null,
+          account_type: accountType,
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        alert(result.error || "Erreur pendant la création de l'agent.");
+        alert(result.error || "Erreur pendant la création du compte.");
         setSaving(false);
         return;
       }
 
       alert(
-        `Agent créé avec succès.\n\nIdentifiant : ${email.trim().toLowerCase()}\nMot de passe provisoire : ${password.trim()}`
+        `${accountType === 'responsable' ? 'Responsable' : 'Agent'} créé avec succès.\n\n` +
+        `Identifiant : ${email.trim().toLowerCase()}\n` +
+        `Mot de passe provisoire : ${password.trim()}`
       );
 
       resetForm();
@@ -217,7 +222,7 @@ export default function Parametres() {
       await loadCurrentProfileAndProfiles();
     } catch (error) {
       console.error(error);
-      alert("Erreur serveur pendant la création de l'agent.");
+      alert("Erreur serveur pendant la création du compte.");
     }
 
     setSaving(false);
@@ -388,6 +393,16 @@ export default function Parametres() {
     return status || '-';
   }
 
+  function roleLabel(profile: Profile) {
+    if (profile.is_admin === true || profile.role === 'patron' || profile.role === 'responsable') {
+      return 'Responsable';
+    }
+
+    if (profile.role === 'agent') return 'Agent commercial';
+
+    return profile.role || '-';
+  }
+
   function isProtectedProfile(profile: Profile) {
     return profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true;
   }
@@ -427,7 +442,7 @@ export default function Parametres() {
                 }
               }}
             >
-              {showForm ? 'Fermer le formulaire' : '➕ Créer un agent'}
+              {showForm ? 'Fermer le formulaire' : '➕ Créer un compte CRM'}
             </button>
           </div>
         )}
@@ -501,34 +516,68 @@ export default function Parametres() {
 
       {isResponsable && showForm && (
         <div className="card">
-          <h3>Nouvel agent commercial</h3>
+          <h3>{accountType === 'responsable' ? 'Nouveau Responsable' : 'Nouvel agent commercial'}</h3>
 
           <p className="muted">
-            Crée automatiquement le compte de connexion, le profil CRM et la fiche agent.
+            Crée automatiquement le compte de connexion et le profil CRM.
+            Pour un agent, une fiche agent est aussi créée automatiquement.
           </p>
 
           <div style={{ display: 'grid', gap: 10, marginTop: 15 }}>
+            <div className="item">
+              <strong>Type de compte</strong>
+              <p className="muted" style={{ marginTop: 5 }}>
+                Choisis Agent commercial pour un vendeur, ou Responsable pour donner les mêmes droits d’administration que toi.
+              </p>
+            </div>
+
+            <select
+              value={accountType}
+              onChange={(e) => {
+                const value = e.target.value === 'responsable' ? 'responsable' : 'agent';
+                setAccountType(value);
+                if (value === 'responsable') {
+                  setAgencyId('');
+                }
+              }}
+            >
+              <option value="agent">Agent commercial</option>
+              <option value="responsable">Responsable</option>
+            </select>
+
             <input
-              placeholder="Nom complet ex : Maveryk Leveau"
+              placeholder={accountType === 'responsable' ? 'Nom complet du responsable' : 'Nom complet ex : Maveryk Leveau'}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
 
             <input
-              placeholder="Email de connexion ex : maveryk@agentsco.fr"
+              placeholder={accountType === 'responsable' ? 'Email de connexion du responsable' : 'Email de connexion ex : maveryk@agentsco.fr'}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
 
-            <select
-              value={agencyId}
-              onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}
-            >
-              <option value="">Sélectionner une agence</option>
-              <option value={1}>Blois</option>
-              <option value={2}>Tours</option>
-              <option value={3}>Bourges</option>
-            </select>
+            {accountType === 'agent' && (
+              <select
+                value={agencyId}
+                onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">Sélectionner une agence</option>
+                <option value={1}>Blois</option>
+                <option value={2}>Tours</option>
+                <option value={3}>Bourges</option>
+              </select>
+            )}
+
+            {accountType === 'responsable' && (
+              <div className="item">
+                <strong>Compte Responsable</strong>
+                <p className="muted" style={{ marginTop: 5 }}>
+                  Aucun rattachement agence n’est nécessaire. Ce compte aura accès à toutes les agences,
+                  aux paramètres, aux statistiques et aux fonctions Responsable.
+                </p>
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
               <input
@@ -546,13 +595,17 @@ export default function Parametres() {
               <strong>Important</strong>
               <p className="muted" style={{ marginTop: 5 }}>
                 Le mot de passe provisoire sera affiché une seule fois après la création.
-                Il faudra le transmettre à l'agent et éviter de le stocker en clair.
+                Il faudra le transmettre à la personne et éviter de le stocker en clair.
               </p>
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn" onClick={createAgent} disabled={saving}>
-                {saving ? 'Création en cours...' : "Créer l'agent"}
+              <button className="btn" onClick={createAccount} disabled={saving}>
+                {saving
+                  ? 'Création en cours...'
+                  : accountType === 'responsable'
+                    ? 'Créer le Responsable'
+                    : "Créer l'agent"}
               </button>
 
               <button
@@ -653,7 +706,7 @@ export default function Parametres() {
                       </td>
 
                       <td>
-                        {profile.role || '-'}
+                        {roleLabel(profile)}
                       </td>
 
                       <td>
