@@ -406,7 +406,7 @@ export default function Planning({
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
-          <h3>📅 Planning Benoît + agendas agences</h3>
+          <h3>📅 Planning Benoît</h3>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
             <button onClick={previousWeek}>⬅️ Semaine précédente</button>
@@ -416,7 +416,7 @@ export default function Planning({
           </div>
 
           <p className="muted">
-            Vue Responsable : ton planning personnel et les agendas des agences.
+            Ton planning personnel et Direction. Les agendas agences sont affichés plus bas.
           </p>
 
           <p className="muted">
@@ -449,30 +449,6 @@ export default function Planning({
           />
         </div>
       </div>
-
-      <div className="grid cards3" style={{ marginTop: 12 }}>
-        <div className="item">
-          <strong>🔴 Planning Benoît</strong>
-          <p className="muted">Tes rendez-vous personnels et Direction.</p>
-        </div>
-
-        <div className="item">
-          <strong>🟢 Agenda Google Blois</strong>
-          <p className="muted">Agenda Google VM BLOIS intégré en lecture seule.</p>
-        </div>
-
-        <div className="item">
-          <strong>🔵 Agenda Tours</strong>
-          <p className="muted">À configurer quand l’agenda Google Tours existera.</p>
-        </div>
-
-        <div className="item">
-          <strong>🟠 Agenda Bourges</strong>
-          <p className="muted">À configurer quand l’agenda Google Bourges existera.</p>
-        </div>
-      </div>
-
-      <GoogleBloisCalendar />
 
       {showForm && (
         <div className="card" style={{ marginTop: 12, marginBottom: 12 }}>
@@ -649,6 +625,25 @@ export default function Planning({
           })}
         </div>
       </div>
+
+      <div className="grid cards3" style={{ marginTop: 12 }}>
+        <div className="item">
+          <strong>🟢 Agenda Google Blois</strong>
+          <p className="muted">Agenda Google VM BLOIS intégré en lecture seule.</p>
+        </div>
+
+        <div className="item">
+          <strong>🔵 Agenda Tours</strong>
+          <p className="muted">À configurer quand l’agenda Google Tours existera.</p>
+        </div>
+
+        <div className="item">
+          <strong>🟠 Agenda Bourges</strong>
+          <p className="muted">À configurer quand l’agenda Google Bourges existera.</p>
+        </div>
+      </div>
+
+      <GoogleBloisCalendar />
     </div>
   );
 }
