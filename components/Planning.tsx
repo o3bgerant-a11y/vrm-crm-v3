@@ -57,13 +57,6 @@ function getPlanningAgencyIcon(agencyId: number | null) {
   return '🔴';
 }
 
-function getPlanningAgencyDescription(agencyId: number | null) {
-  if (Number(agencyId) === 1) return 'Agenda partagé des agents de Blois.';
-  if (Number(agencyId) === 2) return 'Agenda partagé des agents de Tours.';
-  if (Number(agencyId) === 3) return 'Agenda partagé des agents de Bourges.';
-  return 'Agenda partagé de l’agence.';
-}
-
 function GoogleBloisCalendar() {
   return (
     <div className="card" style={{ marginTop: 12 }}>
@@ -252,8 +245,12 @@ export default function Planning({
   }
 
   useEffect(() => {
-    loadEvents();
-  }, [weekStart, weekEnd]);
+    if (responsableMode) {
+      loadEvents();
+    } else {
+      setLoading(false);
+    }
+  }, [weekStart, weekEnd, responsableMode]);
 
   function resetForm() {
     setEditingEvent(null);
@@ -386,11 +383,30 @@ export default function Planning({
     setSaving(false);
   }
 
+  if (!responsableMode) {
+    return (
+      <div className="card">
+        <h3>📅 Planning</h3>
+
+        {Number(agentAgencyId) === 1 ? (
+          <GoogleBloisCalendar />
+        ) : (
+          <div className="card" style={{ marginTop: 12 }}>
+            <h4>{getPlanningAgencyIcon(agentAgencyId)} Agenda Google {agentAgencyName}</h4>
+            <p className="muted">
+              L’agenda Google de cette agence n’est pas encore configuré. Pour le moment, seul l’agenda Google VM BLOIS est intégré.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
-          <h3>{responsableMode ? '📅 Planning Benoît + agendas agences' : `📅 Agenda Agence ${agentAgencyName}`}</h3>
+          <h3>📅 Planning Benoît + agendas agences</h3>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
             <button onClick={previousWeek}>⬅️ Semaine précédente</button>
@@ -400,9 +416,7 @@ export default function Planning({
           </div>
 
           <p className="muted">
-            {responsableMode
-              ? 'Vue Responsable : ton planning personnel et les agendas des agences.'
-              : `${getPlanningAgencyDescription(agentAgencyId)} Tous les agents de cette agence voient le même agenda.`}
+            Vue Responsable : ton planning personnel et les agendas des agences.
           </p>
 
           <p className="muted">
@@ -436,47 +450,29 @@ export default function Planning({
         </div>
       </div>
 
-      {responsableMode ? (
-        <div className="grid cards3" style={{ marginTop: 12 }}>
-          <div className="item">
-            <strong>🔴 Planning Benoît</strong>
-            <p className="muted">Tes rendez-vous personnels et Direction.</p>
-          </div>
-
-          <div className="item">
-            <strong>🟢 Agenda Google Blois</strong>
-            <p className="muted">Agenda Google VM BLOIS intégré en lecture seule.</p>
-          </div>
-
-          <div className="item">
-            <strong>🔵 Agenda Tours</strong>
-            <p className="muted">À configurer quand l’agenda Google Tours existera.</p>
-          </div>
-
-          <div className="item">
-            <strong>🟠 Agenda Bourges</strong>
-            <p className="muted">À configurer quand l’agenda Google Bourges existera.</p>
-          </div>
+      <div className="grid cards3" style={{ marginTop: 12 }}>
+        <div className="item">
+          <strong>🔴 Planning Benoît</strong>
+          <p className="muted">Tes rendez-vous personnels et Direction.</p>
         </div>
-      ) : (
-        <div className="card" style={{ marginTop: 12 }}>
-          <h4>{getPlanningAgencyIcon(agentAgencyId)} Agenda partagé {agentAgencyName}</h4>
-          <p className="muted">
-            Cet onglet remplace le Planning Benoît pour les agents. Il affichera uniquement les rendez-vous de l’agence {agentAgencyName}.
-          </p>
-        </div>
-      )}
 
-      {(responsableMode || Number(agentAgencyId) === 1) && (
-        <GoogleBloisCalendar />
-      )}
-
-      {!responsableMode && Number(agentAgencyId) !== 1 && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <h4>{getPlanningAgencyIcon(agentAgencyId)} Agenda Google {agentAgencyName}</h4>
-          <p className="muted">L’agenda Google de cette agence n’est pas encore configuré. Pour le moment, seul l’agenda Google VM BLOIS est intégré.</p>
+        <div className="item">
+          <strong>🟢 Agenda Google Blois</strong>
+          <p className="muted">Agenda Google VM BLOIS intégré en lecture seule.</p>
         </div>
-      )}
+
+        <div className="item">
+          <strong>🔵 Agenda Tours</strong>
+          <p className="muted">À configurer quand l’agenda Google Tours existera.</p>
+        </div>
+
+        <div className="item">
+          <strong>🟠 Agenda Bourges</strong>
+          <p className="muted">À configurer quand l’agenda Google Bourges existera.</p>
+        </div>
+      </div>
+
+      <GoogleBloisCalendar />
 
       {showForm && (
         <div className="card" style={{ marginTop: 12, marginBottom: 12 }}>
@@ -514,22 +510,15 @@ export default function Planning({
                 ))}
               </select>
 
-              {responsableMode ? (
-                <select
-                  value={formAgencyId ?? ''}
-                  onChange={(e) => setFormAgencyId(e.target.value ? Number(e.target.value) : null)}
-                >
-                  <option value="1">Blois</option>
-                  <option value="2">Tours</option>
-                  <option value="3">Bourges</option>
-                  <option value="">Personnel / Direction</option>
-                </select>
-              ) : (
-                <div className="item">
-                  <span className="muted">Agenda agence</span>
-                  <strong>{getPlanningAgencyIcon(agentAgencyId)} {agentAgencyName}</strong>
-                </div>
-              )}
+              <select
+                value={formAgencyId ?? ''}
+                onChange={(e) => setFormAgencyId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="1">Blois</option>
+                <option value="2">Tours</option>
+                <option value="3">Bourges</option>
+                <option value="">Personnel / Direction</option>
+              </select>
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
