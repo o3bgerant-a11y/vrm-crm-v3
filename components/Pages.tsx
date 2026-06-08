@@ -898,8 +898,60 @@ export function Agents() {
 }
 export function Leads() {
   const today = new Date().toISOString().slice(0, 10);
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  function getWeekNumberFromDate(date: Date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  }
+
+  function getMondayForWeekLabel(date: Date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function formatWeekDateLabel(date: Date) {
+    return date.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+    });
+  }
+
+  function getWeekOptionsForMonth(year: number, month: number) {
+    const firstDayOfMonth = new Date(year, month - 1, 1);
+    const lastDayOfMonth = new Date(year, month, 0);
+    const firstMonday = getMondayForWeekLabel(firstDayOfMonth);
+    const options: { value: string; label: string }[] = [];
+    const seen = new Set<number>();
+
+    for (let date = new Date(firstMonday); date <= lastDayOfMonth; date.setDate(date.getDate() + 7)) {
+      const weekNumberValue = getWeekNumberFromDate(date);
+      if (seen.has(weekNumberValue)) continue;
+      seen.add(weekNumberValue);
+
+      const weekStart = new Date(date);
+      const weekEnd = new Date(date);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      options.push({
+        value: String(weekNumberValue),
+        label: `Semaine ${weekNumberValue} — du ${formatWeekDateLabel(weekStart)} au ${formatWeekDateLabel(weekEnd)}`,
+      });
+    }
+
+    return options;
+  }
+
+  const currentWeek = getWeekNumberFromDate(now);
 
   const [leads, setLeads] = useState<LeadItem[]>([]);
   const [agentOptions, setAgentOptions] = useState<AgentOption[]>([]);
@@ -911,7 +963,7 @@ export function Leads() {
 
   const [yearNumber, setYearNumber] = useState(String(currentYear));
   const [monthNumber, setMonthNumber] = useState(String(currentMonth));
-  const [weekNumber, setWeekNumber] = useState('');
+  const [weekNumber, setWeekNumber] = useState(String(currentWeek));
   const [agencyId, setAgencyId] = useState<number | ''>('');
   const [agentId, setAgentId] = useState<number | ''>('');
   const [source, setSource] = useState('Call Center');
@@ -940,6 +992,18 @@ export function Leads() {
 
   const leadSources = ['Call Center', 'Démarchage Agent', 'Visite spontanée', 'Leboncoin', 'Facebook', 'Google', 'Recommandation', 'Passage agence', 'Autre'];
   const leadStatuses = ['Nouveau', 'RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu', 'À relancer', 'Perdu', 'Refusé'];
+
+  const weekOptions = useMemo(() => {
+    return getWeekOptionsForMonth(Number(yearNumber || currentYear), Number(monthNumber || currentMonth));
+  }, [yearNumber, monthNumber]);
+
+  useEffect(() => {
+    if (weekOptions.length === 0) return;
+    const weekExists = weekOptions.some(option => option.value === weekNumber);
+    if (!weekExists) {
+      setWeekNumber(weekOptions[0].value);
+    }
+  }, [weekOptions, weekNumber]);
 
   const calculatedLeadMargin = useMemo(() => {
     const sale = Number(salePrice || 0);
@@ -988,7 +1052,7 @@ export function Leads() {
     setEditingLead(null);
     setYearNumber(String(currentYear));
     setMonthNumber(String(currentMonth));
-    setWeekNumber('');
+    setWeekNumber(String(currentWeek));
     setAgencyId('');
     setAgentId('');
     setSource('Call Center');
@@ -1334,10 +1398,19 @@ export function Leads() {
                 <p className="muted">Ces informations permettront de ressortir automatiquement les leads dans le futur rapport de semaine.</p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
                 <input type="number" placeholder="Année" value={yearNumber} onChange={(e) => setYearNumber(e.target.value)} />
-                <input type="number" placeholder="Mois" value={monthNumber} onChange={(e) => setMonthNumber(e.target.value)} />
-                <input type="number" placeholder="Semaine" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} />
+                <select value={monthNumber} onChange={(e) => setMonthNumber(e.target.value)}>
+                  {Array.from({ length: 12 }, (_, index) => (
+                    <option key={index + 1} value={String(index + 1)}>{index + 1}</option>
+                  ))}
+                </select>
+                <select value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)}>
+                  <option value="">Sélectionner une semaine</option>
+                  {weekOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="item">
