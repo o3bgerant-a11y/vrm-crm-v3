@@ -221,10 +221,13 @@ export default function Parametres() {
     setSaving(false);
   }
 
-  async function updateAccount(profile: Profile, action: 'block' | 'activate' | 'archive') {
+  async function updateAccount(
+    profile: Profile,
+    action: 'block' | 'activate' | 'archive' | 'delete'
+  ) {
     if (!isResponsable) return;
 
-    if (profile.role === 'patron' || profile.is_admin === true) {
+    if (profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true) {
       alert('Le compte Responsable ne peut pas être modifié ici.');
       return;
     }
@@ -241,6 +244,14 @@ export default function Parametres() {
 
     if (action === 'archive') {
       confirmMessage = `Archiver ${profile.full_name} ? Ses ventes resteront conservées.`;
+    }
+
+    if (action === 'delete') {
+      confirmMessage =
+        `SUPPRIMER DÉFINITIVEMENT ${profile.full_name} ?\n\n` +
+        `Le compte CRM, le profil et l'accès de connexion seront supprimés.\n\n` +
+        `Cette action est irréversible.\n\n` +
+        `À utiliser surtout pour les comptes tests ou les agents créés par erreur.`;
     }
 
     const ok = confirm(confirmMessage);
@@ -477,7 +488,7 @@ export default function Parametres() {
           <h3>Accès agent</h3>
           <p className="muted">
             Ton espace Paramètres est volontairement limité à ton compte personnel.
-            La création, le blocage et la réinitialisation des comptes agents sont réservés au Responsable.
+            La création, le blocage, la réinitialisation et la suppression des comptes agents sont réservés au Responsable.
           </p>
         </div>
       )}
@@ -645,7 +656,7 @@ export default function Parametres() {
                     </td>
 
                     <td>
-                      {profile.role === 'patron' || profile.is_admin === true ? (
+                      {profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true ? (
                         <span className="muted">Compte Responsable</span>
                       ) : (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -684,6 +695,18 @@ export default function Parametres() {
                               🔑 Réinitialiser MDP
                             </button>
                           )}
+
+                          <button
+                            onClick={() => updateAccount(profile, 'delete')}
+                            disabled={saving}
+                            style={{
+                              background: '#dc2626',
+                              color: '#ffffff',
+                              borderColor: '#dc2626',
+                            }}
+                          >
+                            🗑️ Supprimer
+                          </button>
 
                           {profile.status === 'archived' && (
                             <span className="muted">Archivé</span>
