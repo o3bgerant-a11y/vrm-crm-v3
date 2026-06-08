@@ -18,7 +18,7 @@ import {
 
 const items = [
   ['dashboard', 'Tableau de bord', Home, 'all'],
-  ['planning', 'Planning Benoît', CalendarDays, 'all'],
+  ['planning', 'Planning', CalendarDays, 'all'],
   ['agences', 'Agences', Store, 'responsable'],
   ['agents', 'Agents commerciaux', Users, 'responsable'],
   ['leads', 'Leads', PhoneCall, 'all'],
