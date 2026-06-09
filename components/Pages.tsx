@@ -996,11 +996,11 @@ export function Leads() {
   const leadStatuses = ['Nouveau', 'RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu', 'À relancer', 'Perdu', 'Refusé'];
   const warrantyOptions = [
     { label: 'START - 6 mois - 0 €', value: 'START - 6 mois', amount: 0 },
-    { label: 'MEDIUM - 12 mois - 499 €', value: 'MEDIUM - 12 mois', amount: 499 },
-    { label: 'MEDIUM - 24 mois - 799 €', value: 'MEDIUM - 24 mois', amount: 799 },
-    { label: 'PREMIUM - 12 mois - 999 €', value: 'PREMIUM - 12 mois', amount: 999 },
-    { label: 'PREMIUM - 24 mois - 1499 €', value: 'PREMIUM - 24 mois', amount: 1499 },
-    { label: 'PRESTIGE - 36 mois - 2199 €', value: 'PRESTIGE - 36 mois', amount: 2199 },
+    { label: 'MEDIUM - 12 mois - 799 €', value: 'MEDIUM - 12 mois', amount: 799 },
+    { label: 'MEDIUM - 24 mois - 999 €', value: 'MEDIUM - 24 mois', amount: 999 },
+    { label: 'PREMIUM - 12 mois - 1299 €', value: 'PREMIUM - 12 mois', amount: 1299 },
+    { label: 'PREMIUM - 24 mois - 1799 €', value: 'PREMIUM - 24 mois', amount: 1799 },
+    { label: 'PRESTIGE - 36 mois - 2499 €', value: 'PRESTIGE - 36 mois', amount: 2499 },
   ];
 
   const weekOptions = useMemo(() => {
