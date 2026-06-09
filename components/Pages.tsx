@@ -985,13 +985,23 @@ export function Leads() {
   const [vehicleEntered, setVehicleEntered] = useState(false);
   const [saleDone, setSaleDone] = useState(false);
   const [salePrice, setSalePrice] = useState('');
+  const [saleRoadFees, setSaleRoadFees] = useState('');
   const [marginAmount, setMarginAmount] = useState('');
   const [warrantySold, setWarrantySold] = useState(false);
+  const [warrantyType, setWarrantyType] = useState('');
   const [warrantyAmount, setWarrantyAmount] = useState('');
   const [comments, setComments] = useState('');
 
   const leadSources = ['Call Center', 'Démarchage Agent', 'Visite spontanée', 'Leboncoin', 'Facebook', 'Google', 'Recommandation', 'Passage agence', 'Autre'];
   const leadStatuses = ['Nouveau', 'RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu', 'À relancer', 'Perdu', 'Refusé'];
+  const warrantyOptions = [
+    { label: 'START - 6 mois - 0 €', value: 'START - 6 mois', amount: 0 },
+    { label: 'MEDIUM - 12 mois - 499 €', value: 'MEDIUM - 12 mois', amount: 499 },
+    { label: 'MEDIUM - 24 mois - 799 €', value: 'MEDIUM - 24 mois', amount: 799 },
+    { label: 'PREMIUM - 12 mois - 999 €', value: 'PREMIUM - 12 mois', amount: 999 },
+    { label: 'PREMIUM - 24 mois - 1499 €', value: 'PREMIUM - 24 mois', amount: 1499 },
+    { label: 'PRESTIGE - 36 mois - 2199 €', value: 'PRESTIGE - 36 mois', amount: 2199 },
+  ];
 
   const weekOptions = useMemo(() => {
     return getWeekOptionsForMonth(Number(yearNumber || currentYear), Number(monthNumber || currentMonth));
@@ -1008,8 +1018,24 @@ export function Leads() {
   const calculatedLeadMargin = useMemo(() => {
     const sale = Number(salePrice || 0);
     const seller = Number(sellerNetPrice || 0);
-    return sale - seller;
-  }, [salePrice, sellerNetPrice]);
+    const roadFees = Number(saleRoadFees || 0);
+    const warranty = warrantySold ? Number(warrantyAmount || 0) : 0;
+    return sale + roadFees + warranty - seller;
+  }, [salePrice, sellerNetPrice, saleRoadFees, warrantySold, warrantyAmount]);
+
+  function handleWarrantyTypeChange(value: string) {
+    setWarrantyType(value);
+
+    if (!value) {
+      setWarrantySold(false);
+      setWarrantyAmount('');
+      return;
+    }
+
+    const selectedWarranty = warrantyOptions.find(option => option.value === value);
+    setWarrantySold(true);
+    setWarrantyAmount(String(selectedWarranty?.amount ?? 0));
+  }
 
   async function loadAgents() {
     const { data, error } = await supabase
@@ -1074,8 +1100,10 @@ export function Leads() {
     setVehicleEntered(false);
     setSaleDone(false);
     setSalePrice('');
+    setSaleRoadFees('');
     setMarginAmount('');
     setWarrantySold(false);
+    setWarrantyType('');
     setWarrantyAmount('');
     setComments('');
   }
@@ -1111,8 +1139,10 @@ export function Leads() {
     setVehicleEntered(Boolean(lead.vehicle_entered));
     setSaleDone(Boolean(lead.sale_done));
     setSalePrice(String(lead.sale_price ?? ''));
+    setSaleRoadFees('');
     setMarginAmount(String(lead.margin_amount ?? ''));
     setWarrantySold(Boolean(lead.warranty_sold));
+    setWarrantyType(lead.warranty_sold ? 'Garantie déjà renseignée' : '');
     setWarrantyAmount(String(lead.warranty_amount ?? ''));
     setComments(lead.comments || '');
     setShowForm(true);
@@ -1141,6 +1171,8 @@ export function Leads() {
       customerName.trim() ? `Client lead : ${customerName.trim()}` : '',
       customerPhone.trim() ? `Téléphone lead : ${customerPhone.trim()}` : '',
       source ? `Source lead : ${source}` : '',
+      saleRoadFees ? `Frais de mise à la route : ${saleRoadFees} €` : '',
+      warrantySold && warrantyType ? `Garantie choisie : ${warrantyType}` : '',
     ].filter(Boolean).join('\n');
 
     const salePayload = {
@@ -1153,7 +1185,7 @@ export function Leads() {
       sale_price: saleValue,
       margin_amount: finalMarginAmount,
       warranty_sold: warrantySold,
-      warranty_type: warrantySold ? 'Garantie vendue depuis lead' : null,
+      warranty_type: warrantySold ? warrantyType || 'Garantie vendue depuis lead' : null,
       warranty_amount: warrantySold ? warrantyValue : 0,
       registration: vehicleRegistration.trim() || null,
       vin: null,
@@ -1215,7 +1247,7 @@ export function Leads() {
     const selectedAgent = agentOptions.find(agent => Number(agent.id) === Number(agentId));
     const finalAgencyId = agencyId || selectedAgent?.agency_id || null;
     const finalMarginAmount = saleDone
-      ? (marginAmount ? Number(marginAmount) : calculatedLeadMargin)
+      ? calculatedLeadMargin
       : Number(marginAmount || 0);
 
     setSaving(true);
@@ -1502,30 +1534,102 @@ export function Leads() {
               </div>
 
               {saleDone && (
-                <div className="card" style={{ border: '1px solid rgba(34, 197, 94, 0.35)' }}>
+                <div
+                  className="card"
+                  style={{
+                    border: '1px solid rgba(34, 197, 94, 0.45)',
+                    boxShadow: '0 0 0 1px rgba(34, 197, 94, 0.08), 0 18px 45px rgba(0, 0, 0, 0.22)',
+                  }}
+                >
                   <h4>✅ Transformation automatique en vente</h4>
                   <p className="muted">
                     En enregistrant ce lead, le CRM créera ou mettra à jour une vente dans l’onglet Ventes avec le même agent, véhicule, plaque, prix, marge et garantie.
                   </p>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-                    <input type="number" placeholder="Prix net vendeur / prix acheté" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
-                    <input type="number" placeholder="Prix de vente" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
-                    <div className="item">
-                      <span className="muted">Marge calculée</span>
-                      <div style={{ fontSize: 22, fontWeight: 800 }}>{euro(calculatedLeadMargin)}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, alignItems: 'start' }}>
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(150px, 1fr))', gap: 10 }}>
+                        <label style={{ display: 'grid', gap: 6 }}>
+                          <span className="muted">Prix net vendeur</span>
+                          <input type="number" placeholder="Ex : 12000" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
+                        </label>
+
+                        <label style={{ display: 'grid', gap: 6 }}>
+                          <span className="muted">Prix de vente</span>
+                          <input type="number" placeholder="Ex : 14500" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+                        </label>
+
+                        <label style={{ display: 'grid', gap: 6 }}>
+                          <span className="muted">Frais de mise à la route</span>
+                          <input type="number" placeholder="Ex : 399" value={saleRoadFees} onChange={(e) => setSaleRoadFees(e.target.value)} />
+                        </label>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1.2fr) minmax(180px, 0.8fr)', gap: 10, alignItems: 'start' }}>
+                        <label style={{ display: 'grid', gap: 6 }}>
+                          <span className="muted">Garantie vendue</span>
+                          <select value={warrantyType} onChange={(e) => handleWarrantyTypeChange(e.target.value)}>
+                            <option value="">Aucune garantie</option>
+                            {warrantyOptions.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                            {warrantyType === 'Garantie déjà renseignée' && (
+                              <option value="Garantie déjà renseignée">Garantie déjà renseignée</option>
+                            )}
+                          </select>
+                          <span className="muted" style={{ fontSize: 12 }}>
+                            Le prix de la garantie est pré-rempli selon la garantie sélectionnée mais reste modifiable.
+                          </span>
+                        </label>
+
+                        <label style={{ display: 'grid', gap: 6 }}>
+                          <span className="muted">Prix garantie (modifiable)</span>
+                          <input
+                            type="number"
+                            placeholder="Prix garantie"
+                            value={warrantyAmount}
+                            onChange={(e) => {
+                              setWarrantyAmount(e.target.value);
+                              setWarrantySold(Number(e.target.value || 0) > 0 || Boolean(warrantyType));
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
-                  </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10, marginTop: 10 }}>
-                    <input type="number" placeholder="Marge forcée facultative" value={marginAmount} onChange={(e) => setMarginAmount(e.target.value)} />
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div className="item" style={{ minHeight: 88 }}>
+                        <span className="muted">Marge calculée</span>
+                        <div style={{ fontSize: 26, fontWeight: 900, color: '#4ade80', marginTop: 6 }}>{euro(calculatedLeadMargin)}</div>
+                      </div>
 
-                    <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input type="checkbox" checked={warrantySold} onChange={(e) => setWarrantySold(e.target.checked)} />
-                      Garantie vendue
-                    </label>
-
-                    <input type="number" placeholder="Montant garantie" value={warrantyAmount} onChange={(e) => setWarrantyAmount(e.target.value)} />
+                      <div className="item">
+                        <strong>Détail du calcul de la marge</strong>
+                        <div style={{ display: 'grid', gap: 5, marginTop: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                            <span className="muted">Prix de vente</span>
+                            <strong>{euro(Number(salePrice || 0))}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                            <span className="muted">+ Frais de mise à la route</span>
+                            <strong>{euro(Number(saleRoadFees || 0))}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                            <span className="muted">+ Garantie vendue</span>
+                            <strong>{euro(warrantySold ? Number(warrantyAmount || 0) : 0)}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                            <span className="muted">- Prix net vendeur</span>
+                            <strong>{euro(Number(sellerNetPrice || 0))}</strong>
+                          </div>
+                          <div style={{ height: 1, background: 'rgba(148, 163, 184, 0.28)', margin: '6px 0' }} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 16 }}>
+                            <strong>= Marge</strong>
+                            <strong style={{ color: '#4ade80' }}>{euro(calculatedLeadMargin)}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
