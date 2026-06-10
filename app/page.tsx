@@ -10,6 +10,7 @@ import {
   Agences,
   Agents,
   ObjectifsMensuels,
+  Remuneration,
   Leads,
   RapportSemaine,
   Ventes,
@@ -35,6 +36,7 @@ const titles: Record<string, string> = {
   agences: 'Agences',
   agents: 'Agents commerciaux',
   'objectifs-mensuels': 'Objectifs mensuels',
+  remuneration: 'Rémunération',
   leads: 'Leads',
   'rapport-semaine': 'Rapport semaine',
   ventes: 'Ventes véhicules',
@@ -182,7 +184,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentAgent) return;
 
-    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels'].includes(active)) {
+    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels', 'remuneration'].includes(active)) {
       setActive('dashboard');
     }
   }, [currentAgent, isResponsable, active]);
@@ -340,6 +342,7 @@ export default function Home() {
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
         {isResponsable && active === 'objectifs-mensuels' && <ObjectifsMensuels />}
+        {isResponsable && active === 'remuneration' && <Remuneration />}
         {active === 'leads' && <Leads />}
         {active === 'rapport-semaine' && (
           <RapportSemaine
@@ -347,12 +350,7 @@ export default function Home() {
             isResponsable={isResponsable}
           />
         )}
-        {active === 'ventes' && (
-          <Ventes
-            currentAgent={currentAgent}
-            isResponsable={isResponsable}
-          />
-        )}
+        {active === 'ventes' && <Ventes currentAgent={currentAgent} isResponsable={isResponsable} />}
         {active === 'garanties' && <Garanties />}
         {active === 'messages' && (
           <Messages
