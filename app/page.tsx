@@ -10,7 +10,6 @@ import {
   Agences,
   Agents,
   ObjectifsMensuels,
-  Remuneration,
   Leads,
   RapportSemaine,
   Ventes,
@@ -342,7 +341,16 @@ export default function Home() {
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
         {isResponsable && active === 'objectifs-mensuels' && <ObjectifsMensuels />}
-        {isResponsable && active === 'remuneration' && <Remuneration />}
+
+        {isResponsable && active === 'remuneration' && (
+          <div className="card">
+            <h3>💰 Rémunération</h3>
+            <p className="muted">
+              Onglet en préparation. Prochaine étape : création du module avec sélection Agence → Année → Mois → Personne concernée.
+            </p>
+          </div>
+        )}
+
         {active === 'leads' && <Leads />}
         {active === 'rapport-semaine' && (
           <RapportSemaine
