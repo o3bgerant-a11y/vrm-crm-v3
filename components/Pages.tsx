@@ -2656,13 +2656,7 @@ export function RapportSemaine({
   );
 }
 
-export function Ventes({
-  currentAgent = null,
-  isResponsable = true,
-}: {
-  currentAgent?: CurrentAgentForPages | null;
-  isResponsable?: boolean;
-} = {}) {
+export function Ventes() {
   const today = new Date().toISOString().slice(0, 10);
 
   const [realSales, setRealSales] = useState<VehicleSale[]>([]);
@@ -2708,7 +2702,7 @@ export function Ventes({
   async function loadSales() {
     setLoading(true);
 
-    let query = supabase
+    const { data, error } = await supabase
       .from('vehicle_sales')
       .select(`
         *,
@@ -2718,12 +2712,6 @@ export function Ventes({
         )
       `)
       .order('id', { ascending: false });
-
-    if (!isResponsable && currentAgent?.id) {
-      query = query.eq('agent_id', currentAgent.id);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       console.error('Erreur chargement ventes:', error);
@@ -2738,7 +2726,7 @@ export function Ventes({
   useEffect(() => {
     loadAgents();
     loadSales();
-  }, [currentAgent?.id, isResponsable]);
+  }, []);
 
   function resetForm() {
     setEditingSale(null);
@@ -2757,13 +2745,11 @@ export function Ventes({
   }
 
   function openNewSaleForm() {
-    if (!isResponsable) return;
     resetForm();
     setShowForm(true);
   }
 
   function openEditSaleForm(sale: VehicleSale) {
-    if (!isResponsable) return;
     setEditingSale(sale);
     setVehicleName(sale.vehicle_name || '');
     setVehiclePhotoUrl(sale.vehicle_photo_url || '');
@@ -2782,8 +2768,6 @@ export function Ventes({
   }
 
   async function saveSale() {
-    if (!isResponsable) return;
-
     if (!vehicleName.trim()) {
       alert('Il faut indiquer le véhicule vendu.');
       return;
@@ -2835,7 +2819,6 @@ export function Ventes({
   }
 
   async function deleteSale() {
-    if (!isResponsable) return;
     if (!editingSale) return;
 
     const ok = confirm(`Supprimer la vente "${editingSale.vehicle_name}" ?`);
@@ -2886,26 +2869,24 @@ export function Ventes({
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
           <h3>Ventes véhicules</h3>
-          <p className="muted">{isResponsable ? 'Ajout, modification et suivi des ventes connectées à Supabase.' : 'Historique des véhicules vendus. Les nouvelles ventes doivent être créées depuis un lead validé.'}</p>
+          <p className="muted">Ajout, modification et suivi des ventes connectées à Supabase.</p>
         </div>
 
-        {isResponsable && (
-          <button
-            className="btn"
-            onClick={() => {
-              if (showForm && !editingSale) {
-                setShowForm(false);
-              } else {
-                openNewSaleForm();
-              }
-            }}
-          >
-            {showForm && !editingSale ? 'Fermer' : 'Nouvelle vente'}
-          </button>
-        )}
+        <button
+          className="btn"
+          onClick={() => {
+            if (showForm && !editingSale) {
+              setShowForm(false);
+            } else {
+              openNewSaleForm();
+            }
+          }}
+        >
+          {showForm && !editingSale ? 'Fermer' : 'Nouvelle vente'}
+        </button>
       </div>
 
-      {isResponsable && showForm && (
+      {showForm && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
           <h4>{editingSale ? 'Modifier la vente' : 'Nouvelle vente'}</h4>
 
@@ -2986,7 +2967,7 @@ export function Ventes({
 
           <tbody>
             {filteredSales.map(s => (
-              <tr key={s.id} onClick={() => isResponsable && openEditSaleForm(s)} style={{ cursor: isResponsable ? 'pointer' : 'default' }} title={isResponsable ? "Cliquer pour modifier la vente" : "Historique de vente"}>
+              <tr key={s.id} onClick={() => openEditSaleForm(s)} style={{ cursor: 'pointer' }} title="Cliquer pour modifier la vente">
                 <td>
                   <strong>{s.vehicle_name}</strong>
                   {(s.registration || s.vin) && (
@@ -4119,7 +4100,7 @@ export function Stats() {
   async function loadSales() {
     setLoading(true);
 
-    let query = supabase
+    const { data, error } = await supabase
       .from('vehicle_sales')
       .select(`
         *,
@@ -4129,12 +4110,6 @@ export function Stats() {
         )
       `)
       .order('id', { ascending: false });
-
-    if (!isResponsable && currentAgent?.id) {
-      query = query.eq('agent_id', currentAgent.id);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       console.error('Erreur stats:', error);
