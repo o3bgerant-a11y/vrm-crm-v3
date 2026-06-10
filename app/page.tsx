@@ -347,7 +347,12 @@ export default function Home() {
             isResponsable={isResponsable}
           />
         )}
-        {active === 'ventes' && <Ventes />}
+        {active === 'ventes' && (
+          <Ventes
+            currentAgent={currentAgent}
+            isResponsable={isResponsable}
+          />
+        )}
         {active === 'garanties' && <Garanties />}
         {active === 'messages' && (
           <Messages
