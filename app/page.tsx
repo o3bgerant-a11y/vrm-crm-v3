@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import {
   Agences,
   Agents,
+  ObjectifsMensuels,
   Leads,
   RapportSemaine,
   Ventes,
@@ -33,6 +34,7 @@ const titles: Record<string, string> = {
   planning: 'Planning Benoît',
   agences: 'Agences',
   agents: 'Agents commerciaux',
+  'objectifs-mensuels': 'Objectifs mensuels',
   leads: 'Leads',
   'rapport-semaine': 'Rapport semaine',
   ventes: 'Ventes véhicules',
@@ -180,7 +182,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentAgent) return;
 
-    if (!isResponsable && ['agences', 'agents'].includes(active)) {
+    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels'].includes(active)) {
       setActive('dashboard');
     }
   }, [currentAgent, isResponsable, active]);
@@ -324,13 +326,14 @@ export default function Home() {
 
         {active === 'dashboard' && <Dashboard />}
         {active === 'planning' && (
-  <Planning
-    currentAgent={currentAgent}
-    isResponsable={isResponsable}
-  />
-)}
+          <Planning
+            currentAgent={currentAgent}
+            isResponsable={isResponsable}
+          />
+        )}
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
+        {isResponsable && active === 'objectifs-mensuels' && <ObjectifsMensuels />}
         {active === 'leads' && <Leads />}
         {active === 'rapport-semaine' && (
           <RapportSemaine
