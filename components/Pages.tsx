@@ -4330,3 +4330,316 @@ export function Stats() {
     </div>
   );
 }
+
+export function Remuneration() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  const monthNames = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  ];
+
+  const [people, setPeople] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedAgencyId, setSelectedAgencyId] = useState<number | ''>('');
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const [selectedMonth, setSelectedMonth] = useState(String(currentMonth));
+  const [selectedPersonKey, setSelectedPersonKey] = useState('');
+  const [showResult, setShowResult] = useState(false);
+  const [moneyAnimation, setMoneyAnimation] = useState(false);
+
+  async function loadPeople() {
+    setLoading(true);
+
+    const { data: agentsData, error: agentsError } = await supabase
+      .from('agents')
+      .select('id, full_name, agency_id, account_type, role')
+      .order('full_name', { ascending: true });
+
+    if (agentsError) {
+      console.error('Erreur chargement personnes rémunération:', agentsError);
+      setPeople([]);
+    } else {
+      const rows = (agentsData || []).map((person: any) => ({
+        id: person.id,
+        full_name: person.full_name,
+        agency_id: person.agency_id,
+        account_type: person.account_type || person.role || 'agent',
+        label_type:
+          person.account_type === 'responsable' || person.role === 'responsable' || person.role === 'patron'
+            ? 'Responsable'
+            : 'Agent commercial',
+      }));
+
+      setPeople(rows);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadPeople();
+  }, []);
+
+  const filteredPeople = useMemo(() => {
+    return people.filter((person) => {
+      const isResponsablePerson =
+        person.account_type === 'responsable' ||
+        person.role === 'responsable' ||
+        person.role === 'patron' ||
+        person.label_type === 'Responsable';
+
+      if (isResponsablePerson) return true;
+
+      if (!selectedAgencyId) return true;
+
+      return Number(person.agency_id) === Number(selectedAgencyId);
+    });
+  }, [people, selectedAgencyId]);
+
+  const selectedPerson = useMemo(() => {
+    if (!selectedPersonKey) return null;
+
+    const [type, id] = selectedPersonKey.split(':');
+
+    return filteredPeople.find((person) => {
+      const isResponsablePerson =
+        person.account_type === 'responsable' ||
+        person.role === 'responsable' ||
+        person.role === 'patron' ||
+        person.label_type === 'Responsable';
+
+      const personType = isResponsablePerson ? 'responsable' : 'agent';
+
+      return personType === type && String(person.id) === String(id);
+    }) || null;
+  }, [selectedPersonKey, filteredPeople]);
+
+  function showRemuneration() {
+    if (!selectedAgencyId) {
+      alert('Il faut sélectionner une agence.');
+      return;
+    }
+
+    if (!selectedYear || !selectedMonth) {
+      alert("Il faut sélectionner l'année et le mois.");
+      return;
+    }
+
+    if (!selectedPersonKey) {
+      alert('Il faut sélectionner un agent ou un responsable.');
+      return;
+    }
+
+    setShowResult(false);
+    setMoneyAnimation(true);
+
+    setTimeout(() => {
+      setMoneyAnimation(false);
+      setShowResult(true);
+    }, 2000);
+  }
+
+  return (
+    <div className="section">
+      {moneyAnimation && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            background: 'rgba(2, 6, 23, 0.20)',
+            backdropFilter: 'blur(2px)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 72,
+              animation: 'money-pop 2s ease-in-out forwards',
+              textAlign: 'center',
+              lineHeight: 1.1,
+            }}
+          >
+            💸💶💸
+            <div style={{ fontSize: 42, marginTop: 10 }}>💰💸💰</div>
+          </div>
+
+          <style>
+            {`
+              @keyframes money-pop {
+                0% {
+                  opacity: 0;
+                  transform: scale(0.35) rotate(-8deg);
+                  filter: blur(2px);
+                }
+                20% {
+                  opacity: 1;
+                  transform: scale(1.15) rotate(4deg);
+                  filter: blur(0);
+                }
+                55% {
+                  opacity: 1;
+                  transform: scale(1.35) rotate(-3deg) translateY(-8px);
+                }
+                100% {
+                  opacity: 0;
+                  transform: scale(1.9) rotate(8deg) translateY(-40px);
+                }
+              }
+            `}
+          </style>
+        </div>
+      )}
+
+      <div className="card">
+        <h3>💰 Rémunération</h3>
+        <p className="muted">
+          Première version de préparation. Sélectionne une agence, une période et une personne concernée.
+          Les règles de calcul seront ajoutées plus tard.
+        </p>
+      </div>
+
+      <div className="card">
+        <h3>Sélection de la rémunération</h3>
+
+        <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+          <div className="item">
+            <strong>Filtres</strong>
+            <p className="muted" style={{ marginTop: 5 }}>
+              Choisis l'agence, l'année, le mois puis la personne concernée : agent commercial ou responsable.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 10 }}>
+            <select
+              value={selectedAgencyId}
+              onChange={(e) => {
+                setSelectedAgencyId(e.target.value ? Number(e.target.value) : '');
+                setSelectedPersonKey('');
+                setShowResult(false);
+              }}
+            >
+              <option value="">Sélectionner une agence</option>
+              <option value={1}>Blois</option>
+              <option value={2}>Tours</option>
+              <option value={3}>Bourges</option>
+            </select>
+
+            <input
+              type="number"
+              placeholder="Année"
+              value={selectedYear}
+              onChange={(e) => {
+                setSelectedYear(e.target.value);
+                setShowResult(false);
+              }}
+            />
+
+            <select
+              value={selectedMonth}
+              onChange={(e) => {
+                setSelectedMonth(e.target.value);
+                setShowResult(false);
+              }}
+            >
+              {monthNames.map((month, index) => (
+                <option key={index + 1} value={String(index + 1)}>
+                  {month}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedPersonKey}
+              onChange={(e) => {
+                setSelectedPersonKey(e.target.value);
+                setShowResult(false);
+              }}
+              disabled={loading}
+            >
+              <option value="">Agent ou Responsable</option>
+
+              {filteredPeople.map((person) => {
+                const isResponsablePerson =
+                  person.account_type === 'responsable' ||
+                  person.role === 'responsable' ||
+                  person.role === 'patron' ||
+                  person.label_type === 'Responsable';
+
+                const type = isResponsablePerson ? 'responsable' : 'agent';
+
+                return (
+                  <option key={`${type}:${person.id}`} value={`${type}:${person.id}`}>
+                    {person.full_name} — {isResponsablePerson ? 'Responsable' : agencyName(person.agency_id)}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn" onClick={showRemuneration} disabled={loading || moneyAnimation}>
+              {moneyAnimation ? 'Calcul en cours...' : 'Afficher la rémunération'}
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedAgencyId('');
+                setSelectedPersonKey('');
+                setSelectedYear(String(currentYear));
+                setSelectedMonth(String(currentMonth));
+                setShowResult(false);
+              }}
+              disabled={moneyAnimation}
+            >
+              Réinitialiser
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showResult && (
+        <div className="grid cards3">
+          <div className="card">
+            <h3>Personne concernée</h3>
+            <div className="stat-value" style={{ fontSize: 24 }}>
+              {selectedPerson?.full_name || '-'}
+            </div>
+            <p className="muted">
+              {selectedPerson?.label_type || '-'} — {selectedPerson?.label_type === 'Responsable' ? 'Toutes agences' : agencyName(selectedPerson?.agency_id)}
+            </p>
+          </div>
+
+          <div className="card">
+            <h3>Période</h3>
+            <div className="stat-value" style={{ fontSize: 24 }}>
+              {monthNames[Number(selectedMonth || 1) - 1]} {selectedYear}
+            </div>
+            <p className="muted">Agence sélectionnée : {agencyName(selectedAgencyId)}</p>
+          </div>
+
+          <div className="card">
+            <h3>Rémunération estimée</h3>
+            <div className="stat-value">0 €</div>
+            <p className="muted">Calcul réel à brancher plus tard.</p>
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <h3>Base de calcul à venir</h3>
+        <p className="muted">
+          Les règles de calcul seront ajoutées plus tard : commissions agents, marges HT, garanties, frais engagés,
+          salaires agents et rémunération responsables.
+        </p>
+      </div>
+    </div>
+  );
+}
+
