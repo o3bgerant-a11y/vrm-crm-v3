@@ -2656,7 +2656,13 @@ export function RapportSemaine({
   );
 }
 
-export function Ventes() {
+export function Ventes({
+  currentAgent = null,
+  isResponsable = true,
+}: {
+  currentAgent?: CurrentAgentForPages | null;
+  isResponsable?: boolean;
+} = {}) {
   const today = new Date().toISOString().slice(0, 10);
 
   const [realSales, setRealSales] = useState<VehicleSale[]>([]);
@@ -2702,7 +2708,7 @@ export function Ventes() {
   async function loadSales() {
     setLoading(true);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('vehicle_sales')
       .select(`
         *,
@@ -2712,6 +2718,12 @@ export function Ventes() {
         )
       `)
       .order('id', { ascending: false });
+
+    if (!isResponsable && currentAgent?.id) {
+      query = query.eq('agent_id', currentAgent.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Erreur chargement ventes:', error);
@@ -2726,7 +2738,7 @@ export function Ventes() {
   useEffect(() => {
     loadAgents();
     loadSales();
-  }, []);
+  }, [currentAgent?.id, isResponsable]);
 
   function resetForm() {
     setEditingSale(null);
@@ -2869,24 +2881,30 @@ export function Ventes() {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
           <h3>Ventes véhicules</h3>
-          <p className="muted">Ajout, modification et suivi des ventes connectées à Supabase.</p>
+          <p className="muted">
+            {isResponsable
+              ? 'Ajout, modification et suivi des ventes connectées à Supabase.'
+              : 'Historique de tes ventes. Pour créer une vente, transforme un lead en véhicule vendu.'}
+          </p>
         </div>
 
-        <button
-          className="btn"
-          onClick={() => {
-            if (showForm && !editingSale) {
-              setShowForm(false);
-            } else {
-              openNewSaleForm();
-            }
-          }}
-        >
-          {showForm && !editingSale ? 'Fermer' : 'Nouvelle vente'}
-        </button>
+        {isResponsable && (
+          <button
+            className="btn"
+            onClick={() => {
+              if (showForm && !editingSale) {
+                setShowForm(false);
+              } else {
+                openNewSaleForm();
+              }
+            }}
+          >
+            {showForm && !editingSale ? 'Fermer' : 'Nouvelle vente'}
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {isResponsable && showForm && (
         <div className="card" style={{ marginTop: 14, marginBottom: 14 }}>
           <h4>{editingSale ? 'Modifier la vente' : 'Nouvelle vente'}</h4>
 
@@ -2967,7 +2985,14 @@ export function Ventes() {
 
           <tbody>
             {filteredSales.map(s => (
-              <tr key={s.id} onClick={() => openEditSaleForm(s)} style={{ cursor: 'pointer' }} title="Cliquer pour modifier la vente">
+              <tr
+                key={s.id}
+                onClick={() => {
+                  if (isResponsable) openEditSaleForm(s);
+                }}
+                style={{ cursor: isResponsable ? 'pointer' : 'default' }}
+                title={isResponsable ? 'Cliquer pour modifier la vente' : 'Historique de vente'}
+              >
                 <td>
                   <strong>{s.vehicle_name}</strong>
                   {(s.registration || s.vin) && (
