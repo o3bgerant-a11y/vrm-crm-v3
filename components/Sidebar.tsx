@@ -13,7 +13,8 @@ import {
   ShieldCheck,
   Store,
   Users,
-  PhoneCall
+  PhoneCall,
+  Target
 } from 'lucide-react';
 
 const items = [
@@ -21,6 +22,7 @@ const items = [
   ['planning', 'Planning', CalendarDays, 'all'],
   ['agences', 'Agences', Store, 'responsable'],
   ['agents', 'Agents commerciaux', Users, 'responsable'],
+  ['objectifs-mensuels', 'Objectifs mensuels', Target, 'responsable'],
   ['leads', 'Leads', PhoneCall, 'all'],
   ['rapport-semaine', 'Rapport semaine', ClipboardList, 'all'],
   ['ventes', 'Ventes', Car, 'all'],
