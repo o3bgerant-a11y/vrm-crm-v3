@@ -130,6 +130,24 @@ type LeadItem = {
   } | null;
 };
 
+
+type MonthlyObjective = {
+  id: number;
+  agent_id: number;
+  agency_id: number;
+  year_number: number;
+  month_number: number;
+  sales_target: number;
+  margin_target: number;
+  warranty_target: number;
+  created_at: string | null;
+  updated_at?: string | null;
+  agents?: {
+    full_name: string | null;
+    agency_id: number | null;
+  } | null;
+};
+
 type WeeklyReport = {
   id: number;
   agent_id: number | null;
@@ -896,6 +914,362 @@ export function Agents() {
     </div>
   );
 }
+export function ObjectifsMensuels() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  const monthNames = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  ];
+
+  const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
+  const [objectives, setObjectives] = useState<MonthlyObjective[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [selectedAgencyId, setSelectedAgencyId] = useState<number | ''>('');
+  const [selectedAgentId, setSelectedAgentId] = useState<number | ''>('');
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const [selectedMonth, setSelectedMonth] = useState(String(currentMonth));
+
+  const [salesTarget, setSalesTarget] = useState('');
+  const [marginTarget, setMarginTarget] = useState('');
+  const [warrantyTarget, setWarrantyTarget] = useState('');
+
+  async function loadObjectivesPage() {
+    setLoading(true);
+
+    const { data: agentsData, error: agentsError } = await supabase
+      .from('agents')
+      .select('id, full_name, agency_id')
+      .order('full_name', { ascending: true });
+
+    const { data: objectivesData, error: objectivesError } = await supabase
+      .from('monthly_objectives')
+      .select('*')
+      .order('year_number', { ascending: false })
+      .order('month_number', { ascending: false })
+      .order('agency_id', { ascending: true })
+      .order('agent_id', { ascending: true });
+
+    if (agentsError) {
+      console.error('Erreur chargement agents objectifs mensuels:', agentsError);
+      setAgentsList([]);
+    } else {
+      setAgentsList((agentsData || []) as AgentOption[]);
+    }
+
+    if (objectivesError) {
+      console.error('Erreur chargement objectifs mensuels:', objectivesError);
+      setObjectives([]);
+    } else {
+      setObjectives((objectivesData || []) as MonthlyObjective[]);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadObjectivesPage();
+  }, []);
+
+  const filteredAgents = useMemo(() => {
+    if (!selectedAgencyId) return agentsList;
+    return agentsList.filter(agent => Number(agent.agency_id) === Number(selectedAgencyId));
+  }, [agentsList, selectedAgencyId]);
+
+  useEffect(() => {
+    if (!selectedAgentId) return;
+
+    const selectedAgent = agentsList.find(agent => Number(agent.id) === Number(selectedAgentId));
+
+    if (selectedAgencyId && selectedAgent && Number(selectedAgent.agency_id) !== Number(selectedAgencyId)) {
+      setSelectedAgentId('');
+    }
+  }, [selectedAgencyId, selectedAgentId, agentsList]);
+
+  const selectedObjective = useMemo(() => {
+    if (!selectedAgentId || !selectedYear || !selectedMonth) return null;
+
+    return objectives.find(objective =>
+      Number(objective.agent_id) === Number(selectedAgentId) &&
+      Number(objective.year_number) === Number(selectedYear) &&
+      Number(objective.month_number) === Number(selectedMonth)
+    ) || null;
+  }, [objectives, selectedAgentId, selectedYear, selectedMonth]);
+
+  useEffect(() => {
+    if (selectedObjective) {
+      setSalesTarget(String(selectedObjective.sales_target ?? ''));
+      setMarginTarget(String(selectedObjective.margin_target ?? ''));
+      setWarrantyTarget(String(selectedObjective.warranty_target ?? ''));
+    } else {
+      setSalesTarget('');
+      setMarginTarget('');
+      setWarrantyTarget('');
+    }
+  }, [selectedObjective]);
+
+  async function saveMonthlyObjective() {
+    if (!selectedAgencyId) {
+      alert('Il faut sélectionner une agence.');
+      return;
+    }
+
+    if (!selectedAgentId) {
+      alert('Il faut sélectionner un agent commercial.');
+      return;
+    }
+
+    if (!selectedYear || !selectedMonth) {
+      alert("Il faut sélectionner l'année et le mois.");
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      agent_id: Number(selectedAgentId),
+      agency_id: Number(selectedAgencyId),
+      year_number: Number(selectedYear),
+      month_number: Number(selectedMonth),
+      sales_target: Number(salesTarget || 0),
+      margin_target: Number(marginTarget || 0),
+      warranty_target: Number(warrantyTarget || 0),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('monthly_objectives')
+      .upsert(payload, {
+        onConflict: 'agent_id,year_number,month_number',
+      });
+
+    if (error) {
+      console.error('Erreur sauvegarde objectif mensuel:', error);
+      alert("Erreur pendant l'enregistrement de l'objectif mensuel. Vérifie que la table monthly_objectives existe bien et que la contrainte unique est créée.");
+    } else {
+      alert('Objectifs mensuels enregistrés.');
+      await loadObjectivesPage();
+    }
+
+    setSaving(false);
+  }
+
+  const objectiveRows = useMemo(() => {
+    return objectives
+      .map((objective) => {
+        const agent = agentsList.find(item => Number(item.id) === Number(objective.agent_id));
+
+        return {
+          ...objective,
+          agentName: agent?.full_name || `Agent #${objective.agent_id}`,
+          agencyName: agencyName(objective.agency_id || agent?.agency_id),
+        };
+      })
+      .sort((a, b) => {
+        if (Number(b.year_number) !== Number(a.year_number)) return Number(b.year_number) - Number(a.year_number);
+        if (Number(b.month_number) !== Number(a.month_number)) return Number(b.month_number) - Number(a.month_number);
+        return String(a.agentName).localeCompare(String(b.agentName));
+      });
+  }, [objectives, agentsList]);
+
+  return (
+    <div className="section">
+      <div className="card">
+        <h3>Objectifs mensuels</h3>
+        <p className="muted">
+          Définis des objectifs différents par agence, par agent commercial, par année et par mois.
+          Ces objectifs serviront ensuite au tableau de bord agent avec la progression réelle du mois.
+        </p>
+      </div>
+
+      <div className="card">
+        <h3>Définir les objectifs d'un agent</h3>
+
+        <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+          <div className="item">
+            <strong>Sélection</strong>
+            <p className="muted" style={{ marginTop: 5 }}>
+              Ordre conseillé : agence → agent commercial → année → mois.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 10 }}>
+            <select
+              value={selectedAgencyId}
+              onChange={(e) => setSelectedAgencyId(e.target.value ? Number(e.target.value) : '')}
+            >
+              <option value="">Sélectionner une agence</option>
+              <option value={1}>Blois</option>
+              <option value={2}>Tours</option>
+              <option value={3}>Bourges</option>
+            </select>
+
+            <select
+              value={selectedAgentId}
+              onChange={(e) => setSelectedAgentId(e.target.value ? Number(e.target.value) : '')}
+              disabled={!selectedAgencyId}
+            >
+              <option value="">Sélectionner un agent</option>
+              {filteredAgents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.full_name} — {agencyName(agent.agency_id)}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="number"
+              placeholder="Année"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+            />
+
+            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+              {monthNames.map((month, index) => (
+                <option key={index + 1} value={String(index + 1)}>
+                  {month}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="item">
+            <strong>Objectifs du mois</strong>
+            <p className="muted" style={{ marginTop: 5 }}>
+              Si un objectif existe déjà pour cet agent sur ce mois, il sera mis à jour au lieu de créer un doublon.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span className="muted">Objectif ventes</span>
+              <input
+                type="number"
+                placeholder="Ex : 10"
+                value={salesTarget}
+                onChange={(e) => setSalesTarget(e.target.value)}
+              />
+            </label>
+
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span className="muted">Objectif marge</span>
+              <input
+                type="number"
+                placeholder="Ex : 15000"
+                value={marginTarget}
+                onChange={(e) => setMarginTarget(e.target.value)}
+              />
+            </label>
+
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span className="muted">Objectif garanties</span>
+              <input
+                type="number"
+                placeholder="Ex : 5"
+                value={warrantyTarget}
+                onChange={(e) => setWarrantyTarget(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn" onClick={saveMonthlyObjective} disabled={saving || loading}>
+              {saving ? 'Enregistrement...' : selectedObjective ? 'Modifier les objectifs du mois' : 'Enregistrer les objectifs du mois'}
+            </button>
+
+            <button
+              onClick={() => {
+                setSalesTarget('');
+                setMarginTarget('');
+                setWarrantyTarget('');
+              }}
+              disabled={saving}
+            >
+              Effacer les champs
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid cards3">
+        <div className="card">
+          <h3>Objectifs enregistrés</h3>
+          <div className="stat-value">{objectiveRows.length}</div>
+          <p className="muted">Toutes périodes confondues</p>
+        </div>
+
+        <div className="card">
+          <h3>Année sélectionnée</h3>
+          <div className="stat-value">{selectedYear}</div>
+          <p className="muted">Objectifs consultés / modifiés</p>
+        </div>
+
+        <div className="card">
+          <h3>Mois sélectionné</h3>
+          <div className="stat-value">{monthNames[Number(selectedMonth || 1) - 1] || '-'}</div>
+          <p className="muted">Période de travail</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>Historique des objectifs mensuels</h3>
+
+        {loading && <p className="muted">Chargement des objectifs mensuels...</p>}
+
+        {!loading && objectiveRows.length === 0 && (
+          <p className="muted">Aucun objectif mensuel enregistré pour le moment.</p>
+        )}
+
+        {!loading && objectiveRows.length > 0 && (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Période</th>
+                <th>Agence</th>
+                <th>Agent</th>
+                <th>Objectif ventes</th>
+                <th>Objectif marge</th>
+                <th>Objectif garanties</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {objectiveRows.map((objective) => (
+                <tr
+                  key={objective.id}
+                  onClick={() => {
+                    setSelectedAgencyId(Number(objective.agency_id));
+                    setSelectedAgentId(Number(objective.agent_id));
+                    setSelectedYear(String(objective.year_number));
+                    setSelectedMonth(String(objective.month_number));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  style={{ cursor: 'pointer' }}
+                  title="Cliquer pour modifier cet objectif"
+                >
+                  <td>
+                    <strong>{monthNames[Number(objective.month_number || 1) - 1]} {objective.year_number}</strong>
+                  </td>
+                  <td><span className="badge">{objective.agencyName}</span></td>
+                  <td>{objective.agentName}</td>
+                  <td>{objective.sales_target}</td>
+                  <td><strong>{euro(Number(objective.margin_target || 0))}</strong></td>
+                  <td>{objective.warranty_target}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 export function Leads() {
   const today = new Date().toISOString().slice(0, 10);
   const now = new Date();
@@ -1551,17 +1925,17 @@ export function Leads() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(150px, 1fr))', gap: 10 }}>
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Prix net vendeur</span>
-                          <input type="text" inputMode="numeric" placeholder="Ex : 12000" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
+                          <input type="number" placeholder="Ex : 12000" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
                         </label>
 
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Prix de vente</span>
-                          <input type="text" inputMode="numeric" placeholder="Ex : 14500" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+                          <input type="number" placeholder="Ex : 14500" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
                         </label>
 
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Frais de mise à la route</span>
-                          <input type="text" inputMode="numeric" placeholder="Ex : 399" value={saleRoadFees} onChange={(e) => setSaleRoadFees(e.target.value)} />
+                          <input type="number" placeholder="Ex : 399" value={saleRoadFees} onChange={(e) => setSaleRoadFees(e.target.value)} />
                         </label>
                       </div>
 
@@ -1585,8 +1959,7 @@ export function Leads() {
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Prix garantie (modifiable)</span>
                           <input
-                            type="text"
-                            inputMode="numeric"
+                            type="number"
                             placeholder="Prix garantie"
                             value={warrantyAmount}
                             onChange={(e) => {
