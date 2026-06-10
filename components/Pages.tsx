@@ -1551,17 +1551,17 @@ export function Leads() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(150px, 1fr))', gap: 10 }}>
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Prix net vendeur</span>
-                          <input type="number" placeholder="Ex : 12000" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
+                          <input type="text" inputMode="numeric" placeholder="Ex : 12000" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
                         </label>
 
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Prix de vente</span>
-                          <input type="number" placeholder="Ex : 14500" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
+                          <input type="text" inputMode="numeric" placeholder="Ex : 14500" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
                         </label>
 
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Frais de mise à la route</span>
-                          <input type="number" placeholder="Ex : 399" value={saleRoadFees} onChange={(e) => setSaleRoadFees(e.target.value)} />
+                          <input type="text" inputMode="numeric" placeholder="Ex : 399" value={saleRoadFees} onChange={(e) => setSaleRoadFees(e.target.value)} />
                         </label>
                       </div>
 
@@ -1585,7 +1585,8 @@ export function Leads() {
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Prix garantie (modifiable)</span>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             placeholder="Prix garantie"
                             value={warrantyAmount}
                             onChange={(e) => {
