@@ -4341,7 +4341,8 @@ export function Remuneration() {
     'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
   ];
 
-  const [people, setPeople] = useState<any[]>([]);
+  const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
+  const [responsablesList, setResponsablesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAgencyId, setSelectedAgencyId] = useState<number | ''>('');
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
@@ -4350,72 +4351,69 @@ export function Remuneration() {
   const [showResult, setShowResult] = useState(false);
   const [moneyAnimation, setMoneyAnimation] = useState(false);
 
-  async function loadPeople() {
+  async function loadRemunerationPeople() {
     setLoading(true);
 
     const { data: agentsData, error: agentsError } = await supabase
       .from('agents')
-      .select('id, full_name, agency_id, account_type, role')
+      .select('id, full_name, agency_id')
+      .order('full_name', { ascending: true });
+
+    const { data: responsablesData, error: responsablesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, agency_id, role, account_type, is_admin, status')
+      .or('role.eq.responsable,account_type.eq.responsable,is_admin.eq.true')
       .order('full_name', { ascending: true });
 
     if (agentsError) {
-      console.error('Erreur chargement personnes rémunération:', agentsError);
-      setPeople([]);
+      console.error('Erreur chargement agents rémunération:', agentsError);
+      setAgentsList([]);
     } else {
-      const rows = (agentsData || []).map((person: any) => ({
-        id: person.id,
-        full_name: person.full_name,
-        agency_id: person.agency_id,
-        account_type: person.account_type || person.role || 'agent',
-        label_type:
-          person.account_type === 'responsable' || person.role === 'responsable' || person.role === 'patron'
-            ? 'Responsable'
-            : 'Agent commercial',
-      }));
+      setAgentsList((agentsData || []) as AgentOption[]);
+    }
 
-      setPeople(rows);
+    if (responsablesError) {
+      console.error('Erreur chargement responsables rémunération:', responsablesError);
+      setResponsablesList([]);
+    } else {
+      setResponsablesList(responsablesData || []);
     }
 
     setLoading(false);
   }
 
   useEffect(() => {
-    loadPeople();
+    loadRemunerationPeople();
   }, []);
 
-  const filteredPeople = useMemo(() => {
-    return people.filter((person) => {
-      const isResponsablePerson =
-        person.account_type === 'responsable' ||
-        person.role === 'responsable' ||
-        person.role === 'patron' ||
-        person.label_type === 'Responsable';
+  const peopleOptions = useMemo(() => {
+    const responsables = responsablesList.map((responsable) => ({
+      key: `responsable:${responsable.id}`,
+      id: responsable.id,
+      full_name: responsable.full_name || responsable.email || 'Responsable',
+      agency_id: responsable.agency_id || null,
+      type: 'responsable',
+      label_type: 'Responsable',
+    }));
 
-      if (isResponsablePerson) return true;
+    const agents = agentsList
+      .filter((agent) => !selectedAgencyId || Number(agent.agency_id) === Number(selectedAgencyId))
+      .map((agent) => ({
+        key: `agent:${agent.id}`,
+        id: agent.id,
+        full_name: agent.full_name,
+        agency_id: agent.agency_id,
+        type: 'agent',
+        label_type: 'Agent commercial',
+      }));
 
-      if (!selectedAgencyId) return true;
-
-      return Number(person.agency_id) === Number(selectedAgencyId);
-    });
-  }, [people, selectedAgencyId]);
+    return [...responsables, ...agents];
+  }, [agentsList, responsablesList, selectedAgencyId]);
 
   const selectedPerson = useMemo(() => {
     if (!selectedPersonKey) return null;
-
-    const [type, id] = selectedPersonKey.split(':');
-
-    return filteredPeople.find((person) => {
-      const isResponsablePerson =
-        person.account_type === 'responsable' ||
-        person.role === 'responsable' ||
-        person.role === 'patron' ||
-        person.label_type === 'Responsable';
-
-      const personType = isResponsablePerson ? 'responsable' : 'agent';
-
-      return personType === type && String(person.id) === String(id);
-    }) || null;
-  }, [selectedPersonKey, filteredPeople]);
+    return peopleOptions.find((person) => person.key === selectedPersonKey) || null;
+  }, [selectedPersonKey, peopleOptions]);
 
   function showRemuneration() {
     if (!selectedAgencyId) {
@@ -4429,7 +4427,7 @@ export function Remuneration() {
     }
 
     if (!selectedPersonKey) {
-      alert('Il faut sélectionner un agent ou un responsable.');
+      alert('Il faut sélectionner un agent commercial ou un responsable.');
       return;
     }
 
@@ -4500,8 +4498,8 @@ export function Remuneration() {
       <div className="card">
         <h3>💰 Rémunération</h3>
         <p className="muted">
-          Première version de préparation. Sélectionne une agence, une période et une personne concernée.
-          Les règles de calcul seront ajoutées plus tard.
+          Première version de préparation. Sélectionne une agence, une année, un mois et la personne concernée.
+          Aucun calcul réel n'est encore branché volontairement.
         </p>
       </div>
 
@@ -4565,27 +4563,23 @@ export function Remuneration() {
             >
               <option value="">Agent ou Responsable</option>
 
-              {filteredPeople.map((person) => {
-                const isResponsablePerson =
-                  person.account_type === 'responsable' ||
-                  person.role === 'responsable' ||
-                  person.role === 'patron' ||
-                  person.label_type === 'Responsable';
-
-                const type = isResponsablePerson ? 'responsable' : 'agent';
-
-                return (
-                  <option key={`${type}:${person.id}`} value={`${type}:${person.id}`}>
-                    {person.full_name} — {isResponsablePerson ? 'Responsable' : agencyName(person.agency_id)}
-                  </option>
-                );
-              })}
+              {peopleOptions.map((person) => (
+                <option key={person.key} value={person.key}>
+                  {person.full_name} — {person.label_type === 'Responsable' ? 'Responsable' : agencyName(person.agency_id)}
+                </option>
+              ))}
             </select>
           </div>
 
+          {loading && <p className="muted">Chargement des personnes...</p>}
+
+          {!loading && peopleOptions.length === 0 && (
+            <p className="muted">Aucun agent ou responsable trouvé pour le moment.</p>
+          )}
+
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn" onClick={showRemuneration} disabled={loading || moneyAnimation}>
-              {moneyAnimation ? 'Calcul en cours...' : 'Afficher la rémunération'}
+              {moneyAnimation ? 'Chargement...' : 'Afficher la rémunération'}
             </button>
 
             <button
@@ -4612,7 +4606,7 @@ export function Remuneration() {
               {selectedPerson?.full_name || '-'}
             </div>
             <p className="muted">
-              {selectedPerson?.label_type || '-'} — {selectedPerson?.label_type === 'Responsable' ? 'Toutes agences' : agencyName(selectedPerson?.agency_id)}
+              {selectedPerson?.label_type || '-'} — {selectedPerson?.label_type === 'Responsable' ? 'Responsable réseau' : agencyName(selectedPerson?.agency_id)}
             </p>
           </div>
 
@@ -4642,4 +4636,3 @@ export function Remuneration() {
     </div>
   );
 }
-
