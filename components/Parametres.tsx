@@ -14,7 +14,10 @@ type Profile = {
   auth_user_id?: string | null;
   agent_id?: number | null;
   is_admin?: boolean | null;
+  account_type?: string | null;
 };
+
+const MASTER_EMAIL = 'o3b.gerant@gmail.com';
 
 const agencyName = (agencyId: any) => {
   const id = Number(agencyId);
@@ -30,17 +33,15 @@ export default function Parametres() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
-
   const [accountType, setAccountType] = useState<'agent' | 'responsable'>('agent');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [agencyId, setAgencyId] = useState<number | ''>('');
+  const [agencyId, setAgencyId] = useState<any>('');
 
   const [resettingProfile, setResettingProfile] = useState<Profile | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -52,7 +53,8 @@ export default function Parametres() {
   const isResponsable =
     currentProfile?.is_admin === true ||
     currentProfile?.role === 'patron' ||
-    currentProfile?.role === 'responsable';
+    currentProfile?.role === 'responsable' ||
+    currentProfile?.account_type === 'responsable';
 
   async function loadCurrentProfileAndProfiles() {
     setLoading(true);
@@ -67,7 +69,10 @@ export default function Parametres() {
       return;
     }
 
-    setCurrentUserEmail(userData.user.email || null);
+    const userEmail = userData.user.email || null;
+    setCurrentUserEmail(userEmail);
+
+    let profile: Profile | null = null;
 
     const { data: myProfileData, error: myProfileError } = await supabase
       .from('profiles')
@@ -77,19 +82,45 @@ export default function Parametres() {
 
     if (myProfileError) {
       console.error('Erreur chargement profil connecté:', myProfileError);
-      setCurrentProfile(null);
-      setProfiles([]);
-      setLoading(false);
-      return;
+    } else {
+      profile = myProfileData as Profile | null;
     }
 
-    const profile = myProfileData as Profile | null;
+    if (!profile) {
+      const { data: myProfileByAuthData, error: myProfileByAuthError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('auth_user_id', userData.user.id)
+        .maybeSingle();
+
+      if (myProfileByAuthError) {
+        console.error('Erreur chargement profil connecté via auth_user_id:', myProfileByAuthError);
+      } else {
+        profile = myProfileByAuthData as Profile | null;
+      }
+    }
+
+    if (!profile && userEmail) {
+      const { data: myProfileByEmailData, error: myProfileByEmailError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', userEmail)
+        .maybeSingle();
+
+      if (myProfileByEmailError) {
+        console.error('Erreur chargement profil connecté via email:', myProfileByEmailError);
+      } else {
+        profile = myProfileByEmailData as Profile | null;
+      }
+    }
+
     setCurrentProfile(profile);
 
     const responsable =
       profile?.is_admin === true ||
       profile?.role === 'patron' ||
-      profile?.role === 'responsable';
+      profile?.role === 'responsable' ||
+      profile?.account_type === 'responsable';
 
     if (!responsable) {
       setProfiles([]);
@@ -106,7 +137,7 @@ export default function Parametres() {
       console.error(error);
       setProfiles([]);
     } else {
-      setProfiles(data || []);
+      setProfiles((data || []) as Profile[]);
     }
 
     setLoading(false);
@@ -146,11 +177,35 @@ export default function Parametres() {
     return generated;
   }
 
+  function isResponsableProfile(profile: Profile) {
+    return (
+      profile.is_admin === true ||
+      profile.role === 'patron' ||
+      profile.role === 'responsable' ||
+      profile.account_type === 'responsable'
+    );
+  }
+
+  function isMasterProfile(profile: Profile) {
+    const profileEmail = String(profile.email || '').trim().toLowerCase();
+    const connectedEmail = String(currentUserEmail || '').trim().toLowerCase();
+
+    if (profileEmail && profileEmail === MASTER_EMAIL) return true;
+    if (connectedEmail && profileEmail && profileEmail === connectedEmail) return true;
+    if (currentProfile?.id && Number(profile.id) === Number(currentProfile.id)) return true;
+
+    return false;
+  }
+
+  function canManageProfile(profile: Profile) {
+    return isResponsable && !isMasterProfile(profile);
+  }
+
   function openResetPassword(profile: Profile) {
     if (!isResponsable) return;
 
-    if (profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true) {
-      alert('Le mot de passe du compte Responsable ne peut pas être modifié ici.');
+    if (isMasterProfile(profile)) {
+      alert('Ton compte principal est protégé. Son mot de passe doit uniquement être modifié depuis "Mon compte".');
       return;
     }
 
@@ -206,7 +261,7 @@ export default function Parametres() {
       const result = await response.json();
 
       if (!response.ok) {
-        alert(result.error || "Erreur pendant la création du compte.");
+        alert(result.error || 'Erreur pendant la création du compte.');
         setSaving(false);
         return;
       }
@@ -222,7 +277,7 @@ export default function Parametres() {
       await loadCurrentProfileAndProfiles();
     } catch (error) {
       console.error(error);
-      alert("Erreur serveur pendant la création du compte.");
+      alert('Erreur serveur pendant la création du compte.');
     }
 
     setSaving(false);
@@ -234,8 +289,8 @@ export default function Parametres() {
   ) {
     if (!isResponsable) return;
 
-    if (profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true) {
-      alert('Le compte Responsable ne peut pas être modifié ici.');
+    if (isMasterProfile(profile)) {
+      alert('Ton compte principal est protégé. Il ne peut pas être bloqué, archivé ou supprimé.');
       return;
     }
 
@@ -250,7 +305,7 @@ export default function Parametres() {
     }
 
     if (action === 'archive') {
-      confirmMessage = `Archiver ${profile.full_name} ? Ses ventes resteront conservées.`;
+      confirmMessage = `Archiver ${profile.full_name} ? Ses données resteront conservées.`;
     }
 
     if (action === 'delete') {
@@ -258,10 +313,11 @@ export default function Parametres() {
         `SUPPRIMER DÉFINITIVEMENT ${profile.full_name} ?\n\n` +
         `Le compte CRM, le profil et l'accès de connexion seront supprimés.\n\n` +
         `Cette action est irréversible.\n\n` +
-        `À utiliser surtout pour les comptes tests ou les agents créés par erreur.`;
+        `À utiliser uniquement si tu es sûr de toi.`;
     }
 
     const ok = confirm(confirmMessage);
+
     if (!ok) return;
 
     setSaving(true);
@@ -281,7 +337,7 @@ export default function Parametres() {
       const result = await response.json();
 
       if (!response.ok) {
-        alert(result.error || "Erreur pendant la mise à jour du compte.");
+        alert(result.error || 'Erreur pendant la mise à jour du compte.');
         setSaving(false);
         return;
       }
@@ -289,15 +345,20 @@ export default function Parametres() {
       await loadCurrentProfileAndProfiles();
     } catch (error) {
       console.error(error);
-      alert("Erreur serveur pendant la mise à jour du compte.");
+      alert('Erreur serveur pendant la mise à jour du compte.');
     }
 
     setSaving(false);
   }
 
-  async function resetAgentPassword() {
+  async function resetAccountPassword() {
     if (!isResponsable) return;
     if (!resettingProfile) return;
+
+    if (isMasterProfile(resettingProfile)) {
+      alert('Ton compte principal est protégé. Son mot de passe doit uniquement être modifié depuis "Mon compte".');
+      return;
+    }
 
     if (!newPassword.trim()) {
       alert('Il faut indiquer un nouveau mot de passe.');
@@ -310,6 +371,7 @@ export default function Parametres() {
     }
 
     const ok = confirm(`Réinitialiser le mot de passe de ${resettingProfile.full_name} ?`);
+
     if (!ok) return;
 
     setSaving(true);
@@ -335,7 +397,11 @@ export default function Parametres() {
       }
 
       alert(
-        `Mot de passe réinitialisé avec succès.\n\nAgent : ${resettingProfile.full_name}\nEmail : ${resettingProfile.email || '-'}\nNouveau mot de passe temporaire : ${newPassword.trim()}\n\nTransmets ce mot de passe à l'agent. Il pourra ensuite le personnaliser.`
+        `Mot de passe réinitialisé avec succès.\n\n` +
+        `Compte : ${resettingProfile.full_name}\n` +
+        `Email : ${resettingProfile.email || '-'}\n` +
+        `Nouveau mot de passe temporaire : ${newPassword.trim()}\n\n` +
+        `Transmets ce mot de passe à la personne. Elle pourra ensuite le personnaliser.`
       );
 
       closeResetPassword();
@@ -365,6 +431,7 @@ export default function Parametres() {
     }
 
     const ok = confirm('Modifier ton mot de passe de connexion CRM ?');
+
     if (!ok) return;
 
     setChangingMyPassword(true);
@@ -377,7 +444,7 @@ export default function Parametres() {
       console.error('Erreur modification mot de passe personnel:', error);
       alert(error.message || 'Erreur pendant la modification du mot de passe.');
     } else {
-      alert('Mot de passe modifié avec succès. Utilise ce nouveau mot de passe à ta prochaine connexion.');
+      alert('Mot de passe modifié avec succès.\nUtilise ce nouveau mot de passe à ta prochaine connexion.');
       setMyNewPassword('');
       setMyConfirmPassword('');
     }
@@ -394,26 +461,20 @@ export default function Parametres() {
   }
 
   function roleLabel(profile: Profile) {
-    if (profile.is_admin === true || profile.role === 'patron' || profile.role === 'responsable') {
+    if (isResponsableProfile(profile)) {
       return 'Responsable';
     }
 
-    if (profile.role === 'agent') return 'Agent commercial';
+    if (profile.role === 'agent' || profile.account_type === 'agent') return 'Agent commercial';
 
     return profile.role || '-';
   }
 
-  function isProtectedProfile(profile: Profile) {
-    return profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true;
-  }
-
   if (loading) {
     return (
-      <div className="section">
-        <div className="card">
-          <h3>⚙️ Paramètres CRM</h3>
-          <p className="muted">Chargement des paramètres...</p>
-        </div>
+      <div className="card">
+        <h3>⚙️ Paramètres CRM</h3>
+        <p className="muted">Chargement des paramètres...</p>
       </div>
     );
   }
@@ -422,7 +483,6 @@ export default function Parametres() {
     <div className="section">
       <div className="card">
         <h3>⚙️ Paramètres CRM</h3>
-
         <p className="muted">
           {isResponsable
             ? 'Gestion des accès utilisateurs du CRM.'
@@ -430,41 +490,38 @@ export default function Parametres() {
         </p>
 
         {isResponsable && (
-          <div style={{ marginTop: 15 }}>
-            <button
-              className="btn"
-              onClick={() => {
-                if (showForm) {
-                  setShowForm(false);
-                  resetForm();
-                } else {
-                  setShowForm(true);
-                }
-              }}
-            >
-              {showForm ? 'Fermer le formulaire' : '➕ Créer un compte CRM'}
-            </button>
-          </div>
+          <button
+            className="btn"
+            onClick={() => {
+              if (showForm) {
+                setShowForm(false);
+                resetForm();
+              } else {
+                setShowForm(true);
+              }
+            }}
+          >
+            {showForm ? 'Fermer le formulaire' : '➕ Créer un compte CRM'}
+          </button>
         )}
       </div>
 
       <div className="card">
-        <h3>👤 Mon compte</h3>
-
+        <h3>🔐 Mon compte</h3>
         <p className="muted">
           {currentUserEmail ? `Connecté avec : ${currentUserEmail}` : 'Compte CRM connecté.'}
         </p>
 
         {currentProfile && (
-          <div className="item" style={{ marginTop: 12 }}>
+          <div className="item">
             <strong>{currentProfile.full_name}</strong>
-            <p className="muted" style={{ marginTop: 5 }}>
+            <p className="muted">
               Rôle : {isResponsable ? 'Responsable' : 'Agent commercial'} — Agence : {agencyName(currentProfile.agency_id)}
             </p>
           </div>
         )}
 
-        <div style={{ display: 'grid', gap: 10, marginTop: 15 }}>
+        <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
           <input
             type="password"
             placeholder="Nouveau mot de passe"
@@ -481,13 +538,13 @@ export default function Parametres() {
 
           <div className="item">
             <strong>Important</strong>
-            <p className="muted" style={{ marginTop: 5 }}>
+            <p className="muted">
               Ce changement modifie uniquement ton propre mot de passe de connexion au CRM.
             </p>
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn" onClick={changeMyPassword} disabled={changingMyPassword || saving}>
+            <button className="btn" onClick={changeMyPassword} disabled={changingMyPassword}>
               {changingMyPassword ? 'Modification...' : '🔑 Modifier mon mot de passe'}
             </button>
 
@@ -517,16 +574,15 @@ export default function Parametres() {
       {isResponsable && showForm && (
         <div className="card">
           <h3>{accountType === 'responsable' ? 'Nouveau Responsable' : 'Nouvel agent commercial'}</h3>
-
           <p className="muted">
             Crée automatiquement le compte de connexion et le profil CRM.
             Pour un agent, une fiche agent est aussi créée automatiquement.
           </p>
 
-          <div style={{ display: 'grid', gap: 10, marginTop: 15 }}>
+          <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
             <div className="item">
               <strong>Type de compte</strong>
-              <p className="muted" style={{ marginTop: 5 }}>
+              <p className="muted">
                 Choisis Agent commercial pour un vendeur, ou Responsable pour donner les mêmes droits d’administration que toi.
               </p>
             </div>
@@ -536,6 +592,7 @@ export default function Parametres() {
               onChange={(e) => {
                 const value = e.target.value === 'responsable' ? 'responsable' : 'agent';
                 setAccountType(value);
+
                 if (value === 'responsable') {
                   setAgencyId('');
                 }
@@ -546,13 +603,14 @@ export default function Parametres() {
             </select>
 
             <input
-              placeholder={accountType === 'responsable' ? 'Nom complet du responsable' : 'Nom complet ex : Maveryk Leveau'}
+              placeholder="Nom complet"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
 
             <input
-              placeholder={accountType === 'responsable' ? 'Email de connexion du responsable' : 'Email de connexion ex : maveryk@agentsco.fr'}
+              placeholder="Email de connexion"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -572,28 +630,26 @@ export default function Parametres() {
             {accountType === 'responsable' && (
               <div className="item">
                 <strong>Compte Responsable</strong>
-                <p className="muted" style={{ marginTop: 5 }}>
-                  Aucun rattachement agence n’est nécessaire. Ce compte aura accès à toutes les agences,
-                  aux paramètres, aux statistiques et aux fonctions Responsable.
+                <p className="muted">
+                  Aucun rattachement agence n’est nécessaire.
+                  Ce compte aura accès à toutes les agences, aux paramètres, aux statistiques et aux fonctions Responsable.
                 </p>
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input
                 placeholder="Mot de passe provisoire"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
 
-              <button onClick={generatePassword} type="button">
-                Générer
-              </button>
+              <button onClick={generatePassword}>Générer</button>
             </div>
 
             <div className="item">
               <strong>Important</strong>
-              <p className="muted" style={{ marginTop: 5 }}>
+              <p className="muted">
                 Le mot de passe provisoire sera affiché une seule fois après la création.
                 Il faudra le transmettre à la personne et éviter de le stocker en clair.
               </p>
@@ -601,11 +657,7 @@ export default function Parametres() {
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn" onClick={createAccount} disabled={saving}>
-                {saving
-                  ? 'Création en cours...'
-                  : accountType === 'responsable'
-                    ? 'Créer le Responsable'
-                    : "Créer l'agent"}
+                {saving ? 'Création en cours...' : accountType === 'responsable' ? 'Créer le Responsable' : "Créer l'agent"}
               </button>
 
               <button
@@ -625,38 +677,31 @@ export default function Parametres() {
       {isResponsable && resettingProfile && (
         <div className="card">
           <h3>🔑 Réinitialiser le mot de passe</h3>
-
           <p className="muted">
-            Agent : <strong>{resettingProfile.full_name}</strong> — {resettingProfile.email || '-'}
+            Compte : {resettingProfile.full_name} — {resettingProfile.email || '-'}
           </p>
 
-          <div style={{ display: 'grid', gap: 10, marginTop: 15 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
-              <input
-                placeholder="Nouveau mot de passe temporaire"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
+          <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+            <input
+              placeholder="Nouveau mot de passe temporaire"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
 
-              <button
-                type="button"
-                onClick={() => setNewPassword(createTemporaryPassword())}
-                disabled={saving}
-              >
-                Générer
-              </button>
-            </div>
+            <button onClick={() => setNewPassword(createTemporaryPassword())} disabled={saving}>
+              Générer
+            </button>
 
             <div className="item">
               <strong>Important</strong>
-              <p className="muted" style={{ marginTop: 5 }}>
+              <p className="muted">
                 Le nouveau mot de passe sera affiché une seule fois après validation.
-                Transmets-le à l'agent, puis demande-lui de le personnaliser depuis son espace.
+                Transmets-le à la personne, puis demande-lui de le personnaliser depuis son espace.
               </p>
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn" onClick={resetAgentPassword} disabled={saving}>
+              <button className="btn" onClick={resetAccountPassword} disabled={saving}>
                 {saving ? 'Réinitialisation...' : 'Réinitialiser le mot de passe'}
               </button>
 
@@ -669,13 +714,11 @@ export default function Parametres() {
       )}
 
       {isResponsable && (
-        <div className="card">
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
           <h3>Comptes CRM</h3>
 
           {profiles.length === 0 && (
-            <p className="muted">
-              Aucun compte trouvé.
-            </p>
+            <p className="muted">Aucun compte trouvé.</p>
           )}
 
           {profiles.length > 0 && (
@@ -692,77 +735,59 @@ export default function Parametres() {
               </thead>
 
               <tbody>
-                {profiles.map(profile => {
-                  const protectedProfile = isProtectedProfile(profile);
+                {profiles.map((profile) => {
+                  const masterProfile = isMasterProfile(profile);
+                  const responsableProfile = isResponsableProfile(profile);
+                  const manageableProfile = canManageProfile(profile);
 
                   return (
                     <tr key={profile.id}>
                       <td>
                         <strong>{profile.full_name}</strong>
+                        {masterProfile && (
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            👑 Compte principal protégé
+                          </div>
+                        )}
                       </td>
 
-                      <td>
-                        {profile.email || '-'}
-                      </td>
+                      <td>{profile.email || '-'}</td>
+                      <td>{roleLabel(profile)}</td>
+                      <td>{agencyName(profile.agency_id)}</td>
+                      <td><strong>{statusLabel(profile.status)}</strong></td>
 
                       <td>
-                        {roleLabel(profile)}
-                      </td>
+                        {masterProfile ? (
+                          <span className="muted">Compte principal</span>
+                        ) : manageableProfile ? (
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {profile.status !== 'blocked' && profile.status !== 'archived' && (
+                              <button onClick={() => updateAccount(profile, 'block')} disabled={saving}>
+                                Bloquer
+                              </button>
+                            )}
 
-                      <td>
-                        {agencyName(profile.agency_id)}
-                      </td>
+                            {profile.status === 'blocked' && (
+                              <button onClick={() => updateAccount(profile, 'activate')} disabled={saving}>
+                                Réactiver
+                              </button>
+                            )}
 
-                      <td>
-                        <strong>{statusLabel(profile.status)}</strong>
-                      </td>
+                            {profile.status !== 'archived' && (
+                              <button onClick={() => updateAccount(profile, 'archive')} disabled={saving}>
+                                Archiver
+                              </button>
+                            )}
 
-                      <td>
-                        {protectedProfile ? (
-                          <span className="muted">Compte Responsable</span>
-                        ) : (
-                          <div style={{ display: 'grid', gap: 6 }}>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                              {profile.status !== 'blocked' && profile.status !== 'archived' && (
-                                <button
-                                  onClick={() => updateAccount(profile, 'block')}
-                                  disabled={saving}
-                                >
-                                  Bloquer
-                                </button>
-                              )}
+                            {profile.status !== 'archived' && (
+                              <button onClick={() => openResetPassword(profile)} disabled={saving}>
+                                🔑 Réinitialiser MDP
+                              </button>
+                            )}
 
-                              {profile.status === 'blocked' && (
-                                <button
-                                  onClick={() => updateAccount(profile, 'activate')}
-                                  disabled={saving}
-                                >
-                                  Réactiver
-                                </button>
-                              )}
-
-                              {profile.status !== 'archived' && (
-                                <button
-                                  onClick={() => updateAccount(profile, 'archive')}
-                                  disabled={saving}
-                                >
-                                  Archiver
-                                </button>
-                              )}
-
-                              {profile.status !== 'archived' && (
-                                <button
-                                  onClick={() => openResetPassword(profile)}
-                                  disabled={saving}
-                                >
-                                  🔑 Réinitialiser MDP
-                                </button>
-                              )}
-
-                              {profile.status === 'archived' && (
-                                <span className="muted">Archivé</span>
-                              )}
-                            </div>
+                            {profile.status === 'archived' && (
+                              <span className="muted">Archivé</span>
+                            )}
 
                             <button
                               onClick={() => updateAccount(profile, 'delete')}
@@ -777,7 +802,13 @@ export default function Parametres() {
                             >
                               🗑️ Supprimer définitivement
                             </button>
+
+                            {responsableProfile && (
+                              <span className="badge">Responsable modifiable</span>
+                            )}
                           </div>
+                        ) : (
+                          <span className="muted">Action non autorisée</span>
                         )}
                       </td>
                     </tr>
