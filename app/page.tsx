@@ -205,7 +205,7 @@ export default function Home() {
 
     const timer = setTimeout(() => {
       setShowWelcomeAnimation(false);
-    }, 2600);
+    }, 4500);
 
     return () => clearTimeout(timer);
   }, [showWelcomeAnimation]);
@@ -316,7 +316,7 @@ export default function Home() {
             padding: 24,
             background: 'radial-gradient(circle at top, rgba(37,99,235,.95) 0, rgba(7,17,31,.96) 45%, rgba(2,6,23,.98) 100%)',
             backdropFilter: 'blur(14px)',
-            animation: 'welcomeFadeOut 2.6s ease-in-out forwards',
+            animation: 'welcomeFadeOut 4.5s ease-in-out forwards',
           }}
         >
           <div
@@ -338,7 +338,7 @@ export default function Home() {
                 top: 18,
                 left: 28,
                 fontSize: 28,
-                animation: 'floatingIconOne 2.6s ease-in-out forwards',
+                animation: 'floatingIconOne 4.5s ease-in-out forwards',
               }}
             >
               🚗
@@ -350,7 +350,7 @@ export default function Home() {
                 top: 26,
                 right: 30,
                 fontSize: 28,
-                animation: 'floatingIconTwo 2.6s ease-in-out forwards',
+                animation: 'floatingIconTwo 4.5s ease-in-out forwards',
               }}
             >
               💸
@@ -362,7 +362,7 @@ export default function Home() {
                 bottom: 28,
                 right: 46,
                 fontSize: 28,
-                animation: 'floatingIconThree 2.6s ease-in-out forwards',
+                animation: 'floatingIconThree 4.5s ease-in-out forwards',
               }}
             >
               👑
@@ -379,7 +379,7 @@ export default function Home() {
                 fontSize: 36,
                 background: 'linear-gradient(135deg,#25c2ff,#2563eb)',
                 boxShadow: '0 18px 40px rgba(37,99,235,.36)',
-                animation: 'welcomeLogoPop 2.6s ease-in-out forwards',
+                animation: 'welcomeLogoPop 4.5s ease-in-out forwards',
               }}
             >
               🚗
@@ -436,7 +436,7 @@ export default function Home() {
                   width: '100%',
                   borderRadius: 999,
                   background: 'linear-gradient(90deg,#2563eb,#06b6d4,#34d399)',
-                  animation: 'welcomeProgress 2.4s ease-in-out forwards',
+                  animation: 'welcomeProgress 4.3s ease-in-out forwards',
                   transformOrigin: 'left',
                 }}
               />
@@ -446,14 +446,14 @@ export default function Home() {
           <style>{`
             @keyframes welcomeFadeOut {
               0% { opacity: 1; }
-              78% { opacity: 1; }
+              82% { opacity: 1; }
               100% { opacity: 0; visibility: hidden; }
             }
 
             @keyframes welcomeLogoPop {
               0% { transform: scale(.72); opacity: 0; }
-              18% { transform: scale(1.1); opacity: 1; }
-              45% { transform: scale(1); opacity: 1; }
+              14% { transform: scale(1.1); opacity: 1; }
+              35% { transform: scale(1); opacity: 1; }
               100% { transform: scale(1); opacity: 1; }
             }
 
@@ -464,19 +464,19 @@ export default function Home() {
 
             @keyframes floatingIconOne {
               0% { transform: translateY(18px) rotate(-8deg); opacity: 0; }
-              20% { opacity: 1; }
+              18% { opacity: 1; }
               100% { transform: translateY(-18px) rotate(8deg); opacity: 0; }
             }
 
             @keyframes floatingIconTwo {
               0% { transform: translateY(18px) rotate(12deg); opacity: 0; }
-              20% { opacity: 1; }
+              18% { opacity: 1; }
               100% { transform: translateY(-24px) rotate(-12deg); opacity: 0; }
             }
 
             @keyframes floatingIconThree {
               0% { transform: translateY(18px) rotate(6deg); opacity: 0; }
-              20% { opacity: 1; }
+              18% { opacity: 1; }
               100% { transform: translateY(-18px) rotate(-6deg); opacity: 0; }
             }
           `}</style>
