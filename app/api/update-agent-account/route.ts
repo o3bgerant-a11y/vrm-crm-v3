@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const MASTER_EMAIL = 'o3b.gerant@gmail.com';
 
 const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -31,9 +32,14 @@ export async function POST(request: Request) {
       );
     }
 
-    if (profile.role === 'patron' || profile.role === 'responsable' || profile.is_admin === true) {
+    const email = String(profile.email || '').trim().toLowerCase();
+
+    if (email === MASTER_EMAIL) {
       return NextResponse.json(
-        { error: 'Impossible de modifier ou supprimer un compte Responsable.' },
+        {
+          error:
+            'Le compte principal Benoît est protégé. Il ne peut pas être bloqué, archivé ou supprimé.',
+        },
         { status: 403 }
       );
     }
