@@ -225,9 +225,20 @@ function calculateStats(sales: VehicleSale[]) {
 }
 
 export function Agences() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  const monthNames = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  ];
+
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [sales, setSales] = useState<VehicleSale[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const [selectedMonth, setSelectedMonth] = useState(String(currentMonth));
 
   async function loadAgenciesPage() {
     setLoading(true);
@@ -269,6 +280,20 @@ export function Agences() {
     loadAgenciesPage();
   }, []);
 
+  const filteredSales = useMemo(() => {
+    return sales.filter((sale) => {
+      if (!sale.sale_date) return false;
+
+      const date = new Date(sale.sale_date);
+      if (Number.isNaN(date.getTime())) return false;
+
+      return (
+        date.getFullYear() === Number(selectedYear) &&
+        date.getMonth() + 1 === Number(selectedMonth)
+      );
+    });
+  }, [sales, selectedYear, selectedMonth]);
+
   const agencyRows = useMemo(() => {
     const base = [
       { id: 1, agency: 'Blois', agents: 0, sales: 0, ca: 0, margin: 0, warranties: 0 },
@@ -281,7 +306,7 @@ export function Agences() {
       if (row) row.agents += 1;
     });
 
-    sales.forEach((sale) => {
+    filteredSales.forEach((sale) => {
       const agencyId = Number(sale.agents?.agency_id);
       const row = base.find(item => item.id === agencyId);
 
@@ -300,7 +325,7 @@ export function Agences() {
         averageMargin: row.sales > 0 ? row.margin / row.sales : 0,
       }))
       .sort((a, b) => b.margin - a.margin);
-  }, [agentsList, sales]);
+  }, [agentsList, filteredSales]);
 
   function formatPdfDate(value: string | null) {
     if (!value) return '-';
@@ -327,8 +352,9 @@ export function Agences() {
     warrantyRate: number;
     averageMargin: number;
   }) {
-    const agencySales = sales.filter((sale) => Number(sale.agents?.agency_id) === Number(agency.id));
+    const agencySales = filteredSales.filter((sale) => Number(sale.agents?.agency_id) === Number(agency.id));
     const agencyAgents = agentsList.filter((agent) => Number(agent.agency_id) === Number(agency.id));
+    const selectedMonthName = monthNames[Number(selectedMonth) - 1] || selectedMonth;
 
     const agentRows = agencyAgents
       .map((agent) => {
@@ -366,7 +392,7 @@ export function Agences() {
       <html lang="fr">
         <head>
           <meta charset="utf-8" />
-          <title>Récap agence ${escapeHtml(agency.agency)}</title>
+          <title>Récap agence ${escapeHtml(agency.agency)} - ${escapeHtml(selectedMonthName)} ${escapeHtml(selectedYear)}</title>
           <style>
             @page { size: A4; margin: 12mm; }
             * { box-sizing: border-box; }
@@ -502,7 +528,7 @@ export function Agences() {
               </div>
               <div class="period">
                 Généré le ${generatedAt}<br />
-                Période : données actuellement visibles dans le CRM
+                Période : ${escapeHtml(selectedMonthName)} ${escapeHtml(selectedYear)}
               </div>
             </div>
 
@@ -545,7 +571,7 @@ export function Agences() {
               </tbody>
             </table>
 
-            <div class="section-title">Derniers véhicules vendus</div>
+            <div class="section-title">Véhicules vendus sur la période</div>
             <table>
               <thead>
                 <tr>
@@ -559,7 +585,7 @@ export function Agences() {
               </thead>
               <tbody>
                 ${vehicleRows.length === 0
-                  ? '<tr><td colspan="6">Aucun véhicule vendu enregistré pour cette agence.</td></tr>'
+                  ? '<tr><td colspan="6">Aucun véhicule vendu enregistré pour cette agence sur cette période.</td></tr>'
                   : vehicleRows.map((sale) => `
                     <tr>
                       <td>${escapeHtml(sale.date)}</td>
@@ -607,28 +633,65 @@ export function Agences() {
   }
 
   return (
-    <div className="grid cards3">
-      {agencyRows.map((agency, index) => (
-        <div className="card" key={agency.agency}>
-          <h3>{index === 0 ? '👑 ' : ''}{agency.agency}</h3>
-          <p className="muted">#{index + 1} au classement agences</p>
-          <p>Agents : <strong>{agency.agents}</strong></p>
-          <p>Ventes : <strong>{agency.sales}</strong></p>
-          <p>CA total : <strong>{euro(agency.ca)}</strong></p>
-          <p>Marge : <strong>{euro(agency.margin)}</strong></p>
-          <p>Marge moyenne : <strong>{euro(agency.averageMargin)}</strong></p>
-          <p>Garanties : <strong>{agency.warranties}</strong></p>
-          <p>Taux garantie : <strong>{agency.warrantyRate}%</strong></p>
+    <div style={{ display: 'grid', gap: 18 }}>
+      <div className="card">
+        <h3>Résultats agences</h3>
+        <p className="muted">
+          Choisis l'année et le mois avant de consulter les chiffres ou d'exporter le récapitulatif PDF d'une agence.
+        </p>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            <button className="btn">Voir comparatif</button>
-            <button onClick={() => exportAgencyPdf(agency)}>Exporter PDF</button>
-          </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span className="muted">Année</span>
+            <input
+              type="number"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              style={{ minWidth: 130 }}
+            />
+          </label>
+
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span className="muted">Mois</span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              style={{ minWidth: 180 }}
+            >
+              {monthNames.map((month, index) => (
+                <option key={index + 1} value={String(index + 1)}>
+                  {month}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-      ))}
+      </div>
+
+      <div className="grid cards3">
+        {agencyRows.map((agency, index) => (
+          <div className="card" key={agency.agency}>
+            <h3>{index === 0 ? '👑 ' : ''}{agency.agency}</h3>
+            <p className="muted">#{index + 1} au classement agences — {monthNames[Number(selectedMonth) - 1]} {selectedYear}</p>
+            <p>Agents : <strong>{agency.agents}</strong></p>
+            <p>Ventes : <strong>{agency.sales}</strong></p>
+            <p>CA total : <strong>{euro(agency.ca)}</strong></p>
+            <p>Marge : <strong>{euro(agency.margin)}</strong></p>
+            <p>Marge moyenne : <strong>{euro(agency.averageMargin)}</strong></p>
+            <p>Garanties : <strong>{agency.warranties}</strong></p>
+            <p>Taux garantie : <strong>{agency.warrantyRate}%</strong></p>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <button className="btn">Voir comparatif</button>
+              <button onClick={() => exportAgencyPdf(agency)}>Exporter PDF</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
 
 
 export function Agents() {
