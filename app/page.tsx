@@ -58,10 +58,16 @@ export default function Home() {
 
   const [documentsNotificationCount, setDocumentsNotificationCount] = useState(0);
   const [messagesNotificationCount, setMessagesNotificationCount] = useState(0);
+  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false);
 
   const isResponsable = currentAgent?.account_type === 'responsable';
 
-  async function loadCurrentUser() {
+  function firstName(fullName: string | null | undefined) {
+    if (!fullName) return '';
+    return fullName.trim().split(' ')[0] || fullName;
+  }
+
+  async function loadCurrentUser(showWelcome = false) {
     setLoadingUser(true);
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -82,7 +88,12 @@ export default function Home() {
       console.error('Erreur recherche fiche agent:', agentError);
       setCurrentAgent(null);
     } else {
-      setCurrentAgent((agentData as CurrentAgent) || null);
+      const agent = (agentData as CurrentAgent) || null;
+      setCurrentAgent(agent);
+
+      if (agent && showWelcome) {
+        setShowWelcomeAnimation(true);
+      }
     }
 
     setLoadingUser(false);
@@ -166,7 +177,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    loadCurrentUser();
+    loadCurrentUser(false);
   }, []);
 
   useEffect(() => {
@@ -189,6 +200,16 @@ export default function Home() {
     }
   }, [currentAgent, isResponsable, active]);
 
+  useEffect(() => {
+    if (!showWelcomeAnimation) return;
+
+    const timer = setTimeout(() => {
+      setShowWelcomeAnimation(false);
+    }, 2600);
+
+    return () => clearTimeout(timer);
+  }, [showWelcomeAnimation]);
+
   async function signIn() {
     if (!loginEmail.trim() || !loginPassword.trim()) {
       setLoginError('Indique ton email et ton mot de passe.');
@@ -207,7 +228,7 @@ export default function Home() {
       console.error('Erreur connexion:', error);
       setLoginError('Connexion impossible. Vérifie l’email et le mot de passe.');
     } else {
-      await loadCurrentUser();
+      await loadCurrentUser(true);
     }
 
     setLoginLoading(false);
@@ -220,6 +241,7 @@ export default function Home() {
     setLoginPassword('');
     setDocumentsNotificationCount(0);
     setMessagesNotificationCount(0);
+    setShowWelcomeAnimation(false);
     setActive('dashboard');
   }
 
@@ -282,6 +304,185 @@ export default function Home() {
 
   return (
     <div className="app">
+      {showWelcomeAnimation && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            background: 'radial-gradient(circle at top, rgba(37,99,235,.95) 0, rgba(7,17,31,.96) 45%, rgba(2,6,23,.98) 100%)',
+            backdropFilter: 'blur(14px)',
+            animation: 'welcomeFadeOut 2.6s ease-in-out forwards',
+          }}
+        >
+          <div
+            style={{
+              width: 'min(520px, 94vw)',
+              borderRadius: 30,
+              padding: '34px 28px',
+              textAlign: 'center',
+              background: 'rgba(15,23,42,.82)',
+              border: '1px solid rgba(255,255,255,.14)',
+              boxShadow: '0 26px 80px rgba(0,0,0,.38)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 18,
+                left: 28,
+                fontSize: 28,
+                animation: 'floatingIconOne 2.6s ease-in-out forwards',
+              }}
+            >
+              🚗
+            </div>
+
+            <div
+              style={{
+                position: 'absolute',
+                top: 26,
+                right: 30,
+                fontSize: 28,
+                animation: 'floatingIconTwo 2.6s ease-in-out forwards',
+              }}
+            >
+              💸
+            </div>
+
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 28,
+                right: 46,
+                fontSize: 28,
+                animation: 'floatingIconThree 2.6s ease-in-out forwards',
+              }}
+            >
+              👑
+            </div>
+
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                margin: '0 auto 16px',
+                borderRadius: 24,
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: 36,
+                background: 'linear-gradient(135deg,#25c2ff,#2563eb)',
+                boxShadow: '0 18px 40px rgba(37,99,235,.36)',
+                animation: 'welcomeLogoPop 2.6s ease-in-out forwards',
+              }}
+            >
+              🚗
+            </div>
+
+            <div
+              style={{
+                letterSpacing: 2,
+                textTransform: 'uppercase',
+                color: '#93c5fd',
+                fontWeight: 900,
+                fontSize: 14,
+                marginBottom: 12,
+              }}
+            >
+              Vroom Market CRM
+            </div>
+
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 'clamp(30px, 6vw, 46px)',
+                lineHeight: 1.05,
+                color: 'white',
+              }}
+            >
+              Bonjour {firstName(currentAgent.full_name)} 👋
+            </h1>
+
+            <p
+              style={{
+                margin: '14px 0 0',
+                color: '#cbd5e1',
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              Prêt pour une belle journée de ventes ?
+            </p>
+
+            <div
+              style={{
+                margin: '24px auto 0',
+                height: 8,
+                width: '78%',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,.12)',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  width: '100%',
+                  borderRadius: 999,
+                  background: 'linear-gradient(90deg,#2563eb,#06b6d4,#34d399)',
+                  animation: 'welcomeProgress 2.4s ease-in-out forwards',
+                  transformOrigin: 'left',
+                }}
+              />
+            </div>
+          </div>
+
+          <style>{`
+            @keyframes welcomeFadeOut {
+              0% { opacity: 1; }
+              78% { opacity: 1; }
+              100% { opacity: 0; visibility: hidden; }
+            }
+
+            @keyframes welcomeLogoPop {
+              0% { transform: scale(.72); opacity: 0; }
+              18% { transform: scale(1.1); opacity: 1; }
+              45% { transform: scale(1); opacity: 1; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+
+            @keyframes welcomeProgress {
+              0% { transform: scaleX(0); }
+              100% { transform: scaleX(1); }
+            }
+
+            @keyframes floatingIconOne {
+              0% { transform: translateY(18px) rotate(-8deg); opacity: 0; }
+              20% { opacity: 1; }
+              100% { transform: translateY(-18px) rotate(8deg); opacity: 0; }
+            }
+
+            @keyframes floatingIconTwo {
+              0% { transform: translateY(18px) rotate(12deg); opacity: 0; }
+              20% { opacity: 1; }
+              100% { transform: translateY(-24px) rotate(-12deg); opacity: 0; }
+            }
+
+            @keyframes floatingIconThree {
+              0% { transform: translateY(18px) rotate(6deg); opacity: 0; }
+              20% { opacity: 1; }
+              100% { transform: translateY(-18px) rotate(-6deg); opacity: 0; }
+            }
+          `}</style>
+        </div>
+      )}
+
       <Sidebar
         active={active}
         setActive={setActive}
@@ -339,12 +540,11 @@ export default function Home() {
             isResponsable={isResponsable}
           />
         )}
+
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
         {isResponsable && active === 'objectifs-mensuels' && <ObjectifsMensuels />}
-
         {isResponsable && active === 'remuneration' && <Remuneration />}
-
         {active === 'leads' && <Leads />}
         {active === 'rapport-semaine' && (
           <RapportSemaine
