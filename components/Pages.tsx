@@ -297,9 +297,306 @@ export function Agences() {
       .map((row) => ({
         ...row,
         warrantyRate: row.sales > 0 ? Math.round((row.warranties / row.sales) * 100) : 0,
+        averageMargin: row.sales > 0 ? row.margin / row.sales : 0,
       }))
       .sort((a, b) => b.margin - a.margin);
   }, [agentsList, sales]);
+
+  function formatPdfDate(value: string | null) {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('fr-FR');
+  }
+
+  function escapeHtml(value: any) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function exportAgencyPdf(agency: {
+    id: number;
+    agency: string;
+    agents: number;
+    sales: number;
+    ca: number;
+    margin: number;
+    warranties: number;
+    warrantyRate: number;
+    averageMargin: number;
+  }) {
+    const agencySales = sales.filter((sale) => Number(sale.agents?.agency_id) === Number(agency.id));
+    const agencyAgents = agentsList.filter((agent) => Number(agent.agency_id) === Number(agency.id));
+
+    const agentRows = agencyAgents
+      .map((agent) => {
+        const agentSales = agencySales.filter((sale) => Number(sale.agent_id) === Number(agent.id));
+        const ca = agentSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
+        const margin = agentSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
+        const warranties = agentSales.filter((sale) => sale.warranty_sold).length;
+
+        return {
+          name: agent.full_name,
+          sales: agentSales.length,
+          ca,
+          margin,
+          warranties,
+          warrantyRate: agentSales.length > 0 ? Math.round((warranties / agentSales.length) * 100) : 0,
+        };
+      })
+      .sort((a, b) => b.margin - a.margin);
+
+    const vehicleRows = agencySales
+      .slice(0, 10)
+      .map((sale) => ({
+        date: formatPdfDate(sale.sale_date),
+        vehicle: sale.vehicle_name || '-',
+        agent: sale.agents?.full_name || '-',
+        price: Number(sale.sale_price || 0),
+        margin: Number(sale.margin_amount || 0),
+        warranty: sale.warranty_sold ? 'Oui' : 'Non',
+      }));
+
+    const generatedAt = new Date().toLocaleDateString('fr-FR');
+
+    const html = `
+      <!doctype html>
+      <html lang="fr">
+        <head>
+          <meta charset="utf-8" />
+          <title>Récap agence ${escapeHtml(agency.agency)}</title>
+          <style>
+            @page { size: A4; margin: 12mm; }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              font-family: Arial, sans-serif;
+              color: #0f172a;
+              background: #ffffff;
+              font-size: 11px;
+            }
+            .page {
+              width: 100%;
+              min-height: 100vh;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              gap: 18px;
+              align-items: flex-start;
+              border-bottom: 3px solid #2563eb;
+              padding-bottom: 12px;
+              margin-bottom: 14px;
+            }
+            .brand {
+              font-size: 12px;
+              color: #2563eb;
+              font-weight: 900;
+              letter-spacing: 1.5px;
+              text-transform: uppercase;
+            }
+            h1 {
+              margin: 4px 0 0;
+              font-size: 25px;
+              line-height: 1.1;
+            }
+            .muted { color: #64748b; }
+            .period {
+              text-align: right;
+              font-size: 11px;
+              color: #475569;
+            }
+            .stats {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 8px;
+              margin-bottom: 12px;
+            }
+            .card {
+              border: 1px solid #dbeafe;
+              background: #f8fafc;
+              border-radius: 12px;
+              padding: 10px;
+              min-height: 64px;
+            }
+            .label {
+              font-size: 10px;
+              color: #64748b;
+              margin-bottom: 4px;
+            }
+            .value {
+              font-size: 18px;
+              font-weight: 900;
+              color: #0f172a;
+            }
+            .blue { color: #2563eb; }
+            .green { color: #059669; }
+            .section-title {
+              font-size: 14px;
+              font-weight: 900;
+              margin: 12px 0 7px;
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 8px;
+            }
+            th {
+              text-align: left;
+              background: #eff6ff;
+              color: #1e3a8a;
+              font-size: 10px;
+              padding: 7px;
+              border: 1px solid #dbeafe;
+            }
+            td {
+              padding: 7px;
+              border: 1px solid #e2e8f0;
+              font-size: 10px;
+            }
+            tr:nth-child(even) td { background: #f8fafc; }
+            .footer {
+              margin-top: 10px;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 8px;
+              display: flex;
+              justify-content: space-between;
+              color: #64748b;
+              font-size: 10px;
+            }
+            .screen-actions {
+              margin: 14px 0;
+              display: flex;
+              gap: 8px;
+            }
+            .screen-actions button {
+              border: 0;
+              border-radius: 8px;
+              padding: 8px 12px;
+              color: white;
+              background: #2563eb;
+              font-weight: 800;
+              cursor: pointer;
+            }
+            @media print {
+              .screen-actions { display: none; }
+              body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="screen-actions">
+            <button onclick="window.print()">Télécharger / enregistrer en PDF</button>
+            <button onclick="window.close()">Fermer</button>
+          </div>
+
+          <div class="page">
+            <div class="header">
+              <div>
+                <div class="brand">Vroom Market CRM</div>
+                <h1>Récapitulatif agence ${escapeHtml(agency.agency)}</h1>
+                <div class="muted">Synthèse direction — export agence</div>
+              </div>
+              <div class="period">
+                Généré le ${generatedAt}<br />
+                Période : données actuellement visibles dans le CRM
+              </div>
+            </div>
+
+            <div class="stats">
+              <div class="card"><div class="label">Véhicules vendus</div><div class="value blue">${agency.sales}</div></div>
+              <div class="card"><div class="label">Chiffre d'affaires</div><div class="value">${euro(agency.ca)}</div></div>
+              <div class="card"><div class="label">Marge totale</div><div class="value green">${euro(agency.margin)}</div></div>
+              <div class="card"><div class="label">Marge moyenne</div><div class="value">${euro(agency.averageMargin)}</div></div>
+              <div class="card"><div class="label">Agents commerciaux</div><div class="value blue">${agency.agents}</div></div>
+              <div class="card"><div class="label">Garanties vendues</div><div class="value">${agency.warranties}</div></div>
+              <div class="card"><div class="label">Taux garantie</div><div class="value">${agency.warrantyRate}%</div></div>
+              <div class="card"><div class="label">Classement interne</div><div class="value">#${agencyRows.findIndex((row) => row.id === agency.id) + 1}</div></div>
+            </div>
+
+            <div class="section-title">Performance des agents</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Agent</th>
+                  <th>Ventes</th>
+                  <th>CA</th>
+                  <th>Marge</th>
+                  <th>Garanties</th>
+                  <th>Taux garantie</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${agentRows.length === 0
+                  ? '<tr><td colspan="6">Aucun agent rattaché à cette agence.</td></tr>'
+                  : agentRows.map((agent) => `
+                    <tr>
+                      <td><strong>${escapeHtml(agent.name)}</strong></td>
+                      <td>${agent.sales}</td>
+                      <td>${euro(agent.ca)}</td>
+                      <td><strong>${euro(agent.margin)}</strong></td>
+                      <td>${agent.warranties}</td>
+                      <td>${agent.warrantyRate}%</td>
+                    </tr>
+                  `).join('')}
+              </tbody>
+            </table>
+
+            <div class="section-title">Derniers véhicules vendus</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Véhicule</th>
+                  <th>Agent</th>
+                  <th>Prix vente</th>
+                  <th>Marge</th>
+                  <th>Garantie</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${vehicleRows.length === 0
+                  ? '<tr><td colspan="6">Aucun véhicule vendu enregistré pour cette agence.</td></tr>'
+                  : vehicleRows.map((sale) => `
+                    <tr>
+                      <td>${escapeHtml(sale.date)}</td>
+                      <td><strong>${escapeHtml(sale.vehicle)}</strong></td>
+                      <td>${escapeHtml(sale.agent)}</td>
+                      <td>${euro(sale.price)}</td>
+                      <td><strong>${euro(sale.margin)}</strong></td>
+                      <td>${escapeHtml(sale.warranty)}</td>
+                    </tr>
+                  `).join('')}
+              </tbody>
+            </table>
+
+            <div class="footer">
+              <span>Document généré automatiquement depuis le CRM V3.</span>
+              <span>Objectif : synthèse agence sur une page.</span>
+            </div>
+          </div>
+
+          <script>
+            setTimeout(function(){ window.print(); }, 500);
+          </script>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=980,height=1200');
+
+    if (!printWindow) {
+      alert('La fenêtre PDF a été bloquée par le navigateur. Autorise les pop-ups pour agentsco.fr puis réessaie.');
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
 
   if (loading) {
     return (
@@ -319,14 +616,20 @@ export function Agences() {
           <p>Ventes : <strong>{agency.sales}</strong></p>
           <p>CA total : <strong>{euro(agency.ca)}</strong></p>
           <p>Marge : <strong>{euro(agency.margin)}</strong></p>
+          <p>Marge moyenne : <strong>{euro(agency.averageMargin)}</strong></p>
           <p>Garanties : <strong>{agency.warranties}</strong></p>
           <p>Taux garantie : <strong>{agency.warrantyRate}%</strong></p>
-          <button className="btn">Voir comparatif</button>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            <button className="btn">Voir comparatif</button>
+            <button onClick={() => exportAgencyPdf(agency)}>Exporter PDF</button>
+          </div>
         </div>
       ))}
     </div>
   );
 }
+
 
 export function Agents() {
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
