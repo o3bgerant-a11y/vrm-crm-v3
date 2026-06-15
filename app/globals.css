@@ -59,6 +59,9 @@ button{cursor:pointer}
   background:rgba(37,99,235,.22);
   color:white;
 }
+.mobile-signout{
+  display:none;
+}
 .main{
   flex:1;
   padding:28px;
@@ -145,14 +148,12 @@ input,select,textarea{
   max-width:100%;
 }
 
-/* Supprime les petites flÃ¨ches des champs numÃ©riques sur Chrome, Safari, Edge */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button{
   -webkit-appearance:none;
   margin:0;
 }
 
-/* Supprime les petites flÃ¨ches des champs numÃ©riques sur Firefox */
 input[type="number"]{
   -moz-appearance:textfield;
   appearance:textfield;
@@ -243,12 +244,15 @@ textarea{
 
   .sidebar{
     width:100%;
+    min-height:100vh;
     height:auto;
     position:relative;
     padding:14px;
     border-right:0;
     border-bottom:1px solid rgba(255,255,255,.08);
     background:rgba(7,17,31,.96);
+    display:flex;
+    flex-direction:column;
   }
 
   .brand{
@@ -275,7 +279,7 @@ textarea{
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:8px;
     overflow:visible;
-    padding-bottom:0;
+    padding-bottom:18px;
   }
 
   .nav button{
@@ -294,6 +298,27 @@ textarea{
   .nav button.active{
     background:linear-gradient(135deg,#2563eb,#06b6d4);
     box-shadow:0 8px 22px rgba(37,99,235,.25);
+  }
+
+  .mobile-signout{
+    display:block;
+    margin-top:auto;
+    padding-top:14px;
+  }
+
+  .mobile-signout button{
+    width:100%;
+    min-height:52px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    border-radius:16px;
+    background:rgba(37,99,235,.26);
+    border:1px solid rgba(147,197,253,.28);
+    color:white;
+    font-size:16px;
+    font-weight:700;
   }
 
   .main{
@@ -316,16 +341,7 @@ textarea{
   }
 
   .filters{
-    margin-top:12px;
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:8px;
-  }
-
-  .filters select,
-  .filters button,
-  .search{
-    width:100%;
+    display:none;
   }
 
   .stats,
@@ -450,10 +466,6 @@ textarea{
 
   .top h2{
     font-size:22px;
-  }
-
-  .filters{
-    grid-template-columns:1fr;
   }
 
   .card{
