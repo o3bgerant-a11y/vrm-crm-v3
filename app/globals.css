@@ -271,26 +271,24 @@ textarea{
   }
 
   .nav{
-    display:flex;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
     gap:8px;
-    overflow-x:auto;
-    padding-bottom:6px;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
-  }
-
-  .nav::-webkit-scrollbar{
-    display:none;
+    overflow:visible;
+    padding-bottom:0;
   }
 
   .nav button{
-    flex:0 0 auto;
-    min-width:max-content;
-    padding:11px 13px;
-    border-radius:999px;
-    font-size:13px;
+    width:100%;
+    min-width:0;
+    justify-content:flex-start;
+    padding:11px 10px;
+    border-radius:14px;
+    font-size:12px;
+    line-height:1.15;
     background:rgba(15,23,42,.72);
     border:1px solid rgba(255,255,255,.08);
+    white-space:normal;
   }
 
   .nav button.active{
@@ -467,9 +465,13 @@ textarea{
     font-size:24px;
   }
 
+  .nav{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
   .nav button{
-    font-size:12px;
-    padding:10px 12px;
+    font-size:11px;
+    padding:10px 8px;
   }
 
   .brand h1{
