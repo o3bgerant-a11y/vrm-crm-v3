@@ -489,6 +489,7 @@ export default function Home() {
         isResponsable={isResponsable}
         documentsNotificationCount={documentsNotificationCount}
         messagesNotificationCount={messagesNotificationCount}
+        onSignOut={signOut}
       />
 
       <main className="main">
