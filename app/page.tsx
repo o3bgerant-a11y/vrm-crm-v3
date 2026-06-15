@@ -501,26 +501,6 @@ export default function Home() {
           </div>
 
           <div className="filters">
-            <select><option>2026</option></select>
-            <select><option>Mai</option></select>
-            <select><option>S22</option></select>
-
-            {isResponsable && (
-              <>
-                <select>
-                  <option>Toutes les agences</option>
-                  <option>Blois</option>
-                  <option>Tours</option>
-                  <option>Bourges</option>
-                </select>
-
-                <select>
-                  <option>Tous les agents</option>
-                  <option>Maveryk</option>
-                </select>
-              </>
-            )}
-
             <button onClick={signOut}>
               Déconnexion
             </button>
