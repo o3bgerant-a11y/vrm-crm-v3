@@ -15,7 +15,8 @@ import {
   Users,
   PhoneCall,
   Target,
-  DollarSign
+  DollarSign,
+  LogOut
 } from 'lucide-react';
 
 const items = [
@@ -41,12 +42,14 @@ export default function Sidebar({
   isResponsable = true,
   documentsNotificationCount = 0,
   messagesNotificationCount = 0,
+  onSignOut,
 }: {
   active: string;
   setActive: (v: string) => void;
   isResponsable?: boolean;
   documentsNotificationCount?: number;
   messagesNotificationCount?: number;
+  onSignOut?: () => void;
 }) {
   const visibleItems = items.filter(([, , , access]) => {
     if (access === 'all') return true;
@@ -112,6 +115,15 @@ export default function Sidebar({
           );
         })}
       </div>
+
+      {onSignOut && (
+        <div className="mobile-signout">
+          <button onClick={onSignOut}>
+            <LogOut size={18} />
+            <span>Déconnexion</span>
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
