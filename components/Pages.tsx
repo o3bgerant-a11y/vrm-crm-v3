@@ -2859,7 +2859,6 @@ export function RapportSemaine({
   const responsableMode = isResponsable === true && currentAgent?.account_type === 'responsable';
 
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
-  const [weeklyLeads, setWeeklyLeads] = useState<LeadItem[]>([]);
   const [leadsList, setLeadsList] = useState<LeadItem[]>([]);
   const [salesList, setSalesList] = useState<VehicleSale[]>([]);
   const [reportsList, setReportsList] = useState<WeeklyReport[]>([]);
@@ -2872,43 +2871,9 @@ export function RapportSemaine({
   const [selectedAgency, setSelectedAgency] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
 
-
-  useEffect(() => {
-    loadWeeklyLeads();
-  }, [selectedAgent, selectedYear, selectedWeek]);
-
   const weekOptions = useMemo(() => {
     return getWeekOptionsForMonth(Number(selectedYear || currentYear), Number(selectedMonth || currentMonth));
   }, [selectedYear, selectedMonth]);
-
-
-  async function loadWeeklyLeads() {
-    if (!selectedAgent || !selectedYear || !selectedWeek) {
-      setWeeklyLeads([]);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('leads')
-      .select(`
-        *,
-        agents (
-          full_name,
-          agency_id
-        )
-      `)
-      .eq('agent_id', Number(selectedAgent))
-      .eq('year_number', Number(selectedYear))
-      .eq('week_number', Number(selectedWeek))
-      .order('lead_date', { ascending: false });
-
-    if (error) {
-      console.error('Erreur chargement leads rapport semaine:', error);
-      setWeeklyLeads([]);
-    } else {
-      setWeeklyLeads((data || []) as LeadItem[]);
-    }
-  }
 
   useEffect(() => {
     if (weekOptions.length === 0) return;
@@ -3038,18 +3003,7 @@ export function RapportSemaine({
     const date = saleDateToDate(sale.sale_date);
     if (!date) return false;
 
-  
-  const automaticWeeklySummary = useMemo(() => {
-    const agentName = agentsList.find((agent) => Number(agent.id) === Number(selectedAgent))?.full_name || 'Cet agent';
-
-    if (weeklyStats.totalLeads === 0) {
-      return `${agentName} n'a aucun lead enregistré sur cette semaine pour le moment.`;
-    }
-
-    return `${agentName} a reçu ${weeklyStats.totalLeads} lead(s) cette semaine, signé ${weeklyStats.signedMandates} mandat(s), fait entrer ${weeklyStats.vehiclesOnPark} véhicule(s) sur parc et vendu ${weeklyStats.soldFromLeads} véhicule(s). La marge générée depuis les leads est de ${euro(weeklyStats.marginFromLeads)} avec ${weeklyStats.warrantiesFromLeads} garantie(s) vendue(s). ${(weeklyStats.unsignedMandates + weeklyStats.alertMandates) > 0 ? `${(weeklyStats.unsignedMandates + weeklyStats.alertMandates)} dossier(s) restent à relancer ou à surveiller.` : 'Aucun dossier prioritaire à relancer dans les leads de cette semaine.'}`;
-  }, [selectedAgent, weeklyStats, agentsList]);
-
-  return (
+    return (
       date.getFullYear() === Number(selectedYear)
       && date.getMonth() + 1 === Number(selectedMonth)
       && getWeekNumberFromDate(date) === Number(selectedWeek)
@@ -3380,63 +3334,7 @@ export function RapportSemaine({
             </div>
           </div>
 
-    
-      <div className="card">
-        <h3>📊 Activité commerciale automatique de la semaine</h3>
-        <p className="muted">
-          Résumé calculé automatiquement depuis les leads de l'agent sélectionné sur la semaine choisie.
-        </p>
-
-        <div className="grid cards3" style={{ marginTop: 14 }}>
           <div className="card">
-            <h3>Leads reçus</h3>
-            <div className="stat-value">{weeklyStats.totalLeads}</div>
-            <p className="muted">RDV / contacts : {weeklyStats.appointments}</p>
-          </div>
-
-          <div className="card">
-            <h3>Mandats</h3>
-            <div className="stat-value">{weeklyStats.signedMandates}</div>
-            <p className="muted">Signés</p>
-            <p>Non signés : <strong>{weeklyStats.unsignedMandates}</strong></p>
-            <p>Alertes : <strong>{weeklyStats.alertMandates}</strong></p>
-          </div>
-
-          <div className="card">
-            <h3>Véhicules</h3>
-            <div className="stat-value">{weeklyStats.vehiclesOnPark}</div>
-            <p className="muted">Sur parc</p>
-            <p>Vendus : <strong>{weeklyStats.soldFromLeads}</strong></p>
-          </div>
-
-          <div className="card">
-            <h3>Garanties</h3>
-            <div className="stat-value">{weeklyStats.warrantiesFromLeads}</div>
-            <p className="muted">Garanties vendues</p>
-          </div>
-
-          <div className="card">
-            <h3>Marge générée</h3>
-            <div className="stat-value">{euro(weeklyStats.marginFromLeads)}</div>
-            <p className="muted">Depuis les leads vendus</p>
-          </div>
-
-          <div className="card">
-            <h3>À suivre</h3>
-            <div className="stat-value">{(weeklyStats.unsignedMandates + weeklyStats.alertMandates)}</div>
-            <p className="muted">Non signés + alertes</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <h3>📝 Résumé automatique</h3>
-        <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-          {automaticWeeklySummary}
-        </p>
-      </div>
-
-      <div className="card">
             <h3>Résumé agent</h3>
             <p className="muted">À remplir uniquement pour un agent précis. Les chiffres au-dessus restent automatiques.</p>
 
