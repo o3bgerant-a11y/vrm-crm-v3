@@ -1638,7 +1638,13 @@ export function ObjectifsMensuels() {
 }
 
 
-export function Leads() {
+export function Leads({
+  currentAgent = null,
+  isResponsable = true,
+}: {
+  currentAgent?: CurrentAgentForPages | null;
+  isResponsable?: boolean;
+} = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -1816,11 +1822,23 @@ export function Leads() {
     }
   }, [historyFilter]);
 
-  const leadFilterAgentOptions = useMemo(() => {
-    if (leadAgencyFilter === 'all') return agentOptions;
+  const lockedAgencyId = !isResponsable && currentAgent?.agency_id
+    ? String(currentAgent.agency_id)
+    : null;
 
-    return agentOptions.filter((agent) => Number(agent.agency_id) === Number(leadAgencyFilter));
-  }, [agentOptions, leadAgencyFilter]);
+  useEffect(() => {
+    if (lockedAgencyId) {
+      setLeadAgencyFilter(lockedAgencyId);
+    }
+  }, [lockedAgencyId]);
+
+  const leadFilterAgentOptions = useMemo(() => {
+    const agencyToUse = lockedAgencyId || leadAgencyFilter;
+
+    if (agencyToUse === 'all') return agentOptions;
+
+    return agentOptions.filter((agent) => Number(agent.agency_id) === Number(agencyToUse));
+  }, [agentOptions, leadAgencyFilter, lockedAgencyId]);
 
   useEffect(() => {
     if (leadAgentFilter === 'all') return;
@@ -1832,10 +1850,12 @@ export function Leads() {
       return;
     }
 
-    if (leadAgencyFilter !== 'all' && Number(selectedFilterAgent.agency_id) !== Number(leadAgencyFilter)) {
+    const agencyToUse = lockedAgencyId || leadAgencyFilter;
+
+    if (agencyToUse !== 'all' && Number(selectedFilterAgent.agency_id) !== Number(agencyToUse)) {
       setLeadAgentFilter('all');
     }
-  }, [leadAgencyFilter, leadAgentFilter, agentOptions]);
+  }, [leadAgencyFilter, leadAgentFilter, agentOptions, lockedAgencyId]);
 
   const calculatedLeadMargin = useMemo(() => {
     const sale = Number(salePrice || 0);
@@ -2251,6 +2271,12 @@ appointment_time: appointmentTime.trim() || null,
   }, [historyWeekOptions, historyWeek]);
 
   const filteredLeads = leads.filter((lead) => {
+    const leadAgencyId = lead.agency_id || lead.agents?.agency_id || null;
+    const agencyToUse = lockedAgencyId || leadAgencyFilter;
+
+    if (agencyToUse !== 'all' && Number(leadAgencyId) !== Number(agencyToUse)) return false;
+    if (leadAgentFilter !== 'all' && Number(lead.agent_id) !== Number(leadAgentFilter)) return false;
+
     if (historyFilter === 'signed' && !isMandateSignedLead(lead)) return false;
     if (historyFilter === 'unsigned' && !isMandateUnsignedLead(lead)) return false;
     if (historyFilter === 'park' && !isVehicleOnParkLead(lead)) return false;
@@ -2351,18 +2377,19 @@ appointment_time: appointmentTime.trim() || null,
             </button>
 
             <select
-              value={leadAgencyFilter}
+              value={lockedAgencyId || leadAgencyFilter}
               onChange={(e) => {
                 setLeadAgencyFilter(e.target.value);
                 setLeadAgentFilter('all');
               }}
               style={{ minWidth: 190 }}
               title="Filtrer par agence"
+              disabled={Boolean(lockedAgencyId)}
             >
-              <option value="all">Toutes agences</option>
-              <option value="1">Agence Blois</option>
-              <option value="2">Agence Tours</option>
-              <option value="3">Agence Bourges</option>
+              {!lockedAgencyId && <option value="all">Toutes agences</option>}
+              {(!lockedAgencyId || lockedAgencyId === '1') && <option value="1">Agence Blois</option>}
+              {(!lockedAgencyId || lockedAgencyId === '2') && <option value="2">Agence Tours</option>}
+              {(!lockedAgencyId || lockedAgencyId === '3') && <option value="3">Agence Bourges</option>}
             </select>
 
             <select
