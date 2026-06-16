@@ -1693,6 +1693,29 @@ export function Leads() {
     return options;
   }
 
+  function getMondayFromYearWeek(year: number, week: number) {
+    const simple = new Date(year, 0, 1 + (week - 1) * 7);
+    const dayOfWeek = simple.getDay();
+    const monday = new Date(simple);
+
+    if (dayOfWeek <= 4) {
+      monday.setDate(simple.getDate() - simple.getDay() + 1);
+    } else {
+      monday.setDate(simple.getDate() + 8 - simple.getDay());
+    }
+
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  }
+
+  function getHistoryWeekLabel(year: number, week: number) {
+    const weekStart = getMondayFromYearWeek(year, week);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+
+    return `Semaine ${week} — du ${formatWeekDateLabel(weekStart)} au ${formatWeekDateLabel(weekEnd)}`;
+  }
+
   const currentWeek = getWeekNumberFromDate(now);
 
   const [leads, setLeads] = useState<LeadItem[]>([]);
@@ -1700,6 +1723,8 @@ export function Leads() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [historyFilter, setHistoryFilter] = useState('all');
+  const [historyWeek, setHistoryWeek] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
 
@@ -1761,6 +1786,12 @@ export function Leads() {
       setWeekNumber(weekOptions[0].value);
     }
   }, [weekOptions, weekNumber]);
+
+  useEffect(() => {
+    if (historyFilter !== 'signed' && historyFilter !== 'unsigned') {
+      setHistoryWeek('all');
+    }
+  }, [historyFilter]);
 
   const calculatedLeadMargin = useMemo(() => {
     const sale = Number(salePrice || 0);
@@ -2121,7 +2152,72 @@ export function Leads() {
     return lead.source || 'Autre';
   }
 
+  function isMandateSignedLead(lead: LeadItem) {
+    return Boolean(lead.mandate_signed) || lead.mandate_status === 'signé' || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '');
+  }
+
+  function isMandateUnsignedLead(lead: LeadItem) {
+    return lead.mandate_status === 'non_signé' || (!isMandateSignedLead(lead) && !lead.vehicle_entered && !lead.sale_done);
+  }
+
+  function isVehicleOnParkLead(lead: LeadItem) {
+    return Boolean(lead.vehicle_entered) || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '');
+  }
+
+  function getLeadHistoryWeekKey(lead: LeadItem) {
+    const year = Number(lead.year_number || currentYear);
+    const week = Number(lead.week_number || 0);
+
+    if (!week) return '';
+
+    return `${year}-${week}`;
+  }
+
+  const historyWeekOptions = useMemo(() => {
+    const map = new Map<string, { value: string; label: string; year: number; week: number }>();
+
+    leads.forEach((lead) => {
+      if (historyFilter === 'signed' && !isMandateSignedLead(lead)) return;
+      if (historyFilter === 'unsigned' && !isMandateUnsignedLead(lead)) return;
+
+      const year = Number(lead.year_number || currentYear);
+      const week = Number(lead.week_number || 0);
+      if (!week) return;
+
+      const value = `${year}-${week}`;
+      if (map.has(value)) return;
+
+      map.set(value, {
+        value,
+        label: getHistoryWeekLabel(year, week),
+        year,
+        week,
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (Number(b.year) !== Number(a.year)) return Number(b.year) - Number(a.year);
+      return Number(b.week) - Number(a.week);
+    });
+  }, [leads, historyFilter]);
+
+  useEffect(() => {
+    if (historyWeek === 'all') return;
+    const weekExists = historyWeekOptions.some(option => option.value === historyWeek);
+    if (!weekExists) {
+      setHistoryWeek('all');
+    }
+  }, [historyWeekOptions, historyWeek]);
+
   const filteredLeads = leads.filter((lead) => {
+    if (historyFilter === 'signed' && !isMandateSignedLead(lead)) return false;
+    if (historyFilter === 'unsigned' && !isMandateUnsignedLead(lead)) return false;
+    if (historyFilter === 'park' && !isVehicleOnParkLead(lead)) return false;
+
+    if ((historyFilter === 'signed' || historyFilter === 'unsigned') && historyWeek !== 'all') {
+      if (getLeadHistoryWeekKey(lead) !== historyWeek) return false;
+    }
+
     const q = search.toLowerCase().trim();
 
     if (!q) return true;
@@ -2199,18 +2295,44 @@ export function Leads() {
             <p className="muted">Le lead devient la base de travail : recherche par plaque/modèle, puis transformation automatique en vente quand le véhicule est vendu.</p>
           </div>
 
-          <button
-            className="btn"
-            onClick={() => {
-              if (showForm && !editingLead) {
-                setShowForm(false);
-              } else {
-                openNewLeadForm();
-              }
-            }}
-          >
-            {showForm && !editingLead ? 'Fermer' : 'Nouveau lead'}
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              className="btn"
+              onClick={() => {
+                if (showForm && !editingLead) {
+                  setShowForm(false);
+                } else {
+                  openNewLeadForm();
+                }
+              }}
+            >
+              {showForm && !editingLead ? 'Fermer' : 'Nouveau lead'}
+            </button>
+
+            <select
+              value={historyFilter}
+              onChange={(e) => setHistoryFilter(e.target.value)}
+              style={{ minWidth: 220 }}
+            >
+              <option value="all">Historique leads</option>
+              <option value="signed">Mandats signés</option>
+              <option value="unsigned">Mandats non signés</option>
+              <option value="park">Véhicules sur parc</option>
+            </select>
+
+            {(historyFilter === 'signed' || historyFilter === 'unsigned') && (
+              <select
+                value={historyWeek}
+                onChange={(e) => setHistoryWeek(e.target.value)}
+                style={{ minWidth: 320 }}
+              >
+                <option value="all">Toutes les semaines</option>
+                {historyWeekOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
 
         {showForm && (
