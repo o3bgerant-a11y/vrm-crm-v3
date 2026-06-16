@@ -102,6 +102,7 @@ type LeadItem = {
   agent_id: number | null;
   source: string | null;
   demarchage_source?: string | null;
+  mandate_status?: string | null;
   status: string | null;
   customer_name: string | null;
   customer_phone: string | null;
@@ -1709,7 +1710,7 @@ export function Leads() {
   const [agentId, setAgentId] = useState<number | ''>('');
   const [source, setSource] = useState('Call Center');
   const [demarchageSource, setDemarchageSource] = useState('');
-  const [status, setStatus] = useState('Nouveau');
+  const [mandateStatus, setMandateStatus] = useState('non_signé');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -1723,7 +1724,6 @@ export function Leads() {
   const [appointmentTime, setAppointmentTime] = useState('');
   const [sellerExpectedPrice, setSellerExpectedPrice] = useState('');
   const [sellerNetPrice, setSellerNetPrice] = useState('');
-  const [mandateSigned, setMandateSigned] = useState(false);
   const [vehicleEntered, setVehicleEntered] = useState(false);
   const [saleDone, setSaleDone] = useState(false);
   const [salePrice, setSalePrice] = useState('');
@@ -1736,7 +1736,11 @@ export function Leads() {
 
   const leadSources = ['Call Center', 'Démarchage Agent', 'Visite spontanée'];
   const demarchageSources = ['Leboncoin', 'Facebook', 'LaCentrale', 'Autre'];
-  const leadStatuses = ['Nouveau', 'RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu', 'À relancer', 'Perdu', 'Refusé'];
+  const mandateStatuses = [
+    { value: 'signé', label: 'Mandat signé', help: 'Le mandat est validé et signé.' },
+    { value: 'non_signé', label: 'Mandat non signé', help: 'Le client n’a pas encore signé.' },
+    { value: 'relance', label: 'Mandat alerte', help: 'À relancer rapidement.' },
+  ];
   const warrantyOptions = [
     { label: 'START - 6 mois - 0 €', value: 'START - 6 mois', amount: 0 },
     { label: 'MEDIUM - 12 mois - 799 €', value: 'MEDIUM - 12 mois', amount: 799 },
@@ -1826,7 +1830,7 @@ export function Leads() {
     setAgentId('');
     setSource('Call Center');
     setDemarchageSource('');
-    setStatus('Nouveau');
+    setMandateStatus('non_signé');
     setCustomerName('');
     setCustomerPhone('');
     setCustomerEmail('');
@@ -1840,7 +1844,6 @@ export function Leads() {
     setAppointmentTime('');
     setSellerExpectedPrice('');
     setSellerNetPrice('');
-    setMandateSigned(false);
     setVehicleEntered(false);
     setSaleDone(false);
     setSalePrice('');
@@ -1874,7 +1877,10 @@ export function Leads() {
       setDemarchageSource(lead.demarchage_source || '');
     }
 
-    setStatus(lead.status || 'Nouveau');
+    setMandateStatus(
+      lead.mandate_status ||
+      (lead.mandate_signed ? 'signé' : lead.status === 'À relancer' ? 'relance' : 'non_signé')
+    );
     setCustomerName(lead.customer_name || '');
     setCustomerPhone(lead.customer_phone || '');
     setCustomerEmail(lead.customer_email || '');
@@ -1888,7 +1894,6 @@ export function Leads() {
     setAppointmentTime(lead.appointment_time || '');
     setSellerExpectedPrice(String(lead.seller_expected_price ?? ''));
     setSellerNetPrice(String(lead.seller_net_price ?? ''));
-    setMandateSigned(Boolean(lead.mandate_signed));
     setVehicleEntered(Boolean(lead.vehicle_entered));
     setSaleDone(Boolean(lead.sale_done));
     setSalePrice(String(lead.sale_price ?? ''));
@@ -1982,6 +1987,21 @@ export function Leads() {
     }
   }
 
+  function getStatusFromMandate() {
+    if (saleDone) return 'Véhicule vendu';
+    if (vehicleEntered) return 'Véhicule rentré';
+    if (mandateStatus === 'signé') return 'Mandat signé';
+    if (mandateStatus === 'relance') return 'À relancer';
+    return 'Nouveau';
+  }
+
+  function getMandateStatusLabel(value: string | null | undefined) {
+    if (value === 'signé') return 'Mandat signé';
+    if (value === 'relance') return 'Mandat alerte';
+    if (value === 'non_signé') return 'Mandat non signé';
+    return 'Mandat non signé';
+  }
+
   async function saveLead() {
     if (!customerName.trim()) {
       alert('Il faut indiquer le nom du client.');
@@ -2019,7 +2039,8 @@ export function Leads() {
       agent_id: Number(agentId),
       source,
       demarchage_source: source === 'Démarchage Agent' ? demarchageSource || null : null,
-      status: saleDone ? 'Véhicule vendu' : status,
+      status: getStatusFromMandate(),
+      mandate_status: saleDone ? 'signé' : mandateStatus,
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim() || null,
       customer_email: customerEmail.trim() || null,
@@ -2033,7 +2054,7 @@ export function Leads() {
       appointment_time: appointmentTime.trim() || null,
       seller_expected_price: Number(sellerExpectedPrice || 0),
       seller_net_price: Number(sellerNetPrice || 0),
-      mandate_signed: saleDone ? true : mandateSigned,
+      mandate_signed: saleDone ? true : mandateStatus === 'signé',
       vehicle_entered: saleDone ? true : vehicleEntered,
       sale_done: saleDone,
       sale_price: Number(salePrice || 0),
@@ -2115,6 +2136,9 @@ export function Leads() {
       lead.source,
       lead.demarchage_source,
       lead.status,
+      lead.mandate_status,
+      getMandateStatusLabel(lead.mandate_status),
+      lead.vehicle_entered ? 'véhicule sur parc véhicule rentré sur parc' : '',
       lead.agents?.full_name,
       agencyName(lead.agency_id || lead.agents?.agency_id),
       lead.comments,
@@ -2215,8 +2239,8 @@ export function Leads() {
               </div>
 
               <div className="item">
-                <strong>2. Source, agent et statut</strong>
-                <p className="muted">Le statut passera automatiquement en Véhicule vendu si la case vente est cochée.</p>
+                <strong>2. Source et agent</strong>
+                <p className="muted">La situation du mandat se gère maintenant plus bas dans le bloc 5.</p>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 10 }}>
@@ -2237,10 +2261,6 @@ export function Leads() {
                     {demarchageSources.map((item) => <option key={item} value={item}>{item}</option>)}
                   </select>
                 )}
-
-                <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={saleDone}>
-                  {leadStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
 
                 <select value={agentId} onChange={(e) => {
                   const value = e.target.value ? Number(e.target.value) : '';
@@ -2293,21 +2313,43 @@ export function Leads() {
 
               <div className="item">
                 <strong>5. Mandat / entrée véhicule</strong>
+                <p className="muted">Ces choix remplacent l'ancien menu statut. Ils permettront de retrouver rapidement les mandats signés, non signés, en alerte et les véhicules sur parc.</p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 10 }}>
+                <input type="number" placeholder="Prix souhaité vendeur" value={sellerExpectedPrice} onChange={(e) => setSellerExpectedPrice(e.target.value)} />
+                <input type="number" placeholder="Prix net vendeur / prix acheté" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-                <input type="number" placeholder="Prix souhaité vendeur" value={sellerExpectedPrice} onChange={(e) => setSellerExpectedPrice(e.target.value)} />
-                <input type="number" placeholder="Prix net vendeur / prix acheté" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
-                <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="checkbox" checked={vehicleEntered} onChange={(e) => setVehicleEntered(e.target.checked)} />
-                  Véhicule rentré
-                </label>
+                {mandateStatuses.map((item) => {
+                  const active = mandateStatus === item.value;
+
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setMandateStatus(item.value)}
+                      className={active ? 'btn' : ''}
+                      style={{
+                        textAlign: 'left',
+                        padding: 14,
+                        borderRadius: 12,
+                        border: active ? '1px solid rgba(59, 130, 246, 0.9)' : '1px solid rgba(148, 163, 184, 0.22)',
+                        background: active ? 'rgba(37, 99, 235, 0.35)' : 'rgba(15, 23, 42, 0.45)',
+                      }}
+                    >
+                      <strong>{active ? '✓ ' : ''}{item.label}</strong>
+                      <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{item.help}</div>
+                    </button>
+                  );
+                })}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
                 <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="checkbox" checked={mandateSigned} onChange={(e) => setMandateSigned(e.target.checked)} />
-                  Mandat signé
+                  <input type="checkbox" checked={vehicleEntered} onChange={(e) => setVehicleEntered(e.target.checked)} />
+                  Véhicule sur parc
                 </label>
 
                 <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -2524,7 +2566,7 @@ export function Leads() {
                 <th>Client</th>
                 <th>Source</th>
                 <th>Agent</th>
-                <th>Statut</th>
+                <th>Mandat</th>
                 <th>Véhicule</th>
                 <th>RDV</th>
                 <th>Résultat</th>
@@ -2552,7 +2594,10 @@ export function Leads() {
                     {lead.agents?.full_name || '-'}
                     <div className="muted" style={{ fontSize: 12 }}>{agencyName(lead.agency_id || lead.agents?.agency_id)}</div>
                   </td>
-                  <td><span className="badge">{lead.status || '-'}</span></td>
+                  <td>
+                    <span className="badge">{getMandateStatusLabel(lead.mandate_status || (lead.mandate_signed ? 'signé' : lead.status === 'À relancer' ? 'relance' : 'non_signé'))}</span>
+                    {lead.vehicle_entered && <div className="muted" style={{ fontSize: 12 }}>Véhicule sur parc</div>}
+                  </td>
                   <td>
                     <strong>{[lead.vehicle_brand, lead.vehicle_model].filter(Boolean).join(' ') || '-'}</strong>
                     <div className="muted" style={{ fontSize: 12 }}>
@@ -2565,7 +2610,7 @@ export function Leads() {
                     {lead.appointment_time && <div className="muted" style={{ fontSize: 12 }}>{lead.appointment_time}</div>}
                   </td>
                   <td>
-                    {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Rentré' : lead.mandate_signed ? 'Mandat signé' : '-'}
+                    {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Sur parc' : lead.mandate_signed ? 'Mandat signé' : getMandateStatusLabel(lead.mandate_status)}
                     {(lead.margin_amount || lead.warranty_sold) && (
                       <div className="muted" style={{ fontSize: 12 }}>
                         {lead.margin_amount ? `Marge ${euro(Number(lead.margin_amount))}` : ''}
