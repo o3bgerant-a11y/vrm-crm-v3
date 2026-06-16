@@ -1718,6 +1718,26 @@ export function Leads() {
 
   const currentWeek = getWeekNumberFromDate(now);
 
+  function getCurrentHalfHourTime() {
+    const current = new Date();
+    const hoursValue = current.getHours();
+    const minutesValue = current.getMinutes() < 30 ? 0 : 30;
+
+    return `${String(hoursValue).padStart(2, '0')}:${String(minutesValue).padStart(2, '0')}`;
+  }
+
+  function getTimeOptionsByHalfHour() {
+    const options: string[] = [];
+
+    for (let hour = 7; hour <= 20; hour += 1) {
+      options.push(`${String(hour).padStart(2, '0')}:00`);
+      options.push(`${String(hour).padStart(2, '0')}:30`);
+    }
+
+    return options;
+  }
+
+
   const [leads, setLeads] = useState<LeadItem[]>([]);
   const [agentOptions, setAgentOptions] = useState<AgentOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1745,7 +1765,7 @@ export function Leads() {
   const [vehicleYear, setVehicleYear] = useState('');
   const [vehicleMileage, setVehicleMileage] = useState('');
   const [leadDate, setLeadDate] = useState(today);
-  const [appointmentTime, setAppointmentTime] = useState('');
+  const [appointmentTime, setAppointmentTime] = useState(getCurrentHalfHourTime());
   const [sellerExpectedPrice, setSellerExpectedPrice] = useState('');
   const [sellerNetPrice, setSellerNetPrice] = useState('');
   const [vehicleEntered, setVehicleEntered] = useState(false);
@@ -1773,6 +1793,8 @@ export function Leads() {
     { label: 'PREMIUM - 24 mois - 1799 €', value: 'PREMIUM - 24 mois', amount: 1799 },
     { label: 'PRESTIGE - 36 mois - 2499 €', value: 'PRESTIGE - 36 mois', amount: 2499 },
   ];
+
+  const timeOptions = useMemo(() => getTimeOptionsByHalfHour(), []);
 
   const weekOptions = useMemo(() => {
     return getWeekOptionsForMonth(Number(yearNumber || currentYear), Number(monthNumber || currentMonth));
@@ -1870,7 +1892,7 @@ export function Leads() {
     setVehicleYear('');
     setVehicleMileage('');
     setLeadDate(today);
-    setAppointmentTime('');
+    setAppointmentTime(getCurrentHalfHourTime());
     setSellerExpectedPrice('');
     setSellerNetPrice('');
     setVehicleEntered(false);
@@ -2425,7 +2447,13 @@ appointment_time: appointmentTime.trim() || null,
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: 10 }}>
                 <input type="date" value={leadDate} onChange={(e) => setLeadDate(e.target.value)} />
-<input placeholder="Heure RDV ex : 14:30" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} />
+<select value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)}>
+                  {timeOptions.map((timeOption) => (
+                    <option key={timeOption} value={timeOption}>
+                      {timeOption.replace(':', 'H')}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="item">
@@ -2808,6 +2836,26 @@ export function RapportSemaine({
   }
 
   const currentWeek = getWeekNumberFromDate(now);
+
+  function getCurrentHalfHourTime() {
+    const current = new Date();
+    const hoursValue = current.getHours();
+    const minutesValue = current.getMinutes() < 30 ? 0 : 30;
+
+    return `${String(hoursValue).padStart(2, '0')}:${String(minutesValue).padStart(2, '0')}`;
+  }
+
+  function getTimeOptionsByHalfHour() {
+    const options: string[] = [];
+
+    for (let hour = 7; hour <= 20; hour += 1) {
+      options.push(`${String(hour).padStart(2, '0')}:00`);
+      options.push(`${String(hour).padStart(2, '0')}:30`);
+    }
+
+    return options;
+  }
+
   const responsableMode = isResponsable === true && currentAgent?.account_type === 'responsable';
 
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
