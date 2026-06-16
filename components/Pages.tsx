@@ -3066,7 +3066,7 @@ export function RapportSemaine({
   }, [weeklyLeads]);
 
   const automaticWeeklySummary = useMemo(() => {
-    const agentName = selectedAgentName || 'Cet agent';
+    const agentName = agentsList.find((agent) => Number(agent.id) === Number(selectedAgent))?.full_name || 'Cet agent';
 
     if (weeklyLeadStats.totalLeads === 0) {
       return `${agentName} n'a aucun lead enregistré sur cette semaine pour le moment.`;
