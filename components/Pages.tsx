@@ -101,6 +101,7 @@ type LeadItem = {
   agency_id: number | null;
   agent_id: number | null;
   source: string | null;
+  demarchage_source?: string | null;
   status: string | null;
   customer_name: string | null;
   customer_phone: string | null;
@@ -1707,6 +1708,7 @@ export function Leads() {
   const [agencyId, setAgencyId] = useState<number | ''>('');
   const [agentId, setAgentId] = useState<number | ''>('');
   const [source, setSource] = useState('Call Center');
+  const [demarchageSource, setDemarchageSource] = useState('');
   const [status, setStatus] = useState('Nouveau');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -1732,7 +1734,8 @@ export function Leads() {
   const [warrantyAmount, setWarrantyAmount] = useState('');
   const [comments, setComments] = useState('');
 
-  const leadSources = ['Call Center', 'Démarchage Agent', 'Visite spontanée', 'Leboncoin', 'Facebook', 'Google', 'Recommandation', 'Passage agence', 'Autre'];
+  const leadSources = ['Call Center', 'Démarchage Agent', 'Visite spontanée'];
+  const demarchageSources = ['Leboncoin', 'Facebook', 'LaCentrale', 'Autre'];
   const leadStatuses = ['Nouveau', 'RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu', 'À relancer', 'Perdu', 'Refusé'];
   const warrantyOptions = [
     { label: 'START - 6 mois - 0 €', value: 'START - 6 mois', amount: 0 },
@@ -1822,6 +1825,7 @@ export function Leads() {
     setAgencyId('');
     setAgentId('');
     setSource('Call Center');
+    setDemarchageSource('');
     setStatus('Nouveau');
     setCustomerName('');
     setCustomerPhone('');
@@ -1860,7 +1864,16 @@ export function Leads() {
     setWeekNumber(String(lead.week_number || ''));
     setAgencyId(lead.agency_id || lead.agents?.agency_id || '');
     setAgentId(lead.agent_id || '');
-    setSource(lead.source || 'Call Center');
+
+    const oldDemarchageSources = ['Leboncoin', 'Facebook', 'Google', 'Recommandation', 'Passage agence', 'Autre'];
+    if (lead.source && oldDemarchageSources.includes(lead.source)) {
+      setSource('Démarchage Agent');
+      setDemarchageSource(lead.source === 'Google' || lead.source === 'Recommandation' || lead.source === 'Passage agence' ? 'Autre' : lead.source);
+    } else {
+      setSource(lead.source || 'Call Center');
+      setDemarchageSource(lead.demarchage_source || '');
+    }
+
     setStatus(lead.status || 'Nouveau');
     setCustomerName(lead.customer_name || '');
     setCustomerPhone(lead.customer_phone || '');
@@ -1911,6 +1924,7 @@ export function Leads() {
       customerName.trim() ? `Client lead : ${customerName.trim()}` : '',
       customerPhone.trim() ? `Téléphone lead : ${customerPhone.trim()}` : '',
       source ? `Source lead : ${source}` : '',
+      source === 'Démarchage Agent' && demarchageSource ? `Origine démarchage : ${demarchageSource}` : '',
       saleRoadFees ? `Frais de mise à la route : ${saleRoadFees} €` : '',
       warrantySold && warrantyType ? `Garantie choisie : ${warrantyType}` : '',
     ].filter(Boolean).join('\n');
@@ -1979,6 +1993,11 @@ export function Leads() {
       return;
     }
 
+    if (source === 'Démarchage Agent' && !demarchageSource) {
+      alert("Il faut sélectionner l'origine du démarchage : Leboncoin, Facebook, LaCentrale ou Autre.");
+      return;
+    }
+
     if (saleDone && (!sellerNetPrice || !salePrice)) {
       alert('Pour transformer le lead en vente, il faut indiquer le prix net vendeur et le prix de vente.');
       return;
@@ -1999,6 +2018,7 @@ export function Leads() {
       agency_id: finalAgencyId ? Number(finalAgencyId) : null,
       agent_id: Number(agentId),
       source,
+      demarchage_source: source === 'Démarchage Agent' ? demarchageSource || null : null,
       status: saleDone ? 'Véhicule vendu' : status,
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim() || null,
@@ -2072,6 +2092,14 @@ export function Leads() {
     return new Date(value).toLocaleDateString('fr-FR');
   }
 
+  function getLeadSourceLabel(lead: LeadItem) {
+    if (lead.source === 'Démarchage Agent' && lead.demarchage_source) {
+      return `${lead.source} — ${lead.demarchage_source}`;
+    }
+
+    return lead.source || 'Autre';
+  }
+
   const filteredLeads = leads.filter((lead) => {
     const q = search.toLowerCase().trim();
 
@@ -2085,6 +2113,7 @@ export function Leads() {
       lead.vehicle_model,
       lead.vehicle_registration,
       lead.source,
+      lead.demarchage_source,
       lead.status,
       lead.agents?.full_name,
       agencyName(lead.agency_id || lead.agents?.agency_id),
@@ -2111,7 +2140,7 @@ export function Leads() {
     const map = new Map<string, { source: string; total: number; appointments: number; vehicles: number; sales: number; margin: number; conversionRate: number; }>();
 
     filteredLeads.forEach((lead) => {
-      const key = lead.source || 'Autre';
+      const key = getLeadSourceLabel(lead);
       const current = map.get(key) || { source: key, total: 0, appointments: 0, vehicles: 0, sales: 0, margin: 0, conversionRate: 0 };
 
       current.total += 1;
@@ -2191,9 +2220,23 @@ export function Leads() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 10 }}>
-                <select value={source} onChange={(e) => setSource(e.target.value)}>
+                <select
+                  value={source}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSource(value);
+                    if (value !== 'Démarchage Agent') setDemarchageSource('');
+                  }}
+                >
                   {leadSources.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
+
+                {source === 'Démarchage Agent' && (
+                  <select value={demarchageSource} onChange={(e) => setDemarchageSource(e.target.value)}>
+                    <option value="">Origine du démarchage</option>
+                    {demarchageSources.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                )}
 
                 <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={saleDone}>
                   {leadStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -2499,7 +2542,12 @@ export function Leads() {
                       {lead.customer_email || ''}
                     </div>
                   </td>
-                  <td>{lead.source || '-'}</td>
+                  <td>
+                    <strong>{lead.source || '-'}</strong>
+                    {lead.source === 'Démarchage Agent' && lead.demarchage_source && (
+                      <div className="muted" style={{ fontSize: 12 }}>{lead.demarchage_source}</div>
+                    )}
+                  </td>
                   <td>
                     {lead.agents?.full_name || '-'}
                     <div className="muted" style={{ fontSize: 12 }}>{agencyName(lead.agency_id || lead.agents?.agency_id)}</div>
