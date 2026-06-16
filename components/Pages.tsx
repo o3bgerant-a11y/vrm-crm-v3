@@ -3039,41 +3039,15 @@ export function RapportSemaine({
     if (!date) return false;
 
   
-  const weeklyLeadStats = useMemo(() => {
-    const totalLeads = weeklyLeads.length;
-    const appointments = weeklyLeads.filter((lead) => Boolean(lead.appointment_time || lead.appointment_date || lead.lead_date)).length;
-    const signedMandates = weeklyLeads.filter((lead) => lead.mandate_status === 'signé' || lead.mandate_signed).length;
-    const unsignedMandates = weeklyLeads.filter((lead) => lead.mandate_status === 'non_signé').length;
-    const alertMandates = weeklyLeads.filter((lead) => lead.mandate_status === 'relance' || lead.status === 'À relancer').length;
-    const vehiclesOnPark = weeklyLeads.filter((lead) => lead.vehicle_entered).length;
-    const vehiclesSold = weeklyLeads.filter((lead) => lead.sale_done || lead.status === 'Véhicule vendu').length;
-    const warrantiesSold = weeklyLeads.filter((lead) => lead.warranty_sold).length;
-    const marginGenerated = weeklyLeads.reduce((total, lead) => total + Number(lead.margin_amount || 0), 0);
-    const followUps = unsignedMandates + alertMandates;
-
-    return {
-      totalLeads,
-      appointments,
-      signedMandates,
-      unsignedMandates,
-      alertMandates,
-      vehiclesOnPark,
-      vehiclesSold,
-      warrantiesSold,
-      marginGenerated,
-      followUps,
-    };
-  }, [weeklyLeads]);
-
   const automaticWeeklySummary = useMemo(() => {
     const agentName = agentsList.find((agent) => Number(agent.id) === Number(selectedAgent))?.full_name || 'Cet agent';
 
-    if (weeklyLeadStats.totalLeads === 0) {
+    if (weeklyStats.totalLeads === 0) {
       return `${agentName} n'a aucun lead enregistré sur cette semaine pour le moment.`;
     }
 
-    return `${agentName} a reçu ${weeklyLeadStats.totalLeads} lead(s) cette semaine, signé ${weeklyLeadStats.signedMandates} mandat(s), fait entrer ${weeklyLeadStats.vehiclesOnPark} véhicule(s) sur parc et vendu ${weeklyLeadStats.vehiclesSold} véhicule(s). La marge générée depuis les leads est de ${euro(weeklyLeadStats.marginGenerated)} avec ${weeklyLeadStats.warrantiesSold} garantie(s) vendue(s). ${weeklyLeadStats.followUps > 0 ? `${weeklyLeadStats.followUps} dossier(s) restent à relancer ou à surveiller.` : 'Aucun dossier prioritaire à relancer dans les leads de cette semaine.'}`;
-  }, [selectedAgent, weeklyLeadStats]);
+    return `${agentName} a reçu ${weeklyStats.totalLeads} lead(s) cette semaine, signé ${weeklyStats.signedMandates} mandat(s), fait entrer ${weeklyStats.vehiclesOnPark} véhicule(s) sur parc et vendu ${weeklyStats.soldFromLeads} véhicule(s). La marge générée depuis les leads est de ${euro(weeklyStats.marginFromLeads)} avec ${weeklyStats.warrantiesFromLeads} garantie(s) vendue(s). ${(weeklyStats.unsignedMandates + weeklyStats.alertMandates) > 0 ? `${(weeklyStats.unsignedMandates + weeklyStats.alertMandates)} dossier(s) restent à relancer ou à surveiller.` : 'Aucun dossier prioritaire à relancer dans les leads de cette semaine.'}`;
+  }, [selectedAgent, weeklyStats, agentsList]);
 
   return (
       date.getFullYear() === Number(selectedYear)
@@ -3416,40 +3390,40 @@ export function RapportSemaine({
         <div className="grid cards3" style={{ marginTop: 14 }}>
           <div className="card">
             <h3>Leads reçus</h3>
-            <div className="stat-value">{weeklyLeadStats.totalLeads}</div>
-            <p className="muted">RDV / contacts : {weeklyLeadStats.appointments}</p>
+            <div className="stat-value">{weeklyStats.totalLeads}</div>
+            <p className="muted">RDV / contacts : {weeklyStats.appointments}</p>
           </div>
 
           <div className="card">
             <h3>Mandats</h3>
-            <div className="stat-value">{weeklyLeadStats.signedMandates}</div>
+            <div className="stat-value">{weeklyStats.signedMandates}</div>
             <p className="muted">Signés</p>
-            <p>Non signés : <strong>{weeklyLeadStats.unsignedMandates}</strong></p>
-            <p>Alertes : <strong>{weeklyLeadStats.alertMandates}</strong></p>
+            <p>Non signés : <strong>{weeklyStats.unsignedMandates}</strong></p>
+            <p>Alertes : <strong>{weeklyStats.alertMandates}</strong></p>
           </div>
 
           <div className="card">
             <h3>Véhicules</h3>
-            <div className="stat-value">{weeklyLeadStats.vehiclesOnPark}</div>
+            <div className="stat-value">{weeklyStats.vehiclesOnPark}</div>
             <p className="muted">Sur parc</p>
-            <p>Vendus : <strong>{weeklyLeadStats.vehiclesSold}</strong></p>
+            <p>Vendus : <strong>{weeklyStats.soldFromLeads}</strong></p>
           </div>
 
           <div className="card">
             <h3>Garanties</h3>
-            <div className="stat-value">{weeklyLeadStats.warrantiesSold}</div>
+            <div className="stat-value">{weeklyStats.warrantiesFromLeads}</div>
             <p className="muted">Garanties vendues</p>
           </div>
 
           <div className="card">
             <h3>Marge générée</h3>
-            <div className="stat-value">{euro(weeklyLeadStats.marginGenerated)}</div>
+            <div className="stat-value">{euro(weeklyStats.marginFromLeads)}</div>
             <p className="muted">Depuis les leads vendus</p>
           </div>
 
           <div className="card">
             <h3>À suivre</h3>
-            <div className="stat-value">{weeklyLeadStats.followUps}</div>
+            <div className="stat-value">{(weeklyStats.unsignedMandates + weeklyStats.alertMandates)}</div>
             <p className="muted">Non signés + alertes</p>
           </div>
         </div>
