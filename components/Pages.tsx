@@ -3042,17 +3042,101 @@ export function RapportSemaine({
 
   const weeklyStats = useMemo(() => {
     const leads = filteredLeads.length;
-    const rdv = filteredLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
-    const vehicles = filteredLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
-    const mandates = filteredLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+
+    const rdv = filteredLeads.filter(lead => (
+      Boolean(lead.appointment_time)
+      || ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')
+    )).length;
+
+    const signedMandates = filteredLeads.filter(lead => (
+      lead.mandate_status === 'signé'
+      || lead.mandate_signed
+      || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')
+    )).length;
+
+    const unsignedMandates = filteredLeads.filter(lead => (
+      lead.mandate_status === 'non_signé'
+      && !lead.mandate_signed
+      && !lead.sale_done
+      && lead.status !== 'Véhicule vendu'
+    )).length;
+
+    const alertMandates = filteredLeads.filter(lead => (
+      lead.mandate_status === 'relance'
+      || lead.status === 'À relancer'
+    )).length;
+
+    const vehiclesOnPark = filteredLeads.filter(lead => (
+      lead.vehicle_entered
+      || ['Véhicule rentré', 'Mandat signé'].includes(lead.status || '')
+    )).length;
+
+    const soldFromLeads = filteredLeads.filter(lead => (
+      lead.sale_done
+      || lead.status === 'Véhicule vendu'
+    )).length;
+
+    const warrantiesFromLeads = filteredLeads.filter(lead => lead.warranty_sold).length;
+    const marginFromLeads = filteredLeads.reduce((total, lead) => total + Number(lead.margin_amount || 0), 0);
+    const signedPriceTotal = filteredLeads.reduce((total, lead) => total + Number(lead.seller_net_price || 0), 0);
+
     const sales = filteredSales.length;
     const warranties = filteredSales.filter(sale => sale.warranty_sold).length;
     const ca = filteredSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
     const margin = filteredSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
-    const conversionRate = leads > 0 ? Math.round((sales / leads) * 100) : 0;
+    const conversionRate = leads > 0 ? Math.round((soldFromLeads / leads) * 100) : 0;
 
-    return { leads, rdv, vehicles, mandates, sales, warranties, ca, margin, conversionRate };
+    return {
+      leads,
+      rdv,
+      vehicles: vehiclesOnPark,
+      mandates: signedMandates,
+      signedMandates,
+      unsignedMandates,
+      alertMandates,
+      vehiclesOnPark,
+      soldFromLeads,
+      warrantiesFromLeads,
+      marginFromLeads,
+      signedPriceTotal,
+      sales,
+      warranties,
+      ca,
+      margin,
+      conversionRate,
+    };
   }, [filteredLeads, filteredSales]);
+
+  const automaticWeeklySummary = useMemo(() => {
+    const selectedAgentName = selectedAgent !== 'all'
+      ? agentsList.find(agent => Number(agent.id) === Number(selectedAgent))?.full_name || 'Cet agent'
+      : 'L’équipe sélectionnée';
+
+    const selectedAgencyName = selectedAgency !== 'all'
+      ? agencyName(selectedAgency)
+      : 'toutes agences';
+
+    const parts = [
+      `${selectedAgentName} — ${selectedAgencyName}`,
+      `a traité ${weeklyStats.leads} lead${weeklyStats.leads > 1 ? 's' : ''} sur la semaine`,
+      `${weeklyStats.rdv} RDV`,
+      `${weeklyStats.signedMandates} mandat${weeklyStats.signedMandates > 1 ? 's' : ''} signé${weeklyStats.signedMandates > 1 ? 's' : ''}`,
+      `${weeklyStats.vehiclesOnPark} véhicule${weeklyStats.vehiclesOnPark > 1 ? 's' : ''} sur parc`,
+      `${weeklyStats.soldFromLeads} véhicule${weeklyStats.soldFromLeads > 1 ? 's' : ''} vendu${weeklyStats.soldFromLeads > 1 ? 's' : ''}`,
+      `${weeklyStats.warrantiesFromLeads || weeklyStats.warranties} garantie${(weeklyStats.warrantiesFromLeads || weeklyStats.warranties) > 1 ? 's' : ''}`,
+      `marge générée ${euro(weeklyStats.marginFromLeads || weeklyStats.margin)}`,
+    ];
+
+    const alerts = [];
+    if (weeklyStats.unsignedMandates > 0) alerts.push(`${weeklyStats.unsignedMandates} mandat${weeklyStats.unsignedMandates > 1 ? 's' : ''} non signé${weeklyStats.unsignedMandates > 1 ? 's' : ''} à relancer`);
+    if (weeklyStats.alertMandates > 0) alerts.push(`${weeklyStats.alertMandates} mandat${weeklyStats.alertMandates > 1 ? 's' : ''} alerte`);
+    if (weeklyStats.vehiclesOnPark > weeklyStats.soldFromLeads) alerts.push(`${weeklyStats.vehiclesOnPark - weeklyStats.soldFromLeads} véhicule${weeklyStats.vehiclesOnPark - weeklyStats.soldFromLeads > 1 ? 's' : ''} sur parc non vendu${weeklyStats.vehiclesOnPark - weeklyStats.soldFromLeads > 1 ? 's' : ''}`);
+
+    return {
+      text: `${parts.join(' • ')}.`,
+      alerts,
+    };
+  }, [agentsList, selectedAgent, selectedAgency, weeklyStats]);
 
   const agentRows = useMemo(() => {
     return availableAgents.map((agent) => {
@@ -3202,6 +3286,52 @@ export function RapportSemaine({
             <div className="card"><h3>Mandats</h3><div className="stat-value">{weeklyStats.mandates}</div><p className="muted">Mandats signés</p></div>
             <div className="card"><h3>Ventes</h3><div className="stat-value">{weeklyStats.sales}</div><p className="muted">CA : {euro(weeklyStats.ca)}</p></div>
             <div className="card"><h3>Marge</h3><div className="stat-value">{euro(weeklyStats.margin)}</div><p className="muted">Transformation : {weeklyStats.conversionRate}%</p></div>
+          </div>
+
+          <div className="grid cards3">
+            <div className="card"><h3>Mandats non signés</h3><div className="stat-value">{weeklyStats.unsignedMandates}</div><p className="muted">À relancer</p></div>
+            <div className="card"><h3>Mandats alerte</h3><div className="stat-value">{weeklyStats.alertMandates}</div><p className="muted">Suivi prioritaire</p></div>
+            <div className="card"><h3>Garanties</h3><div className="stat-value">{weeklyStats.warrantiesFromLeads || weeklyStats.warranties}</div><p className="muted">Depuis leads / ventes</p></div>
+          </div>
+
+          <div className="card" style={{ border: '1px solid rgba(59, 130, 246, 0.35)' }}>
+            <h3>Résumé automatique des leads de la semaine</h3>
+            <p className="muted">Résumé direction généré automatiquement depuis les leads et ventes de la semaine sélectionnée.</p>
+
+            <div className="item" style={{ marginTop: 10 }}>
+              <strong>Activité commerciale</strong>
+              <p style={{ marginTop: 6, lineHeight: 1.6 }}>{automaticWeeklySummary.text}</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10, marginTop: 10 }}>
+              <div className="item">
+                <span className="muted">Prix signés cumulés</span>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>{euro(weeklyStats.signedPriceTotal)}</div>
+              </div>
+
+              <div className="item">
+                <span className="muted">Marge leads / ventes</span>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>{euro(weeklyStats.marginFromLeads || weeklyStats.margin)}</div>
+              </div>
+
+              <div className="item">
+                <span className="muted">Taux transformation</span>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>{weeklyStats.conversionRate}%</div>
+              </div>
+            </div>
+
+            <div className="item" style={{ marginTop: 10 }}>
+              <strong>Points de vigilance</strong>
+              {automaticWeeklySummary.alerts.length === 0 ? (
+                <p className="muted" style={{ marginTop: 6 }}>Aucune alerte particulière sur la semaine sélectionnée.</p>
+              ) : (
+                <ul style={{ margin: '8px 0 0 18px', padding: 0 }}>
+                  {automaticWeeklySummary.alerts.map((alert) => (
+                    <li key={alert}>{alert}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           <div className="card">
