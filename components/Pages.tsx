@@ -2463,7 +2463,7 @@ appointment_time: appointmentTime.trim() || null,
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 10 }}>
                 <input type="number" placeholder="Prix souhaité vendeur" value={sellerExpectedPrice} onChange={(e) => setSellerExpectedPrice(e.target.value)} />
-                <input type="number" placeholder="Prix net vendeur / prix acheté" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
+                <input type="number" placeholder="Prix signé" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
