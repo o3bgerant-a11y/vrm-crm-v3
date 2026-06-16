@@ -2897,7 +2897,7 @@ export function RapportSemaine({
           agency_id
         )
       `)
-      .eq('agent_id', Number(selectedAgent.id))
+      .eq('agent_id', Number(selectedAgent))
       .eq('year_number', Number(selectedYear))
       .eq('week_number', Number(selectedWeek))
       .order('lead_date', { ascending: false });
