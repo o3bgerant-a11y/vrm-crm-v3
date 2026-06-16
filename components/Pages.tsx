@@ -1745,6 +1745,8 @@ export function Leads() {
   const [search, setSearch] = useState('');
   const [historyFilter, setHistoryFilter] = useState('all');
   const [historyWeek, setHistoryWeek] = useState('all');
+  const [leadAgencyFilter, setLeadAgencyFilter] = useState('all');
+  const [leadAgentFilter, setLeadAgentFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
 
@@ -1813,6 +1815,27 @@ export function Leads() {
       setHistoryWeek('all');
     }
   }, [historyFilter]);
+
+  const leadFilterAgentOptions = useMemo(() => {
+    if (leadAgencyFilter === 'all') return agentOptions;
+
+    return agentOptions.filter((agent) => Number(agent.agency_id) === Number(leadAgencyFilter));
+  }, [agentOptions, leadAgencyFilter]);
+
+  useEffect(() => {
+    if (leadAgentFilter === 'all') return;
+
+    const selectedFilterAgent = agentOptions.find((agent) => Number(agent.id) === Number(leadAgentFilter));
+
+    if (!selectedFilterAgent) {
+      setLeadAgentFilter('all');
+      return;
+    }
+
+    if (leadAgencyFilter !== 'all' && Number(selectedFilterAgent.agency_id) !== Number(leadAgencyFilter)) {
+      setLeadAgentFilter('all');
+    }
+  }, [leadAgencyFilter, leadAgentFilter, agentOptions]);
 
   const calculatedLeadMargin = useMemo(() => {
     const sale = Number(salePrice || 0);
@@ -2326,6 +2349,35 @@ appointment_time: appointmentTime.trim() || null,
             >
               {showForm && !editingLead ? 'Fermer' : 'Nouveau lead'}
             </button>
+
+            <select
+              value={leadAgencyFilter}
+              onChange={(e) => {
+                setLeadAgencyFilter(e.target.value);
+                setLeadAgentFilter('all');
+              }}
+              style={{ minWidth: 190 }}
+              title="Filtrer par agence"
+            >
+              <option value="all">Toutes agences</option>
+              <option value="1">Agence Blois</option>
+              <option value="2">Agence Tours</option>
+              <option value="3">Agence Bourges</option>
+            </select>
+
+            <select
+              value={leadAgentFilter}
+              onChange={(e) => setLeadAgentFilter(e.target.value)}
+              style={{ minWidth: 240 }}
+              title="Voir toute l'agence ou un agent précis"
+            >
+              <option value="all">Agence complète</option>
+              {leadFilterAgentOptions.map((agent) => (
+                <option key={agent.id} value={String(agent.id)}>
+                  {agent.full_name} — {agencyName(agent.agency_id)}
+                </option>
+              ))}
+            </select>
 
             <select
               value={historyFilter}
