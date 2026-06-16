@@ -1080,7 +1080,7 @@ export function Agents() {
               <p className="muted">Ces objectifs servent à suivre automatiquement la progression de l'agent.</p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: 10 }}>
               <input type="number" placeholder="Objectif ventes / mois" value={objectiveSales} onChange={(e) => setObjectiveSales(e.target.value)} />
               <input type="number" placeholder="Objectif marge / mois" value={objectiveMargin} onChange={(e) => setObjectiveMargin(e.target.value)} />
               <input type="number" placeholder="Objectif garanties / mois" value={objectiveWarranties} onChange={(e) => setObjectiveWarranties(e.target.value)} />
@@ -1512,7 +1512,7 @@ export function ObjectifsMensuels() {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: 10 }}>
             <label style={{ display: 'grid', gap: 6 }}>
               <span className="muted">Objectif ventes</span>
               <input
@@ -1745,7 +1745,6 @@ export function Leads() {
   const [vehicleYear, setVehicleYear] = useState('');
   const [vehicleMileage, setVehicleMileage] = useState('');
   const [leadDate, setLeadDate] = useState(today);
-  const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [sellerExpectedPrice, setSellerExpectedPrice] = useState('');
   const [sellerNetPrice, setSellerNetPrice] = useState('');
@@ -2345,7 +2344,7 @@ export function Leads() {
                 <p className="muted">Ces informations permettront de ressortir automatiquement les leads dans le futur rapport de semaine.</p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: 10 }}>
                 <input type="number" placeholder="Année" value={yearNumber} onChange={(e) => setYearNumber(e.target.value)} />
                 <select value={monthNumber} onChange={(e) => setMonthNumber(e.target.value)}>
                   {Array.from({ length: 12 }, (_, index) => (
@@ -2427,7 +2426,7 @@ export function Leads() {
                 <input type="number" placeholder="Kilométrage" value={vehicleMileage} onChange={(e) => setVehicleMileage(e.target.value)} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: 10 }}>
                 <input type="date" value={leadDate} onChange={(e) => setLeadDate(e.target.value)} />
                 <input type="date" value={appointmentDate} onChange={(e) => setAppointmentDate(e.target.value)} />
                 <input placeholder="Heure RDV ex : 14:30" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} />
@@ -3508,7 +3507,7 @@ export function Ventes({
 
             <input placeholder="VIN facultatif" value={vin} onChange={(e) => setVin(e.target.value.toUpperCase())} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(160px, 1fr))', gap: 10 }}>
               <input type="number" placeholder="Prix net vendeur" value={sellerPrice} onChange={(e) => setSellerPrice(e.target.value)} />
               <input type="number" placeholder="Prix de vente" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
               <div className="item">
