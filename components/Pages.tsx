@@ -1755,6 +1755,8 @@ export function Leads({
   const [leadAgentFilter, setLeadAgentFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
+  const [detectedCurrentAgent, setDetectedCurrentAgent] = useState<CurrentAgentForPages | null>(null);
+  const [detectedIsResponsable, setDetectedIsResponsable] = useState<boolean | null>(null);
 
   const [yearNumber, setYearNumber] = useState(String(currentYear));
   const [monthNumber, setMonthNumber] = useState(String(currentMonth));
@@ -1822,8 +1824,11 @@ export function Leads({
     }
   }, [historyFilter]);
 
-  const lockedAgencyId = !isResponsable && currentAgent?.agency_id
-    ? String(currentAgent.agency_id)
+  const effectiveCurrentAgent = currentAgent || detectedCurrentAgent;
+  const effectiveIsResponsable = detectedIsResponsable === null ? isResponsable : detectedIsResponsable;
+
+  const lockedAgencyId = !effectiveIsResponsable && effectiveCurrentAgent?.agency_id
+    ? String(effectiveCurrentAgent.agency_id)
     : null;
 
   useEffect(() => {
@@ -1911,9 +1916,83 @@ export function Leads({
     setLoading(false);
   }
 
+  async function loadConnectedLeadContext() {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+
+      if (!user) return;
+
+      let profile: any = null;
+
+      const { data: profileByAuth } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+      profile = profileByAuth;
+
+      if (!profile) {
+        const { data: profileById } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        profile = profileById;
+      }
+
+      const roleText = String(profile?.role || profile?.account_type || '').toLowerCase();
+      const isAdminProfile = Boolean(profile?.is_admin) || roleText.includes('responsable') || roleText.includes('patron');
+
+      if (isAdminProfile) {
+        setDetectedIsResponsable(true);
+        return;
+      }
+
+      let linkedAgent: AgentOption | null = null;
+
+      if (user.email) {
+        const { data: agentByEmail } = await supabase
+          .from('agents')
+          .select('id, full_name, agency_id')
+          .eq('email', user.email)
+          .maybeSingle();
+
+        linkedAgent = agentByEmail as AgentOption | null;
+      }
+
+      if (!linkedAgent && profile?.full_name) {
+        const { data: agentByName } = await supabase
+          .from('agents')
+          .select('id, full_name, agency_id')
+          .eq('full_name', profile.full_name)
+          .maybeSingle();
+
+        linkedAgent = agentByName as AgentOption | null;
+      }
+
+      const detectedAgencyId = linkedAgent?.agency_id || profile?.agency_id || null;
+
+      if (detectedAgencyId) {
+        setDetectedCurrentAgent({
+          id: Number(linkedAgent?.id || 0),
+          full_name: linkedAgent?.full_name || profile?.full_name || user.email || 'Agent commercial',
+          agency_id: Number(detectedAgencyId),
+          account_type: profile?.account_type || profile?.role || 'agent',
+        });
+        setDetectedIsResponsable(false);
+      }
+    } catch (error) {
+      console.error('Erreur détection profil leads:', error);
+    }
+  }
+
   useEffect(() => {
     loadAgents();
     loadLeads();
+    loadConnectedLeadContext();
   }, []);
 
   function resetForm() {
@@ -2383,7 +2462,7 @@ appointment_time: appointmentTime.trim() || null,
                 setLeadAgentFilter('all');
               }}
               style={{ minWidth: 190 }}
-              title="Filtrer par agence"
+              title={lockedAgencyId ? "Agence verrouillée sur ton agence" : "Filtrer par agence"}
               disabled={Boolean(lockedAgencyId)}
             >
               {!lockedAgencyId && <option value="all">Toutes agences</option>}
