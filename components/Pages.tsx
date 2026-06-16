@@ -2875,7 +2875,7 @@ export function RapportSemaine({
 
   useEffect(() => {
     loadWeeklyLeads();
-  }, [selectedAgentId, selectedYear, selectedWeek]);
+  }, [selectedAgent, selectedYear, selectedWeek]);
 
   const weekOptions = useMemo(() => {
     return getWeekOptionsForMonth(Number(selectedYear || currentYear), Number(selectedMonth || currentMonth));
@@ -2883,7 +2883,7 @@ export function RapportSemaine({
 
 
   async function loadWeeklyLeads() {
-    if (!selectedAgentId || !selectedYear || !selectedWeek) {
+    if (!selectedAgent || !selectedYear || !selectedWeek) {
       setWeeklyLeads([]);
       return;
     }
@@ -2897,7 +2897,7 @@ export function RapportSemaine({
           agency_id
         )
       `)
-      .eq('agent_id', Number(selectedAgentId))
+      .eq('agent_id', Number(selectedAgent.id))
       .eq('year_number', Number(selectedYear))
       .eq('week_number', Number(selectedWeek))
       .order('lead_date', { ascending: false });
