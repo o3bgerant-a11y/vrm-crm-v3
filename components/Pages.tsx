@@ -2444,6 +2444,7 @@ appointment_time: appointmentTime.trim() || null,
       if (isSoldLead(lead)) return false;
     }
 
+    if (historyFilter === 'all' && !isMandateSignedLead(lead) && !isVehicleOnParkLead(lead)) return false;
     if (historyFilter === 'signed' && !isMandateSignedLead(lead)) return false;
     if (historyFilter === 'unsigned' && !isMandateUnsignedLead(lead)) return false;
     if (historyFilter === 'park' && !isVehicleOnParkLead(lead)) return false;
@@ -2579,7 +2580,7 @@ appointment_time: appointmentTime.trim() || null,
               onChange={(e) => setHistoryFilter(e.target.value)}
               style={{ minWidth: 220 }}
             >
-              <option value="all">Historique leads</option>
+              <option value="all">Historique mandats actifs</option>
               <option value="signed">Mandats signés</option>
               <option value="unsigned">Mandats non signés</option>
               <option value="park">Véhicules sur parc</option>
