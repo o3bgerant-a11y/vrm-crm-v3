@@ -2332,7 +2332,7 @@ appointment_time: appointmentTime.trim() || null,
   }
 
   function isVehicleOnParkLead(lead: LeadItem) {
-    return Boolean(lead.vehicle_entered) || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '');
+    return Boolean(lead.vehicle_entered) || ['Véhicule rentré', 'Véhicule sur parc', 'Véhicule vendu'].includes(lead.status || '');
   }
 
   function getLeadHistoryWeekKey(lead: LeadItem) {
@@ -2423,7 +2423,7 @@ appointment_time: appointmentTime.trim() || null,
   const stats = useMemo(() => {
     const total = filteredLeads.length;
     const appointments = filteredLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
-    const enteredVehicles = filteredLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+    const enteredVehicles = filteredLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Véhicule sur parc', 'Véhicule vendu'].includes(lead.status || '')).length;
     const mandates = filteredLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
     const mandateAlerts = filteredLeads.filter(lead => isMandateAlertLead(lead)).length;
     const sales = filteredLeads.filter(lead => lead.sale_done || lead.status === 'Véhicule vendu').length;
@@ -2447,7 +2447,7 @@ appointment_time: appointmentTime.trim() || null,
         current.appointments += 1;
       }
 
-      if (lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')) {
+      if (lead.vehicle_entered || ['Véhicule rentré', 'Véhicule sur parc', 'Véhicule vendu'].includes(lead.status || '')) {
         current.vehicles += 1;
       }
 
@@ -3395,7 +3395,7 @@ export function RapportSemaine({
         agent,
         leads: agentLeads.length,
         rdv: agentLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
-        vehicles: agentLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
+        vehicles: agentLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Véhicule sur parc', 'Véhicule vendu'].includes(lead.status || '')).length,
         mandates: agentLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
         sales,
         warranties,
