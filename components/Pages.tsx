@@ -3173,6 +3173,7 @@ export function RapportSemaine({
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [leadsList, setLeadsList] = useState<LeadItem[]>([]);
   const [salesList, setSalesList] = useState<VehicleSale[]>([]);
+  const [salesList, setSalesList] = useState<VehicleSale[]>([]);
   const [reportsList, setReportsList] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -5410,6 +5411,7 @@ export function Remuneration() {
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [responsablesList, setResponsablesList] = useState<any[]>([]);
   const [leadsList, setLeadsList] = useState<LeadItem[]>([]);
+  const [salesList, setSalesList] = useState<VehicleSale[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAgencyId, setSelectedAgencyId] = useState<number | ''>('');
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
@@ -5423,6 +5425,16 @@ export function Remuneration() {
   const LEAD_RESPONSABLE_AGENT_SHARE_HT = 29.5;
   const LEAD_RESPONSABLE_DIRECT_SHARE_HT = 49.5;
   const LEBONCOIN_MONTHLY_AGENT_HT = 978.37;
+  const TVA_DIVIDER = 1.2;
+  const WARRANTY_START_RESPONSABLE_COST_HT = 45;
+  const WARRANTY_START_AGENT_COST_HT = 90;
+  const WARRANTY_COSTS_HT: Record<string, number> = {
+    medium_12: 158.01,
+    medium_24: 253.01,
+    premium_12: 250,
+    premium_24: 374.75,
+    prestige_36: 549.75,
+  };
 
   async function loadRemunerationPeople() {
     setLoading(true);
@@ -5441,6 +5453,17 @@ export function Remuneration() {
     const { data: leadsData, error: leadsError } = await supabase
       .from('leads')
       .select('id, year_number, month_number, week_number, agency_id, agent_id, source, demarchage_source, status, mandate_status, customer_name, vehicle_brand, vehicle_model, vehicle_registration, lead_date, created_at')
+      .order('id', { ascending: false });
+
+    const { data: salesData, error: salesError } = await supabase
+      .from('vehicle_sales')
+      .select(`
+        *,
+        agents!vehicle_sales_agent_id_fkey (
+          full_name,
+          agency_id
+        )
+      `)
       .order('id', { ascending: false });
 
     if (agentsError) {
@@ -5475,6 +5498,13 @@ export function Remuneration() {
       setLeadsList([]);
     } else {
       setLeadsList((leadsData || []) as LeadItem[]);
+    }
+
+    if (salesError) {
+      console.error('Erreur chargement ventes rémunération:', salesError);
+      setSalesList([]);
+    } else {
+      setSalesList((salesData || []) as VehicleSale[]);
     }
 
     setLoading(false);
@@ -5525,6 +5555,47 @@ export function Remuneration() {
     if (oldDemarchageSources.includes(value)) return 'demarchage';
 
     return 'autre';
+  }
+
+
+  function normalizeWarrantyType(typeValue: string | null | undefined) {
+    const value = String(typeValue || '').trim().toLowerCase();
+
+    if (value.includes('start')) return 'start';
+    if (value.includes('medium') && value.includes('12')) return 'medium_12';
+    if (value.includes('medium') && value.includes('24')) return 'medium_24';
+    if (value.includes('premium') && value.includes('12')) return 'premium_12';
+    if (value.includes('premium') && value.includes('24')) return 'premium_24';
+    if (value.includes('prestige') && value.includes('36')) return 'prestige_36';
+
+    return 'unknown';
+  }
+
+  function isResponsableName(name: string | null | undefined) {
+    const value = String(name || '').trim().toLowerCase();
+    return responsablesList.some((responsable: any) => {
+      const responsableName = String(responsable.full_name || '').trim().toLowerCase();
+      return responsableName && responsableName === value;
+    });
+  }
+
+  function saleBelongsToCommercialAgent(sale: VehicleSale) {
+    const agent = agentsList.find((item) => Number(item.id) === Number(sale.agent_id));
+    if (!agent) return false;
+    if (isResponsableName(agent.full_name)) return false;
+    return true;
+  }
+
+  function saleDateMatchesSelectedPeriod(sale: VehicleSale) {
+    if (!sale.sale_date || !selectedYear || !selectedMonth) return false;
+
+    const date = new Date(sale.sale_date);
+    if (Number.isNaN(date.getTime())) return false;
+
+    return (
+      date.getFullYear() === Number(selectedYear) &&
+      date.getMonth() + 1 === Number(selectedMonth)
+    );
   }
 
   const remunerationLeads = useMemo(() => {
@@ -5593,8 +5664,110 @@ export function Remuneration() {
     return leadStats.rows.find((row) => row.key === selectedPerson.key) || null;
   }, [leadStats.rows, selectedPerson]);
 
+  const remunerationWarrantySales = useMemo(() => {
+    if (!selectedAgencyId || !selectedYear || !selectedMonth) return [];
+
+    return salesList.filter((sale) => {
+      if (!sale.warranty_sold) return false;
+      if (!saleDateMatchesSelectedPeriod(sale)) return false;
+
+      const saleAgencyId = Number(sale.agents?.agency_id || agentsList.find((agent) => Number(agent.id) === Number(sale.agent_id))?.agency_id || 0);
+      return saleAgencyId === Number(selectedAgencyId);
+    });
+  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList]);
+
+  const warrantyStats = useMemo(() => {
+    const baseRows = peopleOptions.map((person) => ({
+      ...person,
+      warrantiesCount: 0,
+      warrantyGainHT: 0,
+    }));
+
+    let totalWarrantyGainHT = 0;
+    let unknownWarranties = 0;
+
+    remunerationWarrantySales.forEach((sale) => {
+      const warrantyKey = normalizeWarrantyType(sale.warranty_type);
+      const soldByAgent = saleBelongsToCommercialAgent(sale);
+      const warrantyAmountTTC = Number(sale.warranty_amount || 0);
+      let profitHT = 0;
+
+      if (warrantyKey === 'unknown') {
+        unknownWarranties += 1;
+        return;
+      }
+
+      if (warrantyKey === 'start') {
+        if (soldByAgent) {
+          const agentRow = baseRows.find((row) => row.type === 'agent' && Number(row.id) === Number(sale.agent_id));
+          if (agentRow) {
+            agentRow.warrantiesCount += 1;
+            agentRow.warrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
+          }
+          totalWarrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
+        } else {
+          baseRows
+            .filter((row) => row.type === 'responsable')
+            .forEach((row) => {
+              row.warrantiesCount += 1;
+              row.warrantyGainHT -= WARRANTY_START_RESPONSABLE_COST_HT;
+            });
+          totalWarrantyGainHT -= WARRANTY_START_RESPONSABLE_COST_HT * 2;
+        }
+
+        return;
+      }
+
+      const purchaseCostHT = WARRANTY_COSTS_HT[warrantyKey] || 0;
+      const warrantyAmountHT = warrantyAmountTTC / TVA_DIVIDER;
+      profitHT = warrantyAmountHT - purchaseCostHT;
+      totalWarrantyGainHT += profitHT;
+
+      if (soldByAgent) {
+        const agentShare = profitHT * 0.4;
+        const responsableShare = profitHT * 0.3;
+        const agentRow = baseRows.find((row) => row.type === 'agent' && Number(row.id) === Number(sale.agent_id));
+
+        if (agentRow) {
+          agentRow.warrantiesCount += 1;
+          agentRow.warrantyGainHT += agentShare;
+        }
+
+        baseRows
+          .filter((row) => row.type === 'responsable')
+          .forEach((row) => {
+            row.warrantiesCount += 1;
+            row.warrantyGainHT += responsableShare;
+          });
+      } else {
+        const responsableShare = profitHT / 2;
+
+        baseRows
+          .filter((row) => row.type === 'responsable')
+          .forEach((row) => {
+            row.warrantiesCount += 1;
+            row.warrantyGainHT += responsableShare;
+          });
+      }
+    });
+
+    return {
+      totalWarrantySales: remunerationWarrantySales.length,
+      totalWarrantyGainHT,
+      unknownWarranties,
+      rows: baseRows,
+    };
+  }, [remunerationWarrantySales, peopleOptions, agentsList, responsablesList]);
+
+  const selectedPersonWarrantyResult = useMemo(() => {
+    if (!selectedPerson) return null;
+    return warrantyStats.rows.find((row) => row.key === selectedPerson.key) || null;
+  }, [warrantyStats.rows, selectedPerson]);
+
   const selectedLeboncoinDeductionHT = selectedPerson?.type === 'agent' ? LEBONCOIN_MONTHLY_AGENT_HT : 0;
   const selectedTotalDeductionsHT = Number(selectedPersonLeadResult?.deductionHT || 0) + selectedLeboncoinDeductionHT;
+  const selectedWarrantyGainHT = Number(selectedPersonWarrantyResult?.warrantyGainHT || 0);
+  const selectedProvisionalResultHT = selectedWarrantyGainHT - selectedTotalDeductionsHT;
 
   function showRemuneration() {
     if (!selectedAgencyId) {
@@ -5679,7 +5852,7 @@ export function Remuneration() {
       <div className="card">
         <h3>💰 Rémunération</h3>
         <p className="muted">
-          Bloc 1 en cours : coût des leads HT. Les garanties, marges, commissions et frais seront ajoutés ensuite, étape par étape.
+          Blocs actifs : Leads, Leboncoin et Garanties HT. Les marges véhicules, commissions finales et frais seront ajoutés ensuite, étape par étape.
         </p>
       </div>
 
@@ -5812,6 +5985,32 @@ export function Remuneration() {
 
           <div className="grid cards3">
             <div className="card">
+              <h3>Résultat garanties HT</h3>
+              <div className="stat-value" style={{ color: selectedWarrantyGainHT >= 0 ? '#22c55e' : '#f97316' }}>
+                {selectedWarrantyGainHT >= 0 ? '+' : ''}{euro(selectedWarrantyGainHT)}
+              </div>
+              <p className="muted">
+                {selectedPersonWarrantyResult?.warrantiesCount || 0} garantie(s) prise(s) en compte.
+              </p>
+            </div>
+
+            <div className="card">
+              <h3>Résultat provisoire HT</h3>
+              <div className="stat-value" style={{ color: selectedProvisionalResultHT >= 0 ? '#22c55e' : '#f97316' }}>
+                {selectedProvisionalResultHT >= 0 ? '+' : ''}{euro(selectedProvisionalResultHT)}
+              </div>
+              <p className="muted">Garanties - Leads - Leboncoin. Les marges véhicules et frais viendront ensuite.</p>
+            </div>
+
+            <div className="card">
+              <h3>Garanties vendues</h3>
+              <div className="stat-value">{warrantyStats.totalWarrantySales}</div>
+              <p className="muted">Résultat global garanties : {euro(warrantyStats.totalWarrantyGainHT)} HT</p>
+            </div>
+          </div>
+
+          <div className="grid cards3">
+            <div className="card">
               <h3>Déduction Leboncoin HT</h3>
               <div className="stat-value" style={{ color: '#f97316' }}>
                 -{euro(selectedLeboncoinDeductionHT)}
@@ -5848,6 +6047,43 @@ export function Remuneration() {
               <div className="stat-value">{leadStats.visiteLeads.length}</div>
               <p className="muted">Coût total : 0 € HT</p>
             </div>
+          </div>
+
+          <div className="card">
+            <h3>Bloc Garanties</h3>
+            <p className="muted">
+              Règle validée : calcul sur le prix garantie réellement enregistré dans la vente. Le prix est converti en HT, puis on retire le coût d'achat de la garantie.
+              Pour les agents commerciaux : 40 % du bénéfice HT revient à l'agent et 60 % est partagé entre Benoît et Axel. Pour les responsables : partage 50/50.
+              START : -45 € HT par responsable si vendu par un responsable, ou -90 € HT pour l'agent si vendu par un agent commercial.
+            </p>
+
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Personne</th>
+                  <th>Type</th>
+                  <th>Garanties prises en compte</th>
+                  <th>Résultat garanties HT</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {warrantyStats.rows.map((row) => (
+                  <tr key={`warranty-${row.key}`}>
+                    <td><strong>{row.full_name}</strong></td>
+                    <td>{row.label_type}</td>
+                    <td>{row.warrantiesCount}</td>
+                    <td><strong>{row.warrantyGainHT >= 0 ? '+' : ''}{euro(row.warrantyGainHT)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {warrantyStats.unknownWarranties > 0 && (
+              <p className="muted" style={{ color: '#f97316', fontWeight: 800 }}>
+                Attention : {warrantyStats.unknownWarranties} garantie(s) ont un type non reconnu et ne sont pas intégrées au calcul.
+              </p>
+            )}
           </div>
 
           <div className="card">
@@ -5928,6 +6164,10 @@ export function Remuneration() {
         <p className="muted">
           Bloc Leboncoin : chaque agent commercial est déduit automatiquement de 978,37 € HT par mois.
           Les responsables ne sont pas concernés.
+        </p>
+        <p className="muted">
+          Bloc Garanties : START est une pénalité. Les autres garanties sont calculées sur le prix réel saisi, converti en HT, moins le coût d'achat.
+          Agent commercial = 40 % du bénéfice HT, le reste partagé entre Benoît et Axel. Responsable = partage 50/50 entre Benoît et Axel.
         </p>
       </div>
     </div>
