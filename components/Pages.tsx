@@ -5422,8 +5422,8 @@ export function Remuneration() {
 
     const { data: responsablesData, error: responsablesError } = await supabase
       .from('profiles')
-      .select('id, full_name, email, agency_id, role, account_type, is_admin, status')
-      .or('role.eq.responsable,account_type.eq.responsable,is_admin.eq.true')
+      .select('id, full_name, email, agency_id, role, is_admin, status')
+      .or('role.eq.patron,role.eq.responsable,is_admin.eq.true')
       .order('full_name', { ascending: true });
 
     if (agentsError) {
@@ -5437,7 +5437,15 @@ export function Remuneration() {
       console.error('Erreur chargement responsables rémunération:', responsablesError);
       setResponsablesList([]);
     } else {
-      setResponsablesList(responsablesData || []);
+      const activeResponsables = (responsablesData || []).filter((responsable: any) => {
+        return responsable.status === 'active' && (
+          responsable.is_admin === true ||
+          responsable.role === 'patron' ||
+          responsable.role === 'responsable'
+        );
+      });
+
+      setResponsablesList(activeResponsables);
     }
 
     setLoading(false);
