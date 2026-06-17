@@ -5422,6 +5422,7 @@ export function Remuneration() {
   const LEAD_AGENT_PART_HT = 40;
   const LEAD_RESPONSABLE_AGENT_SHARE_HT = 29.5;
   const LEAD_RESPONSABLE_DIRECT_SHARE_HT = 49.5;
+  const LEBONCOIN_MONTHLY_AGENT_HT = 978.37;
 
   async function loadRemunerationPeople() {
     setLoading(true);
@@ -5591,6 +5592,9 @@ export function Remuneration() {
     if (!selectedPerson) return null;
     return leadStats.rows.find((row) => row.key === selectedPerson.key) || null;
   }, [leadStats.rows, selectedPerson]);
+
+  const selectedLeboncoinDeductionHT = selectedPerson?.type === 'agent' ? LEBONCOIN_MONTHLY_AGENT_HT : 0;
+  const selectedTotalDeductionsHT = Number(selectedPersonLeadResult?.deductionHT || 0) + selectedLeboncoinDeductionHT;
 
   function showRemuneration() {
     if (!selectedAgencyId) {
@@ -5808,6 +5812,26 @@ export function Remuneration() {
 
           <div className="grid cards3">
             <div className="card">
+              <h3>Déduction Leboncoin HT</h3>
+              <div className="stat-value" style={{ color: '#f97316' }}>
+                -{euro(selectedLeboncoinDeductionHT)}
+              </div>
+              <p className="muted">
+                {selectedPerson?.type === 'agent'
+                  ? 'Forfait mensuel agent commercial.'
+                  : 'Non appliqué aux responsables.'}
+              </p>
+            </div>
+
+            <div className="card">
+              <h3>Total déductions HT</h3>
+              <div className="stat-value" style={{ color: '#f97316' }}>
+                -{euro(selectedTotalDeductionsHT)}
+              </div>
+              <p className="muted">Leads + Leboncoin pour la période sélectionnée.</p>
+            </div>
+
+            <div className="card">
               <h3>Leads Call Center</h3>
               <div className="stat-value">{leadStats.callCenterLeads.length}</div>
               <p className="muted">Coût total : {euro(leadStats.totalCallCenterCostHT)} HT</p>
@@ -5824,6 +5848,34 @@ export function Remuneration() {
               <div className="stat-value">{leadStats.visiteLeads.length}</div>
               <p className="muted">Coût total : 0 € HT</p>
             </div>
+          </div>
+
+          <div className="card">
+            <h3>Bloc Leboncoin</h3>
+            <p className="muted">
+              Règle validée : chaque agent commercial est déduit automatiquement de 978,37 € HT par mois pour Leboncoin.
+              Les responsables ne sont pas concernés par cette déduction.
+            </p>
+
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Personne</th>
+                  <th>Type</th>
+                  <th>Déduction Leboncoin HT</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {leadStats.rows.map((row) => (
+                  <tr key={`leboncoin-${row.key}`}>
+                    <td><strong>{row.full_name}</strong></td>
+                    <td>{row.label_type}</td>
+                    <td><strong>-{euro(row.type === 'agent' ? LEBONCOIN_MONTHLY_AGENT_HT : 0)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
           <div className="card">
@@ -5868,10 +5920,14 @@ export function Remuneration() {
       )}
 
       <div className="card">
-        <h3>Règle validée — Bloc Leads</h3>
+        <h3>Règles validées — Rémunération V1</h3>
         <p className="muted">
-          Le lead est facturé dès sa création, même s'il est non signé, archivé, perdu ou jamais vendu.
+          Bloc Leads : le lead est facturé dès sa création, même s'il est non signé, archivé, perdu ou jamais vendu.
           Call Center = 99 € HT. Démarchage Agent et Visite spontanée = 0 € HT.
+        </p>
+        <p className="muted">
+          Bloc Leboncoin : chaque agent commercial est déduit automatiquement de 978,37 € HT par mois.
+          Les responsables ne sont pas concernés.
         </p>
       </div>
     </div>
