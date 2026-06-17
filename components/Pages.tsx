@@ -2292,6 +2292,11 @@ appointment_time: appointmentTime.trim() || null,
   async function deleteLead() {
     if (!editingLead) return;
 
+    if (!effectiveIsResponsable) {
+      alert('Seul un responsable peut supprimer un lead.');
+      return;
+    }
+
     const ok = confirm(`Supprimer le lead "${editingLead.customer_name}" ?`);
     if (!ok) return;
 
@@ -2894,7 +2899,7 @@ appointment_time: appointmentTime.trim() || null,
                   {saving ? 'Enregistrement...' : editingLead ? 'Modifier le lead' : 'Enregistrer le lead'}
                 </button>
 
-                {editingLead && <button onClick={deleteLead} disabled={saving}>Supprimer</button>}
+                {editingLead && effectiveIsResponsable && <button onClick={deleteLead} disabled={saving}>Supprimer</button>}
 
                 <button onClick={() => { resetForm(); setShowForm(false); }} disabled={saving}>Annuler</button>
 
