@@ -60,7 +60,10 @@ export default function Home() {
   const [messagesNotificationCount, setMessagesNotificationCount] = useState(0);
   const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false);
 
-  const isResponsable = currentAgent?.account_type === 'responsable';
+  const isResponsable =
+    currentAgent?.account_type === 'responsable' ||
+    currentAgent?.role === 'patron' ||
+    currentAgent?.role === 'responsable';
 
   function firstName(fullName: string | null | undefined) {
     if (!fullName) return '';
@@ -78,22 +81,45 @@ export default function Home() {
       return;
     }
 
-    const { data: agentData, error: agentError } = await supabase
-      .from('agents')
-      .select('id, full_name, email, role, account_type, agency_id, auth_user_id')
-      .eq('auth_user_id', userData.user.id)
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_id, full_name, email, role, agency_id, agent_id, status, is_admin')
+      .eq('user_id', userData.user.id)
       .maybeSingle();
 
-    if (agentError) {
-      console.error('Erreur recherche fiche agent:', agentError);
+    if (profileError) {
+      console.error('Erreur recherche profil:', profileError);
       setCurrentAgent(null);
-    } else {
-      const agent = (agentData as CurrentAgent) || null;
-      setCurrentAgent(agent);
+      setLoadingUser(false);
+      return;
+    }
 
-      if (agent && showWelcome) {
-        setShowWelcomeAnimation(true);
-      }
+    if (!profileData || profileData.status !== 'active') {
+      console.error('Profil introuvable ou inactif:', profileData);
+      setCurrentAgent(null);
+      setLoadingUser(false);
+      return;
+    }
+
+    const isProfileResponsable =
+      profileData.is_admin === true ||
+      profileData.role === 'patron' ||
+      profileData.role === 'responsable';
+
+    const agent: CurrentAgent = {
+      id: Number(profileData.agent_id || profileData.id),
+      full_name: profileData.full_name || userData.user.email || 'Utilisateur',
+      email: profileData.email || userData.user.email || null,
+      role: profileData.role || null,
+      account_type: isProfileResponsable ? 'responsable' : 'agent',
+      agency_id: profileData.agency_id ? Number(profileData.agency_id) : null,
+      auth_user_id: profileData.user_id || userData.user.id,
+    };
+
+    setCurrentAgent(agent);
+
+    if (agent && showWelcome) {
+      setShowWelcomeAnimation(true);
     }
 
     setLoadingUser(false);
@@ -106,7 +132,10 @@ export default function Home() {
       return;
     }
 
-    const responsableMode = agent.account_type === 'responsable';
+    const responsableMode =
+      agent.account_type === 'responsable' ||
+      agent.role === 'patron' ||
+      agent.role === 'responsable';
 
     const { data: documentsData, error: documentsError } = await supabase
       .from('agent_documents')
