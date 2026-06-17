@@ -2873,6 +2873,7 @@ appointment_time: appointmentTime.trim() || null,
                 <th>Véhicule</th>
                 <th>RDV</th>
                 <th>Résultat</th>
+                <th>Prix signé</th>
               </tr>
             </thead>
 
@@ -2908,10 +2909,7 @@ appointment_time: appointmentTime.trim() || null,
                       {lead.vehicle_mileage ? ` — ${lead.vehicle_mileage.toLocaleString('fr-FR')} km` : ''}
                     </div>
                   </td>
-                  <td>
-                    {formatDate(lead.appointment_date)}
-                    {lead.appointment_time && <div className="muted" style={{ fontSize: 12 }}>{lead.appointment_time}</div>}
-                  </td>
+                  <td>{formatDate(lead.appointment_date)}</td>
                   <td>
                     {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Sur parc' : lead.mandate_signed ? 'Mandat signé' : getMandateStatusLabel(lead.mandate_status)}
                     {(lead.margin_amount || lead.warranty_sold) && (
@@ -2921,6 +2919,9 @@ appointment_time: appointmentTime.trim() || null,
                         {lead.warranty_sold ? 'Garantie' : ''}
                       </div>
                     )}
+                  </td>
+                  <td>
+                    {Number(lead.seller_net_price || 0) > 0 ? euro(Number(lead.seller_net_price)) : '-'}
                   </td>
                 </tr>
               ))}
