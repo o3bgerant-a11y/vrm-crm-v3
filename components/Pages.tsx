@@ -1857,6 +1857,14 @@ export function Leads({
     agencyId,
   ]);
 
+
+  useEffect(() => {
+    if (mandateStatus !== 'signé') {
+      setVehicleEntered(false);
+      setSaleDone(false);
+    }
+  }, [mandateStatus]);
+
   const leadFilterAgentOptions = useMemo(() => {
     const agencyToUse = lockedAgencyId || leadAgencyFilter;
 
@@ -2717,7 +2725,12 @@ appointment_time: appointmentTime.trim() || null,
                       type="button"
                       onClick={() => {
                         setMandateStatus(item.value);
-                        if (item.value === 'signé') setMandateAlert(false);
+                        if (item.value === 'signé') {
+                          setMandateAlert(false);
+                        } else {
+                          setVehicleEntered(false);
+                          setSaleDone(false);
+                        }
                       }}
                       className={active ? 'btn' : ''}
                       style={{
@@ -2758,17 +2771,19 @@ appointment_time: appointmentTime.trim() || null,
                 </label>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
-                <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="checkbox" checked={vehicleEntered} onChange={(e) => setVehicleEntered(e.target.checked)} />
-                  Véhicule sur parc
-                </label>
+              {mandateStatus === 'signé' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
+                  <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input type="checkbox" checked={vehicleEntered} onChange={(e) => setVehicleEntered(e.target.checked)} />
+                    Véhicule sur parc
+                  </label>
 
-                <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="checkbox" checked={saleDone} onChange={(e) => setSaleDone(e.target.checked)} />
-                  Véhicule vendu — créer / mettre à jour automatiquement la vente
-                </label>
-              </div>
+                  <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input type="checkbox" checked={saleDone} onChange={(e) => setSaleDone(e.target.checked)} />
+                    Véhicule vendu — créer / mettre à jour automatiquement la vente
+                  </label>
+                </div>
+              )}
 
               {saleDone && (
                 <div
