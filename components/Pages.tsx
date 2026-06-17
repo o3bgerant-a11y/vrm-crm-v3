@@ -2367,8 +2367,12 @@ appointment_time: appointmentTime.trim() || null,
     return lead.status === 'Archivé' || lead.status === 'Archive' || lead.status === 'Archived';
   }
 
+  function isSoldLead(lead: LeadItem) {
+    return Boolean(lead.sale_done) || lead.status === 'Véhicule vendu';
+  }
+
   function isVehicleOnParkLead(lead: LeadItem) {
-    return Boolean(lead.vehicle_entered) || ['Véhicule rentré', 'Véhicule sur parc', 'Véhicule vendu'].includes(lead.status || '');
+    return !isSoldLead(lead) && (Boolean(lead.vehicle_entered) || ['Véhicule rentré', 'Véhicule sur parc'].includes(lead.status || ''));
   }
 
   function getLeadHistoryWeekKey(lead: LeadItem) {
@@ -2425,8 +2429,11 @@ appointment_time: appointmentTime.trim() || null,
 
     if (historyFilter === 'archived') {
       if (!isArchivedLead(lead)) return false;
-    } else if (isArchivedLead(lead)) {
-      return false;
+    } else if (historyFilter === 'sold') {
+      if (!isSoldLead(lead)) return false;
+    } else {
+      if (isArchivedLead(lead)) return false;
+      if (isSoldLead(lead)) return false;
     }
 
     if (historyFilter === 'signed' && !isMandateSignedLead(lead)) return false;
@@ -2468,7 +2475,7 @@ appointment_time: appointmentTime.trim() || null,
     const enteredVehicles = filteredLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Véhicule sur parc', 'Véhicule vendu'].includes(lead.status || '')).length;
     const mandates = filteredLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
     const mandateAlerts = filteredLeads.filter(lead => isMandateAlertLead(lead)).length;
-    const sales = filteredLeads.filter(lead => lead.sale_done || lead.status === 'Véhicule vendu').length;
+    const sales = filteredLeads.filter(lead => isSoldLead(lead)).length;
     const warranties = filteredLeads.filter(lead => lead.warranty_sold).length;
     const margin = filteredLeads.reduce((totalMargin, lead) => totalMargin + Number(lead.margin_amount || 0), 0);
     const conversionRate = total > 0 ? Math.round((sales / total) * 100) : 0;
@@ -2493,7 +2500,7 @@ appointment_time: appointmentTime.trim() || null,
         current.vehicles += 1;
       }
 
-      if (lead.sale_done || lead.status === 'Véhicule vendu') {
+      if (isSoldLead(lead)) {
         current.sales += 1;
       }
 
@@ -2568,6 +2575,7 @@ appointment_time: appointmentTime.trim() || null,
               <option value="signed">Mandats signés</option>
               <option value="unsigned">Mandats non signés</option>
               <option value="park">Véhicules sur parc</option>
+              <option value="sold">Leads vendus</option>
               <option value="archived">Leads archivés</option>
             </select>
 
@@ -3033,7 +3041,7 @@ appointment_time: appointmentTime.trim() || null,
                   </td>
                   <td>{formatDate(lead.appointment_date || lead.lead_date || lead.created_at)}</td>
                   <td>
-                    {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Sur parc' : lead.mandate_signed || lead.mandate_status === 'signé' ? 'Mandat signé' : 'Mandat non signé'}
+                    {isSoldLead(lead) ? 'Vendu' : lead.vehicle_entered ? 'Sur parc' : lead.mandate_signed || lead.mandate_status === 'signé' ? 'Mandat signé' : 'Mandat non signé'}
                     {(lead.margin_amount || lead.warranty_sold) && (
                       <div className="muted" style={{ fontSize: 12 }}>
                         {lead.margin_amount ? `Marge ${euro(Number(lead.margin_amount))}` : ''}
