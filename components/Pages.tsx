@@ -2936,8 +2936,18 @@ appointment_time: appointmentTime.trim() || null,
                     <div className="muted" style={{ fontSize: 12 }}>{agencyName(lead.agency_id || lead.agents?.agency_id)}</div>
                   </td>
                   <td>
-                    <span className="badge">{getMandateStatusLabel(lead.mandate_status || (lead.mandate_signed ? 'signé' : 'non_signé'))}</span>
-                    {isMandateAlertLead(lead) && <div className="muted" style={{ fontSize: 12 }}>Mandat alerte</div>}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <span className="badge">{getMandateStatusLabel(lead.mandate_status || (lead.mandate_signed ? 'signé' : 'non_signé'))}</span>
+                      {isMandateAlertLead(lead) && (
+                        <span
+                          title="Mandat alerte"
+                          aria-label="Mandat alerte"
+                          style={{ color: '#ef4444', fontSize: 17, fontWeight: 900, lineHeight: 1 }}
+                        >
+                          ▲
+                        </span>
+                      )}
+                    </span>
                     {lead.vehicle_entered && <div className="muted" style={{ fontSize: 12 }}>Véhicule sur parc</div>}
                   </td>
                   <td>
@@ -2950,7 +2960,6 @@ appointment_time: appointmentTime.trim() || null,
                   <td>{formatDate(lead.appointment_date || lead.lead_date || lead.created_at)}</td>
                   <td>
                     {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Sur parc' : lead.mandate_signed || lead.mandate_status === 'signé' ? 'Mandat signé' : 'Mandat non signé'}
-                    {isMandateAlertLead(lead) && <div className="muted" style={{ fontSize: 12 }}>Mandat alerte</div>}
                     {(lead.margin_amount || lead.warranty_sold) && (
                       <div className="muted" style={{ fontSize: 12 }}>
                         {lead.margin_amount ? `Marge ${euro(Number(lead.margin_amount))}` : ''}
