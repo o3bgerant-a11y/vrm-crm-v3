@@ -3173,7 +3173,6 @@ export function RapportSemaine({
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [leadsList, setLeadsList] = useState<LeadItem[]>([]);
   const [salesList, setSalesList] = useState<VehicleSale[]>([]);
-  const [salesList, setSalesList] = useState<VehicleSale[]>([]);
   const [reportsList, setReportsList] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
