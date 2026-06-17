@@ -1766,6 +1766,7 @@ export function Leads({
   const [source, setSource] = useState('Call Center');
   const [demarchageSource, setDemarchageSource] = useState('');
   const [mandateStatus, setMandateStatus] = useState('non_signé');
+  const [mandateAlert, setMandateAlert] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -1793,7 +1794,6 @@ export function Leads({
   const mandateStatuses = [
     { value: 'signé', label: 'Mandat signé', help: 'Le mandat est validé et signé.' },
     { value: 'non_signé', label: 'Mandat non signé', help: 'Le client n’a pas encore signé.' },
-    { value: 'relance', label: 'Mandat alerte', help: '' },
   ];
   const warrantyOptions = [
     { label: 'START - 6 mois - 0 €', value: 'START - 6 mois', amount: 0 },
@@ -2005,6 +2005,7 @@ export function Leads({
     setSource('Call Center');
     setDemarchageSource('');
     setMandateStatus('non_signé');
+    setMandateAlert(false);
     setCustomerName('');
     setCustomerPhone('');
     setCustomerEmail('');
@@ -2050,10 +2051,9 @@ export function Leads({
       setDemarchageSource(lead.demarchage_source || '');
     }
 
-    setMandateStatus(
-      lead.mandate_status ||
-      (lead.mandate_signed ? 'signé' : lead.status === 'À relancer' ? 'relance' : 'non_signé')
-    );
+    const leadIsAlert = lead.mandate_status === 'relance' || lead.status === 'À relancer' || lead.status === 'Mandat alerte';
+    setMandateStatus(lead.mandate_signed || lead.mandate_status === 'signé' ? 'signé' : 'non_signé');
+    setMandateAlert(leadIsAlert);
     setCustomerName(lead.customer_name || '');
     setCustomerPhone(lead.customer_phone || '');
     setCustomerEmail(lead.customer_email || '');
@@ -2163,13 +2163,13 @@ export function Leads({
     if (saleDone) return 'Véhicule vendu';
     if (vehicleEntered) return 'Véhicule rentré';
     if (mandateStatus === 'signé') return 'Mandat signé';
-    if (mandateStatus === 'relance') return 'À relancer';
+    if (mandateStatus === 'non_signé' && mandateAlert) return 'Mandat alerte';
     return 'Nouveau';
   }
 
   function getMandateStatusLabel(value: string | null | undefined) {
     if (value === 'signé') return 'Mandat signé';
-    if (value === 'relance') return 'Mandat alerte';
+    if (value === 'relance') return 'Mandat non signé';
     if (value === 'non_signé') return 'Mandat non signé';
     return 'Mandat non signé';
   }
@@ -2212,7 +2212,7 @@ export function Leads({
       source,
       demarchage_source: source === 'Démarchage Agent' ? demarchageSource || null : null,
       status: getStatusFromMandate(),
-      mandate_status: saleDone ? 'signé' : mandateStatus,
+      mandate_status: saleDone ? 'signé' : mandateStatus === 'signé' ? 'signé' : 'non_signé',
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim() || null,
       customer_email: customerEmail.trim() || null,
@@ -2297,7 +2297,11 @@ appointment_time: appointmentTime.trim() || null,
   }
 
   function isMandateUnsignedLead(lead: LeadItem) {
-    return lead.mandate_status === 'non_signé' || (!isMandateSignedLead(lead) && !lead.vehicle_entered && !lead.sale_done);
+    return lead.mandate_status === 'non_signé' || lead.mandate_status === 'relance' || (!isMandateSignedLead(lead) && !lead.vehicle_entered && !lead.sale_done);
+  }
+
+  function isMandateAlertLead(lead: LeadItem) {
+    return lead.mandate_status === 'relance' || lead.status === 'À relancer' || lead.status === 'Mandat alerte';
   }
 
   function isVehicleOnParkLead(lead: LeadItem) {
@@ -2394,12 +2398,13 @@ appointment_time: appointmentTime.trim() || null,
     const appointments = filteredLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
     const enteredVehicles = filteredLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
     const mandates = filteredLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
+    const mandateAlerts = filteredLeads.filter(lead => isMandateAlertLead(lead)).length;
     const sales = filteredLeads.filter(lead => lead.sale_done || lead.status === 'Véhicule vendu').length;
     const warranties = filteredLeads.filter(lead => lead.warranty_sold).length;
     const margin = filteredLeads.reduce((totalMargin, lead) => totalMargin + Number(lead.margin_amount || 0), 0);
     const conversionRate = total > 0 ? Math.round((sales / total) * 100) : 0;
 
-    return { total, appointments, enteredVehicles, mandates, sales, warranties, margin, conversionRate };
+    return { total, appointments, enteredVehicles, mandates, mandateAlerts, sales, warranties, margin, conversionRate };
   }, [filteredLeads]);
 
   const sourceStats = useMemo(() => {
@@ -2624,17 +2629,18 @@ appointment_time: appointmentTime.trim() || null,
                 <input type="number" placeholder="Prix signé" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-                {mandateStatuses
-                  .filter((item) => item.value !== 'relance' || mandateStatus === 'non_signé' || mandateStatus === 'relance')
-                  .map((item) => {
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
+                {mandateStatuses.map((item) => {
                   const active = mandateStatus === item.value;
 
                   return (
                     <button
                       key={item.value}
                       type="button"
-                      onClick={() => setMandateStatus(item.value)}
+                      onClick={() => {
+                        setMandateStatus(item.value);
+                        if (item.value === 'signé') setMandateAlert(false);
+                      }}
                       className={active ? 'btn' : ''}
                       style={{
                         textAlign: 'left',
@@ -2650,6 +2656,29 @@ appointment_time: appointmentTime.trim() || null,
                   );
                 })}
               </div>
+
+              {mandateStatus === 'non_signé' && (
+                <label
+                  className="item"
+                  style={{
+                    display: 'flex',
+                    gap: 10,
+                    alignItems: 'center',
+                    border: mandateAlert ? '1px solid rgba(245, 158, 11, 0.9)' : '1px solid rgba(148, 163, 184, 0.22)',
+                    background: mandateAlert ? 'rgba(245, 158, 11, 0.16)' : undefined,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={mandateAlert}
+                    onChange={(e) => setMandateAlert(e.target.checked)}
+                  />
+                  <div>
+                    <strong>Mandat alerte</strong>
+                    <div className="muted" style={{ fontSize: 12 }}>Option statistique : le mandat reste non signé, mais il est compté comme mandat en alerte.</div>
+                  </div>
+                </label>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10 }}>
                 <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -2810,6 +2839,12 @@ appointment_time: appointmentTime.trim() || null,
         </div>
 
         <div className="card">
+          <h3>Mandats alerte</h3>
+          <div className="stat-value">{stats.mandateAlerts}</div>
+          <p className="muted">Mandats non signés avec alerte</p>
+        </div>
+
+        <div className="card">
           <h3>Garanties</h3>
           <div className="stat-value">{stats.warranties}</div>
           <p className="muted">Garanties vendues depuis les leads</p>
@@ -2901,7 +2936,8 @@ appointment_time: appointmentTime.trim() || null,
                     <div className="muted" style={{ fontSize: 12 }}>{agencyName(lead.agency_id || lead.agents?.agency_id)}</div>
                   </td>
                   <td>
-                    <span className="badge">{getMandateStatusLabel(lead.mandate_status || (lead.mandate_signed ? 'signé' : lead.status === 'À relancer' ? 'relance' : 'non_signé'))}</span>
+                    <span className="badge">{getMandateStatusLabel(lead.mandate_status || (lead.mandate_signed ? 'signé' : 'non_signé'))}</span>
+                    {isMandateAlertLead(lead) && <div className="muted" style={{ fontSize: 12 }}>Mandat alerte</div>}
                     {lead.vehicle_entered && <div className="muted" style={{ fontSize: 12 }}>Véhicule sur parc</div>}
                   </td>
                   <td>
@@ -2913,7 +2949,8 @@ appointment_time: appointmentTime.trim() || null,
                   </td>
                   <td>{formatDate(lead.appointment_date || lead.lead_date || lead.created_at)}</td>
                   <td>
-                    {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Sur parc' : lead.mandate_signed ? 'Mandat signé' : getMandateStatusLabel(lead.mandate_status)}
+                    {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Sur parc' : lead.mandate_signed || lead.mandate_status === 'signé' ? 'Mandat signé' : 'Mandat non signé'}
+                    {isMandateAlertLead(lead) && <div className="muted" style={{ fontSize: 12 }}>Mandat alerte</div>}
                     {(lead.margin_amount || lead.warranty_sold) && (
                       <div className="muted" style={{ fontSize: 12 }}>
                         {lead.margin_amount ? `Marge ${euro(Number(lead.margin_amount))}` : ''}
