@@ -5430,7 +5430,12 @@ export function Remuneration() {
       console.error('Erreur chargement agents rémunération:', agentsError);
       setAgentsList([]);
     } else {
-      setAgentsList((agentsData || []) as AgentOption[]);
+      const commercialAgents = (agentsData || []).filter((agent: any) => {
+        const agencyId = Number(agent.agency_id);
+        return agencyId === 1 || agencyId === 2 || agencyId === 3;
+      });
+
+      setAgentsList(commercialAgents as AgentOption[]);
     }
 
     if (responsablesError) {
