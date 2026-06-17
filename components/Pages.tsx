@@ -1793,7 +1793,7 @@ export function Leads({
   const mandateStatuses = [
     { value: 'signé', label: 'Mandat signé', help: 'Le mandat est validé et signé.' },
     { value: 'non_signé', label: 'Mandat non signé', help: 'Le client n’a pas encore signé.' },
-    { value: 'relance', label: 'Mandat alerte', help: 'À relancer rapidement.' },
+    { value: 'relance', label: 'Mandat alerte', help: '' },
   ];
   const warrantyOptions = [
     { label: 'START - 6 mois - 0 €', value: 'START - 6 mois', amount: 0 },
@@ -2625,7 +2625,9 @@ appointment_time: appointmentTime.trim() || null,
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-                {mandateStatuses.map((item) => {
+                {mandateStatuses
+                  .filter((item) => item.value !== 'relance' || mandateStatus === 'non_signé' || mandateStatus === 'relance')
+                  .map((item) => {
                   const active = mandateStatus === item.value;
 
                   return (
@@ -2643,7 +2645,7 @@ appointment_time: appointmentTime.trim() || null,
                       }}
                     >
                       <strong>{active ? '✓ ' : ''}{item.label}</strong>
-                      <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{item.help}</div>
+                      {item.help && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{item.help}</div>}
                     </button>
                   );
                 })}
