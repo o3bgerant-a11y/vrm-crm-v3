@@ -1837,6 +1837,26 @@ export function Leads({
     }
   }, [lockedAgencyId]);
 
+  useEffect(() => {
+    if (!showForm || editingLead || effectiveIsResponsable || !effectiveCurrentAgent) return;
+
+    if (!agentId && effectiveCurrentAgent.id) {
+      setAgentId(Number(effectiveCurrentAgent.id));
+    }
+
+    if (!agencyId && effectiveCurrentAgent.agency_id) {
+      setAgencyId(Number(effectiveCurrentAgent.agency_id));
+    }
+  }, [
+    showForm,
+    editingLead,
+    effectiveIsResponsable,
+    effectiveCurrentAgent?.id,
+    effectiveCurrentAgent?.agency_id,
+    agentId,
+    agencyId,
+  ]);
+
   const leadFilterAgentOptions = useMemo(() => {
     const agencyToUse = lockedAgencyId || leadAgencyFilter;
 
@@ -1996,12 +2016,19 @@ export function Leads({
   }, []);
 
   function resetForm() {
+    const defaultAgentId = !effectiveIsResponsable && effectiveCurrentAgent?.id
+      ? Number(effectiveCurrentAgent.id)
+      : '';
+    const defaultAgencyId = !effectiveIsResponsable && effectiveCurrentAgent?.agency_id
+      ? Number(effectiveCurrentAgent.agency_id)
+      : '';
+
     setEditingLead(null);
     setYearNumber(String(currentYear));
     setMonthNumber(String(currentMonth));
     setWeekNumber(String(currentWeek));
-    setAgencyId('');
-    setAgentId('');
+    setAgencyId(defaultAgencyId);
+    setAgentId(defaultAgentId);
     setSource('Call Center');
     setDemarchageSource('');
     setMandateStatus('non_signé');
