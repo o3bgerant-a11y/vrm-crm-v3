@@ -5404,6 +5404,7 @@ export function Remuneration() {
 
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [responsablesList, setResponsablesList] = useState<any[]>([]);
+  const [leadsList, setLeadsList] = useState<LeadItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAgencyId, setSelectedAgencyId] = useState<number | ''>('');
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
@@ -5411,6 +5412,11 @@ export function Remuneration() {
   const [selectedPersonKey, setSelectedPersonKey] = useState('');
   const [showResult, setShowResult] = useState(false);
   const [moneyAnimation, setMoneyAnimation] = useState(false);
+
+  const LEAD_CALL_CENTER_TOTAL_HT = 99;
+  const LEAD_AGENT_PART_HT = 40;
+  const LEAD_RESPONSABLE_AGENT_SHARE_HT = 29.5;
+  const LEAD_RESPONSABLE_DIRECT_SHARE_HT = 49.5;
 
   async function loadRemunerationPeople() {
     setLoading(true);
@@ -5425,6 +5431,11 @@ export function Remuneration() {
       .select('id, full_name, email, agency_id, role, is_admin, status')
       .or('role.eq.patron,role.eq.responsable,is_admin.eq.true')
       .order('full_name', { ascending: true });
+
+    const { data: leadsData, error: leadsError } = await supabase
+      .from('leads')
+      .select('id, year_number, month_number, week_number, agency_id, agent_id, source, demarchage_source, status, mandate_status, customer_name, vehicle_brand, vehicle_model, vehicle_registration, lead_date, created_at')
+      .order('id', { ascending: false });
 
     if (agentsError) {
       console.error('Erreur chargement agents rémunération:', agentsError);
@@ -5451,6 +5462,13 @@ export function Remuneration() {
       });
 
       setResponsablesList(activeResponsables);
+    }
+
+    if (leadsError) {
+      console.error('Erreur chargement leads rémunération:', leadsError);
+      setLeadsList([]);
+    } else {
+      setLeadsList((leadsData || []) as LeadItem[]);
     }
 
     setLoading(false);
@@ -5488,6 +5506,86 @@ export function Remuneration() {
     if (!selectedPersonKey) return null;
     return peopleOptions.find((person) => person.key === selectedPersonKey) || null;
   }, [selectedPersonKey, peopleOptions]);
+
+  function normalizeLeadSource(sourceValue: string | null | undefined) {
+    const value = String(sourceValue || '').trim().toLowerCase();
+
+    if (value.includes('call')) return 'call_center';
+    if (value.includes('démarchage') || value.includes('demarchage')) return 'demarchage';
+    if (value.includes('visite')) return 'visite';
+
+    const oldDemarchageSources = ['leboncoin', 'facebook', 'google', 'recommandation', 'passage agence', 'lacentrale', 'la centrale', 'autre'];
+
+    if (oldDemarchageSources.includes(value)) return 'demarchage';
+
+    return 'autre';
+  }
+
+  const remunerationLeads = useMemo(() => {
+    if (!selectedAgencyId || !selectedYear || !selectedMonth) return [];
+
+    return leadsList.filter((lead) => {
+      const sameAgency = Number(lead.agency_id || lead.agents?.agency_id || 0) === Number(selectedAgencyId);
+      const sameYear = Number(lead.year_number || 0) === Number(selectedYear);
+      const sameMonth = Number(lead.month_number || 0) === Number(selectedMonth);
+
+      return sameAgency && sameYear && sameMonth;
+    });
+  }, [leadsList, selectedAgencyId, selectedYear, selectedMonth]);
+
+  const leadStats = useMemo(() => {
+    const callCenterLeads = remunerationLeads.filter((lead) => normalizeLeadSource(lead.source) === 'call_center');
+    const demarchageLeads = remunerationLeads.filter((lead) => normalizeLeadSource(lead.source) === 'demarchage');
+    const visiteLeads = remunerationLeads.filter((lead) => normalizeLeadSource(lead.source) === 'visite');
+    const otherLeads = remunerationLeads.filter((lead) => normalizeLeadSource(lead.source) === 'autre');
+
+    const callCenterAgentLeads = callCenterLeads.filter((lead) =>
+      agentsList.some((agent) => Number(agent.id) === Number(lead.agent_id))
+    );
+
+    const callCenterResponsableOrUnknownLeads = callCenterLeads.filter((lead) =>
+      !agentsList.some((agent) => Number(agent.id) === Number(lead.agent_id))
+    );
+
+    const rows = peopleOptions.map((person) => {
+      let callCenterCount = 0;
+      let deductionHT = 0;
+
+      if (person.type === 'agent') {
+        callCenterCount = callCenterLeads.filter((lead) => Number(lead.agent_id) === Number(person.id)).length;
+        deductionHT = callCenterCount * LEAD_AGENT_PART_HT;
+      }
+
+      if (person.type === 'responsable') {
+        const agentLeadShare = callCenterAgentLeads.length * LEAD_RESPONSABLE_AGENT_SHARE_HT;
+        const responsableLeadShare = callCenterResponsableOrUnknownLeads.length * LEAD_RESPONSABLE_DIRECT_SHARE_HT;
+
+        callCenterCount = callCenterLeads.length;
+        deductionHT = agentLeadShare + responsableLeadShare;
+      }
+
+      return {
+        ...person,
+        callCenterCount,
+        deductionHT,
+      };
+    });
+
+    return {
+      totalLeads: remunerationLeads.length,
+      callCenterLeads,
+      demarchageLeads,
+      visiteLeads,
+      otherLeads,
+      totalCallCenterCostHT: callCenterLeads.length * LEAD_CALL_CENTER_TOTAL_HT,
+      rows,
+    };
+  }, [remunerationLeads, peopleOptions, agentsList]);
+
+  const selectedPersonLeadResult = useMemo(() => {
+    if (!selectedPerson) return null;
+    return leadStats.rows.find((row) => row.key === selectedPerson.key) || null;
+  }, [leadStats.rows, selectedPerson]);
 
   function showRemuneration() {
     if (!selectedAgencyId) {
@@ -5572,8 +5670,7 @@ export function Remuneration() {
       <div className="card">
         <h3>💰 Rémunération</h3>
         <p className="muted">
-          Première version de préparation. Sélectionne une agence, une année, un mois et la personne concernée.
-          Aucun calcul réel n'est encore branché volontairement.
+          Bloc 1 en cours : coût des leads HT. Les garanties, marges, commissions et frais seront ajoutés ensuite, étape par étape.
         </p>
       </div>
 
@@ -5645,7 +5742,7 @@ export function Remuneration() {
             </select>
           </div>
 
-          {loading && <p className="muted">Chargement des personnes...</p>}
+          {loading && <p className="muted">Chargement des personnes et des leads...</p>}
 
           {!loading && peopleOptions.length === 0 && (
             <p className="muted">Aucun agent ou responsable trouvé pour le moment.</p>
@@ -5673,40 +5770,106 @@ export function Remuneration() {
       </div>
 
       {showResult && (
-        <div className="grid cards3">
-          <div className="card">
-            <h3>Personne concernée</h3>
-            <div className="stat-value" style={{ fontSize: 24 }}>
-              {selectedPerson?.full_name || '-'}
+        <>
+          <div className="grid cards3">
+            <div className="card">
+              <h3>Personne concernée</h3>
+              <div className="stat-value" style={{ fontSize: 24 }}>
+                {selectedPerson?.full_name || '-'}
+              </div>
+              <p className="muted">
+                {selectedPerson?.label_type || '-'} — {selectedPerson?.label_type === 'Responsable' ? 'Responsable réseau' : agencyName(selectedPerson?.agency_id)}
+              </p>
             </div>
+
+            <div className="card">
+              <h3>Période</h3>
+              <div className="stat-value" style={{ fontSize: 24 }}>
+                {monthNames[Number(selectedMonth || 1) - 1]} {selectedYear}
+              </div>
+              <p className="muted">Agence sélectionnée : {agencyName(selectedAgencyId)}</p>
+            </div>
+
+            <div className="card">
+              <h3>Déduction leads HT</h3>
+              <div className="stat-value" style={{ color: '#f97316' }}>
+                -{euro(Number(selectedPersonLeadResult?.deductionHT || 0))}
+              </div>
+              <p className="muted">
+                {selectedPersonLeadResult?.callCenterCount || 0} lead(s) Call Center pris en compte.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid cards3">
+            <div className="card">
+              <h3>Leads Call Center</h3>
+              <div className="stat-value">{leadStats.callCenterLeads.length}</div>
+              <p className="muted">Coût total : {euro(leadStats.totalCallCenterCostHT)} HT</p>
+            </div>
+
+            <div className="card">
+              <h3>Démarchage Agent</h3>
+              <div className="stat-value">{leadStats.demarchageLeads.length}</div>
+              <p className="muted">Coût total : 0 € HT</p>
+            </div>
+
+            <div className="card">
+              <h3>Visites spontanées</h3>
+              <div className="stat-value">{leadStats.visiteLeads.length}</div>
+              <p className="muted">Coût total : 0 € HT</p>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3>Répartition du coût des leads Call Center</h3>
             <p className="muted">
-              {selectedPerson?.label_type || '-'} — {selectedPerson?.label_type === 'Responsable' ? 'Responsable réseau' : agencyName(selectedPerson?.agency_id)}
+              Règle Blois actuelle : Agent commercial = 40 € HT par lead Call Center.
+              Benoît et Axel supportent chacun 29,50 € HT par lead Call Center agent, ou 49,50 € HT chacun si le lead est responsable/non rattaché à un agent.
             </p>
+
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Personne</th>
+                  <th>Type</th>
+                  <th>Leads Call Center</th>
+                  <th>Déduction HT</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {leadStats.rows.map((row) => (
+                  <tr key={row.key}>
+                    <td><strong>{row.full_name}</strong></td>
+                    <td>{row.label_type}</td>
+                    <td>{row.callCenterCount}</td>
+                    <td><strong>-{euro(row.deductionHT)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          <div className="card">
-            <h3>Période</h3>
-            <div className="stat-value" style={{ fontSize: 24 }}>
-              {monthNames[Number(selectedMonth || 1) - 1]} {selectedYear}
+          {leadStats.otherLeads.length > 0 && (
+            <div className="card">
+              <h3>Sources non classées</h3>
+              <p className="muted">
+                {leadStats.otherLeads.length} lead(s) ont une source non reconnue. Ils ne sont pas facturés dans ce bloc pour éviter un mauvais calcul.
+              </p>
             </div>
-            <p className="muted">Agence sélectionnée : {agencyName(selectedAgencyId)}</p>
-          </div>
-
-          <div className="card">
-            <h3>Rémunération estimée</h3>
-            <div className="stat-value">0 €</div>
-            <p className="muted">Calcul réel à brancher plus tard.</p>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
       <div className="card">
-        <h3>Base de calcul à venir</h3>
+        <h3>Règle validée — Bloc Leads</h3>
         <p className="muted">
-          Les règles de calcul seront ajoutées plus tard : commissions agents, marges HT, garanties, frais engagés,
-          salaires agents et rémunération responsables.
+          Le lead est facturé dès sa création, même s'il est non signé, archivé, perdu ou jamais vendu.
+          Call Center = 99 € HT. Démarchage Agent et Visite spontanée = 0 € HT.
         </p>
       </div>
     </div>
   );
 }
+
