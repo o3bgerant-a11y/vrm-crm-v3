@@ -2306,6 +2306,38 @@ appointment_time: appointmentTime.trim() || null,
     setSaving(false);
   }
 
+  async function archiveLead() {
+    if (!editingLead) return;
+
+    const ok = confirm(`Archiver le lead "${editingLead.customer_name}" ? Il disparaîtra de la liste active mais restera disponible dans Leads archivés.`);
+    if (!ok) return;
+
+    setSaving(true);
+
+    const archivedComment = comments.trim()
+      ? `${comments.trim()}\n[Lead archivé le ${new Date().toLocaleDateString('fr-FR')}]`
+      : `[Lead archivé le ${new Date().toLocaleDateString('fr-FR')}]`;
+
+    const { error } = await supabase
+      .from('leads')
+      .update({
+        status: 'Archivé',
+        comments: archivedComment,
+      })
+      .eq('id', editingLead.id);
+
+    if (error) {
+      console.error('Erreur archivage lead:', error);
+      alert("Erreur pendant l'archivage du lead.");
+    } else {
+      resetForm();
+      setShowForm(false);
+      await loadLeads();
+    }
+
+    setSaving(false);
+  }
+
   function formatDate(value: string | null) {
     if (!value) return '-';
     return new Date(value).toLocaleDateString('fr-FR');
@@ -2329,6 +2361,10 @@ appointment_time: appointmentTime.trim() || null,
 
   function isMandateAlertLead(lead: LeadItem) {
     return lead.mandate_status === 'relance' || lead.status === 'À relancer' || lead.status === 'Mandat alerte';
+  }
+
+  function isArchivedLead(lead: LeadItem) {
+    return lead.status === 'Archivé' || lead.status === 'Archive' || lead.status === 'Archived';
   }
 
   function isVehicleOnParkLead(lead: LeadItem) {
@@ -2386,6 +2422,12 @@ appointment_time: appointmentTime.trim() || null,
 
     if (agencyToUse !== 'all' && Number(leadAgencyId) !== Number(agencyToUse)) return false;
     if (leadAgentFilter !== 'all' && Number(lead.agent_id) !== Number(leadAgentFilter)) return false;
+
+    if (historyFilter === 'archived') {
+      if (!isArchivedLead(lead)) return false;
+    } else if (isArchivedLead(lead)) {
+      return false;
+    }
 
     if (historyFilter === 'signed' && !isMandateSignedLead(lead)) return false;
     if (historyFilter === 'unsigned' && !isMandateUnsignedLead(lead)) return false;
@@ -2526,6 +2568,7 @@ appointment_time: appointmentTime.trim() || null,
               <option value="signed">Mandats signés</option>
               <option value="unsigned">Mandats non signés</option>
               <option value="park">Véhicules sur parc</option>
+              <option value="archived">Leads archivés</option>
             </select>
 
             {(historyFilter === 'signed' || historyFilter === 'unsigned') && (
@@ -2830,6 +2873,10 @@ appointment_time: appointmentTime.trim() || null,
                 {editingLead && <button onClick={deleteLead} disabled={saving}>Supprimer</button>}
 
                 <button onClick={() => { resetForm(); setShowForm(false); }} disabled={saving}>Annuler</button>
+
+                {editingLead && !isArchivedLead(editingLead) && (
+                  <button onClick={archiveLead} disabled={saving}>Archiver</button>
+                )}
               </div>
             </div>
           </div>
