@@ -2909,7 +2909,7 @@ appointment_time: appointmentTime.trim() || null,
                       {lead.vehicle_mileage ? ` — ${lead.vehicle_mileage.toLocaleString('fr-FR')} km` : ''}
                     </div>
                   </td>
-                  <td>{formatDate(lead.appointment_date)}</td>
+                  <td>{formatDate(lead.appointment_date || lead.lead_date || lead.created_at)}</td>
                   <td>
                     {lead.sale_done || lead.status === 'Véhicule vendu' ? 'Vendu' : lead.vehicle_entered ? 'Sur parc' : lead.mandate_signed ? 'Mandat signé' : getMandateStatusLabel(lead.mandate_status)}
                     {(lead.margin_amount || lead.warranty_sold) && (
