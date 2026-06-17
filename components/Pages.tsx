@@ -2969,7 +2969,9 @@ appointment_time: appointmentTime.trim() || null,
                     )}
                   </td>
                   <td>
-                    {Number(lead.seller_net_price || 0) > 0 ? euro(Number(lead.seller_net_price)) : '-'}
+                    {(lead.mandate_signed || lead.mandate_status === 'signé' || lead.sale_done) && Number(lead.seller_net_price || 0) > 0
+                      ? euro(Number(lead.seller_net_price))
+                      : '-'}
                   </td>
                 </tr>
               ))}
