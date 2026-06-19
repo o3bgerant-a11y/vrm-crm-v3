@@ -3622,7 +3622,7 @@ export function RapportSemaine({
       positive_points: summary.trim() || null,
       negative_points: actionsDone.join(' | ') || null,
       next_week_goals: nextWeekObjectives.trim() || null,
-      comments: saleComments || null,
+      comments: comments.trim() || null,
     };
 
     const { error } = selectedReport
@@ -4025,7 +4025,7 @@ export function Ventes({
       miscellaneous_fees_ht: Number(miscellaneousFeesHT || 0),
       registration: registration.trim() || null,
       vin: vin.trim() || null,
-      comments: saleComments || null,
+      comments: comments.trim() || null,
     };
 
     const { error } = editingSale
