@@ -2144,6 +2144,8 @@ export function Leads({
       source ? `Source lead : ${source}` : '',
       source === 'Démarchage Agent' && demarchageSource ? `Origine démarchage : ${demarchageSource}` : '',
       saleRoadFees ? `Frais de mise à la route : ${saleRoadFees} €` : '',
+      saleToCompany ? 'Vente à entreprise : oui' : '',
+      miscellaneousFeesHT ? `Frais divers HT : ${miscellaneousFeesHT} €` : '',
       warrantySold && warrantyType ? `Garantie choisie : ${warrantyType}` : '',
     ].filter(Boolean).join('\n');
 
@@ -2159,6 +2161,8 @@ export function Leads({
       warranty_sold: warrantySold,
       warranty_type: warrantySold ? warrantyType || 'Garantie vendue depuis lead' : null,
       warranty_amount: warrantySold ? warrantyValue : 0,
+      sale_to_company: saleToCompany,
+      miscellaneous_fees_ht: Number(miscellaneousFeesHT || 0),
       registration: vehicleRegistration.trim() || null,
       vin: null,
       comments: saleComments,
@@ -2859,6 +2863,30 @@ appointment_time: appointmentTime.trim() || null,
                           />
                         </label>
                       </div>
+
+                      <div className="item">
+                        <strong>Frais de rémunération</strong>
+                        <p className="muted" style={{ marginTop: 5 }}>
+                          Ces informations sont reprises automatiquement dans la vente pour calculer la rémunération HT.
+                        </p>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, .8fr) minmax(180px, 1fr)', gap: 10, marginTop: 10, alignItems: 'center' }}>
+                          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <input type="checkbox" checked={saleToCompany} onChange={(e) => setSaleToCompany(e.target.checked)} />
+                            Vente à entreprise
+                          </label>
+
+                          <label style={{ display: 'grid', gap: 6 }}>
+                            <span className="muted">Frais divers HT</span>
+                            <input
+                              type="number"
+                              placeholder="Ex : 50"
+                              value={miscellaneousFeesHT}
+                              onChange={(e) => setMiscellaneousFeesHT(e.target.value)}
+                            />
+                          </label>
+                        </div>
+                      </div>
                     </div>
 
                     <div style={{ display: 'grid', gap: 12 }}>
@@ -2881,6 +2909,14 @@ appointment_time: appointmentTime.trim() || null,
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                             <span className="muted">+ Garantie vendue</span>
                             <strong>{euro(warrantySold ? Number(warrantyAmount || 0) : 0)}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                            <span className="muted">Vente à entreprise</span>
+                            <strong>{saleToCompany ? 'Oui' : 'Non'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                            <span className="muted">Frais divers HT</span>
+                            <strong>{euro(Number(miscellaneousFeesHT || 0))}</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                             <span className="muted">- Prix net vendeur</span>
@@ -4025,12 +4061,15 @@ export function Ventes({
                   Vente à entreprise
                 </label>
 
-                <input
-                  type="number"
-                  placeholder="Frais divers HT"
-                  value={miscellaneousFeesHT}
-                  onChange={(e) => setMiscellaneousFeesHT(e.target.value)}
-                />
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span className="muted">Frais divers HT</span>
+                  <input
+                    type="number"
+                    placeholder="Ex : 50"
+                    value={miscellaneousFeesHT}
+                    onChange={(e) => setMiscellaneousFeesHT(e.target.value)}
+                  />
+                </label>
               </div>
             </div>
 
