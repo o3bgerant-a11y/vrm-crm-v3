@@ -25,7 +25,10 @@ const items = [
   ['agences', 'Agences', Store, 'responsable'],
   ['agents', 'Agents commerciaux', Users, 'responsable'],
   ['objectifs-mensuels', 'Objectifs mensuels', Target, 'responsable'],
-  ['remuneration', 'Rémunération', DollarSign, 'responsable'],
+
+  // ✅ visible pour tout le monde
+  ['remuneration', 'Rémunération', DollarSign, 'all'],
+
   ['leads', 'Leads', PhoneCall, 'all'],
   ['rapport-semaine', 'Rapport semaine', ClipboardList, 'all'],
   ['ventes', 'Ventes', Car, 'all'],
