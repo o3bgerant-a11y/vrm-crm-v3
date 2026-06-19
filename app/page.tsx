@@ -554,7 +554,12 @@ export default function Home() {
         {isResponsable && active === 'agences' && <Agences />}
         {isResponsable && active === 'agents' && <Agents />}
         {isResponsable && active === 'objectifs-mensuels' && <ObjectifsMensuels />}
-        {isResponsable && active === 'remuneration' && <Remuneration />}
+        {active === 'remuneration' && (
+          <Remuneration
+            currentAgent={currentAgent}
+            isResponsable={isResponsable}
+          />
+        )}
         {active === 'leads' && <Leads />}
         {active === 'rapport-semaine' && (
           <RapportSemaine
