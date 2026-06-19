@@ -5588,7 +5588,13 @@ export function Stats() {
   );
 }
 
-export function Remuneration() {
+export function Remuneration({
+  currentAgent = null,
+  isResponsable = true,
+}: {
+  currentAgent?: CurrentAgentForPages | null;
+  isResponsable?: boolean;
+} = {}) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -5610,6 +5616,11 @@ export function Remuneration() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('all');
   const [showResult, setShowResult] = useState(false);
   const [moneyAnimation, setMoneyAnimation] = useState(false);
+  const [currentProfile, setCurrentProfile] = useState<any | null>(null);
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [accessUnlocked, setAccessUnlocked] = useState(false);
+  const [remunerationPassword, setRemunerationPassword] = useState('');
+  const [accessError, setAccessError] = useState('');
 
   const LEAD_CALL_CENTER_TOTAL_HT = 99;
   const LEAD_AGENT_PART_HT = 40;
@@ -5629,6 +5640,36 @@ export function Remuneration() {
     premium_24: 374.75,
     prestige_36: 549.75,
   };
+
+  async function loadCurrentRemunerationProfile() {
+    setAccessLoading(true);
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      setCurrentProfile(null);
+      setAccessLoading(false);
+      return;
+    }
+
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, user_id, full_name, email, role, agency_id, agent_id, status, is_admin')
+      .eq('user_id', userData.user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Erreur chargement profil rémunération:', profileError);
+      setCurrentProfile(null);
+    } else {
+      setCurrentProfile({
+        ...(profileData || {}),
+        auth_email: userData.user.email || profileData?.email || null,
+      });
+    }
+
+    setAccessLoading(false);
+  }
 
   async function loadRemunerationPeople() {
     setLoading(true);
@@ -5705,8 +5746,28 @@ export function Remuneration() {
   }
 
   useEffect(() => {
+    loadCurrentRemunerationProfile();
     loadRemunerationPeople();
   }, []);
+
+  const remunerationIsResponsable = currentProfile
+    ? (
+        currentProfile.is_admin === true ||
+        currentProfile.role === 'patron' ||
+        currentProfile.role === 'responsable'
+      )
+    : (
+        currentAgent?.account_type === 'responsable' ||
+        isResponsable === true
+      );
+
+  const lockedAgentId = remunerationIsResponsable
+    ? null
+    : Number(currentProfile?.agent_id || currentAgent?.id || 0) || null;
+
+  const lockedAgencyId = remunerationIsResponsable
+    ? null
+    : Number(currentProfile?.agency_id || currentAgent?.agency_id || 0) || null;
 
   const peopleOptions = useMemo(() => {
     const responsables = responsablesList.map((responsable) => ({
@@ -5729,13 +5790,35 @@ export function Remuneration() {
         label_type: 'Agent commercial',
       }));
 
-    return [...responsables, ...agents];
-  }, [agentsList, responsablesList, selectedAgencyId]);
+    const combined = [...responsables, ...agents];
+
+    if (!remunerationIsResponsable && lockedAgentId) {
+      return combined.filter((person) => person.type === 'agent' && Number(person.id) === Number(lockedAgentId));
+    }
+
+    return combined;
+  }, [agentsList, responsablesList, selectedAgencyId, remunerationIsResponsable, lockedAgentId]);
 
   const selectedPerson = useMemo(() => {
     if (!selectedPersonKey) return null;
     return peopleOptions.find((person) => person.key === selectedPersonKey) || null;
   }, [selectedPersonKey, peopleOptions]);
+
+  useEffect(() => {
+    if (accessLoading) return;
+    if (remunerationIsResponsable) return;
+    if (!lockedAgentId) return;
+
+    const ownKey = `agent:${lockedAgentId}`;
+
+    if (lockedAgencyId && Number(selectedAgencyId || 0) !== Number(lockedAgencyId)) {
+      setSelectedAgencyId(Number(lockedAgencyId));
+    }
+
+    if (selectedPersonKey !== ownKey) {
+      setSelectedPersonKey(ownKey);
+    }
+  }, [accessLoading, remunerationIsResponsable, lockedAgentId, lockedAgencyId, selectedAgencyId, selectedPersonKey]);
 
   function normalizeLeadSource(sourceValue: string | null | undefined) {
     const value = String(sourceValue || '').trim().toLowerCase();
@@ -5862,10 +5945,11 @@ export function Remuneration() {
       const sameAgency = Number(lead.agency_id || lead.agents?.agency_id || 0) === Number(selectedAgencyId);
       const sameYear = Number(lead.year_number || 0) === Number(selectedYear);
       const sameMonth = Number(lead.month_number || 0) === Number(selectedMonth);
+      const allowedForCurrentUser = !lockedAgentId || Number(lead.agent_id || 0) === Number(lockedAgentId);
 
-      return sameAgency && sameYear && sameMonth;
+      return sameAgency && sameYear && sameMonth && allowedForCurrentUser;
     });
-  }, [leadsList, selectedAgencyId, selectedYear, selectedMonth]);
+  }, [leadsList, selectedAgencyId, selectedYear, selectedMonth, lockedAgentId]);
 
   const leadStats = useMemo(() => {
     const callCenterLeads = remunerationLeads.filter((lead) => normalizeLeadSource(lead.source) === 'call_center');
@@ -5927,10 +6011,11 @@ export function Remuneration() {
     return salesList.filter((sale) => {
       if (!sale.warranty_sold) return false;
       if (!saleDateMatchesSelectedPeriod(sale)) return false;
+      if (lockedAgentId && Number(sale.agent_id || 0) !== Number(lockedAgentId)) return false;
 
       return saleAgencyId(sale) === Number(selectedAgencyId);
     });
-  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList]);
+  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, lockedAgentId]);
 
   const warrantyStats = useMemo(() => {
     const baseRows = peopleOptions.map((person) => ({
@@ -6068,7 +6153,7 @@ export function Remuneration() {
       ...totals,
       responsableShareHT: totals.totalNetMarginHT / 2,
     };
-  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList]);
+  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList, lockedAgentId]);
 
   const commercialVehicleMarginStats = useMemo(() => {
     const emptyRow = peopleOptions.map((person) => ({
@@ -6198,6 +6283,7 @@ export function Remuneration() {
     return salesList
       .filter((sale) => {
         if (!saleDateMatchesSelectedPeriod(sale)) return false;
+        if (lockedAgentId && Number(sale.agent_id || 0) !== Number(lockedAgentId)) return false;
         return saleAgencyId(sale) === Number(selectedAgencyId);
       })
       .sort((a, b) => {
@@ -6275,7 +6361,7 @@ export function Remuneration() {
       });
   }, [remunerationVehicleSales, selectedVehicleId, selectedPerson, agentsList, responsablesList]);
 
-  function showRemuneration() {
+  async function showRemuneration() {
     if (!selectedAgencyId) {
       alert('Il faut sélectionner une agence.');
       return;
@@ -6289,6 +6375,39 @@ export function Remuneration() {
     if (!selectedPersonKey) {
       alert('Il faut sélectionner un agent commercial ou un responsable.');
       return;
+    }
+
+    if (!remunerationIsResponsable && lockedAgentId && selectedPerson?.type === 'agent' && Number(selectedPerson.id) !== Number(lockedAgentId)) {
+      alert("Accès refusé : un agent commercial peut consulter uniquement sa propre rémunération.");
+      return;
+    }
+
+    if (!accessUnlocked) {
+      const email = String(currentProfile?.auth_email || currentProfile?.email || '').trim();
+
+      if (!email) {
+        setAccessError("Impossible de vérifier le compte connecté. Déconnecte-toi puis reconnecte-toi.");
+        return;
+      }
+
+      if (!remunerationPassword.trim()) {
+        setAccessError("Entre ton mot de passe CRM pour ouvrir la rémunération.");
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: remunerationPassword,
+      });
+
+      if (error) {
+        console.error('Erreur mot de passe rémunération:', error);
+        setAccessError('Mot de passe incorrect. Accès rémunération refusé.');
+        return;
+      }
+
+      setAccessUnlocked(true);
+      setAccessError('');
     }
 
     setShowResult(false);
@@ -6379,8 +6498,10 @@ export function Remuneration() {
               onChange={(e) => {
                 setSelectedAgencyId(e.target.value ? Number(e.target.value) : '');
                 setSelectedPersonKey('');
+                setSelectedVehicleId('all');
                 setShowResult(false);
               }}
+              disabled={!remunerationIsResponsable && !!lockedAgencyId}
             >
               <option value="">Sélectionner une agence</option>
               <option value={1}>Blois</option>
@@ -6418,7 +6539,7 @@ export function Remuneration() {
                 setSelectedPersonKey(e.target.value);
                 setShowResult(false);
               }}
-              disabled={loading}
+              disabled={loading || (!remunerationIsResponsable && !!lockedAgentId)}
             >
               <option value="">Agent ou Responsable</option>
 
@@ -6436,8 +6557,47 @@ export function Remuneration() {
             <p className="muted">Aucun agent ou responsable trouvé pour le moment.</p>
           )}
 
+          {!accessUnlocked && (
+            <div className="item" style={{ borderColor: '#f59e0b' }}>
+              <strong>🔐 Mot de passe rémunération</strong>
+              <p className="muted" style={{ marginTop: 5 }}>
+                L’onglet rémunération est protégé. Chaque utilisateur doit entrer son mot de passe CRM avant d’afficher les montants.
+                Les agents commerciaux ne peuvent voir que leur propre rémunération.
+              </p>
+
+              <input
+                type="password"
+                placeholder="Mot de passe CRM"
+                value={remunerationPassword}
+                onChange={(e) => {
+                  setRemunerationPassword(e.target.value);
+                  setAccessError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') showRemuneration();
+                }}
+                style={{ marginTop: 10, maxWidth: 360 }}
+              />
+
+              {accessError && (
+                <p style={{ color: '#f97316', fontWeight: 800, marginTop: 8 }}>
+                  {accessError}
+                </p>
+              )}
+            </div>
+          )}
+
+          {!remunerationIsResponsable && (
+            <div className="item">
+              <strong>Accès agent commercial</strong>
+              <p className="muted" style={{ marginTop: 5 }}>
+                Vue limitée automatiquement à ta rémunération personnelle. Les autres agents et les responsables ne sont pas consultables depuis ce compte.
+              </p>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn" onClick={showRemuneration} disabled={loading || moneyAnimation}>
+            <button className="btn" onClick={showRemuneration} disabled={loading || accessLoading || moneyAnimation}>
               {moneyAnimation ? 'Chargement...' : 'Afficher la rémunération'}
             </button>
 
