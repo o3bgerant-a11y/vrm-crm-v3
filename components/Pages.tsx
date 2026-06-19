@@ -5619,7 +5619,7 @@ export function Remuneration({
   const [currentProfile, setCurrentProfile] = useState<any | null>(null);
   const [accessLoading, setAccessLoading] = useState(true);
   const [accessUnlocked, setAccessUnlocked] = useState(false);
-  const [remunerationPassword, setRemunerationPassword] = useState('');
+  const [remunerationPin, setRemunerationPin] = useState('');
   const [accessError, setAccessError] = useState('');
 
   const LEAD_CALL_CENTER_TOTAL_HT = 99;
@@ -5654,7 +5654,7 @@ export function Remuneration({
 
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('id, user_id, full_name, email, role, agency_id, agent_id, status, is_admin')
+      .select('id, user_id, full_name, email, role, agency_id, agent_id, status, is_admin, remuneration_pin')
       .eq('user_id', userData.user.id)
       .maybeSingle();
 
@@ -5756,10 +5756,9 @@ export function Remuneration({
         currentProfile.role === 'patron' ||
         currentProfile.role === 'responsable'
       )
-    : (
-        currentAgent?.account_type === 'responsable' ||
-        isResponsable === true
-      );
+    : currentAgent
+      ? currentAgent.account_type === 'responsable'
+      : isResponsable === true;
 
   const lockedAgentId = remunerationIsResponsable
     ? null
@@ -6383,26 +6382,26 @@ export function Remuneration({
     }
 
     if (!accessUnlocked) {
-      const email = String(currentProfile?.auth_email || currentProfile?.email || '').trim();
+      const storedPin = String(currentProfile?.remuneration_pin || '').trim();
+      const enteredPin = String(remunerationPin || '').trim();
 
-      if (!email) {
+      if (!currentProfile) {
         setAccessError("Impossible de vérifier le compte connecté. Déconnecte-toi puis reconnecte-toi.");
         return;
       }
 
-      if (!remunerationPassword.trim()) {
-        setAccessError("Entre ton mot de passe CRM pour ouvrir la rémunération.");
+      if (!storedPin) {
+        setAccessError("Aucun code rémunération n'est défini pour ce compte. Benoît doit le créer dans Paramètres.");
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: remunerationPassword,
-      });
+      if (!/^\d{4}$/.test(enteredPin)) {
+        setAccessError('Entre ton code rémunération à 4 chiffres.');
+        return;
+      }
 
-      if (error) {
-        console.error('Erreur mot de passe rémunération:', error);
-        setAccessError('Mot de passe incorrect. Accès rémunération refusé.');
+      if (enteredPin !== storedPin) {
+        setAccessError('Code rémunération incorrect. Accès refusé.');
         return;
       }
 
@@ -6559,18 +6558,20 @@ export function Remuneration({
 
           {!accessUnlocked && (
             <div className="item" style={{ borderColor: '#f59e0b' }}>
-              <strong>🔐 Mot de passe rémunération</strong>
+              <strong>🔐 Code rémunération</strong>
               <p className="muted" style={{ marginTop: 5 }}>
-                L’onglet rémunération est protégé. Chaque utilisateur doit entrer son mot de passe CRM avant d’afficher les montants.
+                L’onglet rémunération est protégé par un code à 4 chiffres différent du mot de passe CRM.
                 Les agents commerciaux ne peuvent voir que leur propre rémunération.
               </p>
 
               <input
                 type="password"
-                placeholder="Mot de passe CRM"
-                value={remunerationPassword}
+                placeholder="Code rémunération à 4 chiffres"
+                inputMode="numeric"
+                maxLength={4}
+                value={remunerationPin}
                 onChange={(e) => {
-                  setRemunerationPassword(e.target.value);
+                  setRemunerationPin(e.target.value.replace(/\D/g, '').slice(0, 4));
                   setAccessError('');
                 }}
                 onKeyDown={(e) => {
