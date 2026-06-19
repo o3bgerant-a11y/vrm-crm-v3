@@ -15,6 +15,19 @@ const agencyName = (agencyId: any) => {
   return '-';
 };
 
+const agencyIdFromName = (value: any) => {
+  const text = String(value || '').toLowerCase();
+
+  if (text.includes('blois')) return 1;
+  if (text.includes('tours')) return 2;
+  if (text.includes('bourges')) return 3;
+
+  return null;
+};
+
+const isResponsableOptionId = (value: any) => Number(value) < 0;
+const responsableProfileIdFromOption = (value: any) => Math.abs(Number(value || 0));
+
 type AgentOption = {
   id: number;
   full_name: string;
@@ -1939,17 +1952,36 @@ export function Leads({
   }
 
   async function loadAgents() {
-    const { data, error } = await supabase
+    const { data: agentsData, error: agentsError } = await supabase
       .from('agents')
       .select('id, full_name, agency_id')
       .order('full_name', { ascending: true });
 
-    if (error) {
-      console.error('Erreur chargement agents leads:', error);
-      setAgentOptions([]);
-    } else {
-      setAgentOptions(data || []);
+    const { data: responsablesData, error: responsablesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, agency_id, role, is_admin, status')
+      .or('role.eq.patron,role.eq.responsable,is_admin.eq.true')
+      .order('full_name', { ascending: true });
+
+    if (agentsError) {
+      console.error('Erreur chargement agents leads:', agentsError);
     }
+
+    if (responsablesError) {
+      console.error('Erreur chargement responsables leads:', responsablesError);
+    }
+
+    const agents = (agentsData || []) as AgentOption[];
+    const responsables = (responsablesData || [])
+      .filter((responsable: any) => responsable.status === 'active')
+      .map((responsable: any) => ({
+        id: -Number(responsable.id),
+        full_name: responsable.full_name || responsable.email || 'Responsable',
+        agency_id: Number(responsable.agency_id || 1),
+        role: 'Responsable',
+      })) as AgentOption[];
+
+    setAgentOptions([...responsables, ...agents]);
   }
 
   async function loadLeads() {
@@ -2157,9 +2189,15 @@ export function Leads({
     const saleValue = Number(salePrice || 0);
     const sellerValue = Number(sellerNetPrice || 0);
     const warrantyValue = Number(warrantyAmount || 0);
+    const selectedSeller = agentOptions.find(agent => Number(agent.id) === Number(agentId));
+    const isResponsibleSeller = isResponsableOptionId(agentId);
+    const responsableProfileId = isResponsibleSeller ? responsableProfileIdFromOption(agentId) : null;
 
     const saleComments = [
       comments.trim(),
+      isResponsibleSeller ? `Responsable vente : ${selectedSeller?.full_name || 'Responsable'}` : '',
+      isResponsibleSeller && responsableProfileId ? `Responsable profile id : ${responsableProfileId}` : '',
+      isResponsibleSeller ? `Agence rémunération : ${agencyName(finalAgencyId || selectedSeller?.agency_id || 1)}` : '',
       `Créée automatiquement depuis ${marker}`,
       customerName.trim() ? `Client lead : ${customerName.trim()}` : '',
       customerPhone.trim() ? `Téléphone lead : ${customerPhone.trim()}` : '',
@@ -2172,7 +2210,7 @@ export function Leads({
     ].filter(Boolean).join('\n');
 
     const salePayload = {
-      agent_id: Number(agentId),
+      agent_id: isResponsibleSeller ? null : Number(agentId),
       weekly_report_id: 1,
       sale_date: leadDate || today,
       vehicle_name: vehicleName,
@@ -2263,6 +2301,7 @@ export function Leads({
     }
 
     const selectedAgent = agentOptions.find(agent => Number(agent.id) === Number(agentId));
+    const isResponsibleLeadSeller = isResponsableOptionId(agentId);
     const finalAgencyId = agencyId || selectedAgent?.agency_id || null;
     const finalMarginAmount = saleDone
       ? calculatedLeadMargin
@@ -2299,7 +2338,11 @@ appointment_time: appointmentTime.trim() || null,
       margin_amount: finalMarginAmount,
       warranty_sold: warrantySold,
       warranty_amount: Number(warrantyAmount || 0),
-      comments: comments.trim() || null,
+      comments: [
+        comments.trim(),
+        isResponsibleLeadSeller ? `Responsable lead : ${selectedAgent?.full_name || 'Responsable'}` : '',
+        isResponsibleLeadSeller ? `Agence rémunération : ${agencyName(finalAgencyId || 1)}` : '',
+      ].filter(Boolean).join('\n') || null,
     };
 
     const response = editingLead
@@ -3099,8 +3142,8 @@ appointment_time: appointmentTime.trim() || null,
                     )}
                   </td>
                   <td>
-                    {lead.agents?.full_name || '-'}
-                    <div className="muted" style={{ fontSize: 12 }}>{agencyName(lead.agency_id || lead.agents?.agency_id)}</div>
+                    {lead.agents?.full_name || agentOptions.find((agent) => Number(agent.id) === Number(lead.agent_id))?.full_name || '-'}
+                    <div className="muted" style={{ fontSize: 12 }}>{agencyName(lead.agency_id || lead.agents?.agency_id || agentOptions.find((agent) => Number(agent.id) === Number(lead.agent_id))?.agency_id)}</div>
                   </td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -3579,7 +3622,7 @@ export function RapportSemaine({
       positive_points: summary.trim() || null,
       negative_points: actionsDone.join(' | ') || null,
       next_week_goals: nextWeekObjectives.trim() || null,
-      comments: comments.trim() || null,
+      comments: saleComments || null,
     };
 
     const { error } = selectedReport
@@ -3827,14 +3870,36 @@ export function Ventes({
   }, [salePrice, sellerPrice]);
 
   async function loadAgents() {
-    const { data, error } = await supabase
+    const { data: agentsData, error: agentsError } = await supabase
       .from('agents')
       .select('id, full_name, agency_id')
       .order('full_name', { ascending: true });
 
-    if (!error && data) {
-      setAgentOptions(data);
+    const { data: responsablesData, error: responsablesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, agency_id, role, is_admin, status')
+      .or('role.eq.patron,role.eq.responsable,is_admin.eq.true')
+      .order('full_name', { ascending: true });
+
+    if (agentsError) {
+      console.error('Erreur chargement agents ventes:', agentsError);
     }
+
+    if (responsablesError) {
+      console.error('Erreur chargement responsables ventes:', responsablesError);
+    }
+
+    const agents = (agentsData || []) as AgentOption[];
+    const responsables = (responsablesData || [])
+      .filter((responsable: any) => responsable.status === 'active')
+      .map((responsable: any) => ({
+        id: -Number(responsable.id),
+        full_name: responsable.full_name || responsable.email || 'Responsable',
+        agency_id: Number(responsable.agency_id || 1),
+        role: 'Responsable',
+      })) as AgentOption[];
+
+    setAgentOptions([...responsables, ...agents]);
   }
 
   async function loadSales() {
@@ -3900,7 +3965,8 @@ export function Ventes({
     setVehicleName(sale.vehicle_name || '');
     setVehiclePhotoUrl(sale.vehicle_photo_url || '');
     setSaleDate(sale.sale_date || today);
-    setAgentId(sale.agent_id || '');
+    const responsableProfileMatch = String(sale.comments || '').match(/Responsable profile id\s*:\s*(\d+)/i);
+    setAgentId(sale.agent_id || (responsableProfileMatch ? -Number(responsableProfileMatch[1]) : ''));
     setSellerPrice(String(sale.seller_price ?? ''));
     setSalePrice(String(sale.sale_price ?? ''));
     setRegistration(sale.registration || '');
@@ -3931,10 +3997,20 @@ export function Ventes({
       return;
     }
 
+    const selectedSeller = agentOptions.find(agent => Number(agent.id) === Number(agentId));
+    const isResponsibleSeller = isResponsableOptionId(agentId);
+    const responsableProfileId = isResponsibleSeller ? responsableProfileIdFromOption(agentId) : null;
+    const saleComments = [
+      comments.trim(),
+      isResponsibleSeller ? `Responsable vente : ${selectedSeller?.full_name || 'Responsable'}` : '',
+      isResponsibleSeller && responsableProfileId ? `Responsable profile id : ${responsableProfileId}` : '',
+      isResponsibleSeller ? `Agence rémunération : ${agencyName(selectedSeller?.agency_id || 1)}` : '',
+    ].filter(Boolean).join('\n');
+
     setSaving(true);
 
     const payload = {
-      agent_id: Number(agentId),
+      agent_id: isResponsibleSeller ? null : Number(agentId),
       weekly_report_id: editingSale?.weekly_report_id || 1,
       sale_date: saleDate || null,
       vehicle_name: vehicleName.trim(),
@@ -3949,7 +4025,7 @@ export function Ventes({
       miscellaneous_fees_ht: Number(miscellaneousFeesHT || 0),
       registration: registration.trim() || null,
       vin: vin.trim() || null,
-      comments: comments.trim() || null,
+      comments: saleComments || null,
     };
 
     const { error } = editingSale
@@ -3993,6 +4069,19 @@ export function Ventes({
     setSaving(false);
   }
 
+  function getSaleSellerName(sale: VehicleSale) {
+    if (sale.agents?.full_name) return sale.agents.full_name;
+
+    const responsableMatch = String(sale.comments || '').match(/Responsable vente\s*:\s*([^\n]+)/i);
+    if (responsableMatch?.[1]) return responsableMatch[1].trim();
+
+    return '-';
+  }
+
+  function getSaleDisplayAgencyId(sale: VehicleSale) {
+    return sale.agents?.agency_id || agencyIdFromName(String(sale.comments || '')) || 1;
+  }
+
   const filteredSales = realSales.filter((sale) => {
     const q = search.toLowerCase().trim();
 
@@ -4002,8 +4091,8 @@ export function Ventes({
       sale.vehicle_name,
       sale.registration,
       sale.vin,
-      sale.agents?.full_name,
-      agencyName(sale.agents?.agency_id),
+      getSaleSellerName(sale),
+      agencyName(getSaleDisplayAgencyId(sale)),
       sale.warranty_type,
       sale.comments,
       sale.notes,
@@ -5703,7 +5792,13 @@ export function Remuneration() {
   }
 
   function saleAgencyId(sale: VehicleSale) {
-    return Number(sale.agents?.agency_id || agentsList.find((agent) => Number(agent.id) === Number(sale.agent_id))?.agency_id || 0);
+    const linkedAgencyId = sale.agents?.agency_id || agentsList.find((agent) => Number(agent.id) === Number(sale.agent_id))?.agency_id;
+    if (linkedAgencyId) return Number(linkedAgencyId);
+
+    const agencyFromComments = agencyIdFromName(String(sale.comments || ''));
+    if (agencyFromComments) return agencyFromComments;
+
+    return 0;
   }
 
   function calculateResponsibleVehicleMarginDetail(sale: VehicleSale) {
@@ -5832,8 +5927,7 @@ export function Remuneration() {
       if (!sale.warranty_sold) return false;
       if (!saleDateMatchesSelectedPeriod(sale)) return false;
 
-      const saleAgencyId = Number(sale.agents?.agency_id || agentsList.find((agent) => Number(agent.id) === Number(sale.agent_id))?.agency_id || 0);
-      return saleAgencyId === Number(selectedAgencyId);
+      return saleAgencyId(sale) === Number(selectedAgencyId);
     });
   }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList]);
 
