@@ -209,11 +209,33 @@ function isAfterOrEqual(date: Date | null, start: Date) {
   return date.getTime() >= start.getTime();
 }
 
+
+function normalizeWarrantyLabel(value: any) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+function isStartWarrantyType(value: any) {
+  const normalized = normalizeWarrantyLabel(value);
+  return normalized.includes('start');
+}
+
+function isRealWarrantySale(sale: any) {
+  return sale?.warranty_sold === true && !isStartWarrantyType(sale?.warranty_type);
+}
+
+function isRealWarrantyLead(lead: any) {
+  return lead?.warranty_sold === true && Number(lead?.warranty_amount || 0) > 0;
+}
+
 function calculateStats(sales: VehicleSale[]) {
   const ca = sales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
   const margin = sales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
-  const warranties = sales.filter(sale => sale.warranty_sold).length;
-  const warrantyAmount = sales.reduce((total, sale) => total + Number(sale.warranty_amount || 0), 0);
+  const warranties = sales.filter(sale => isRealWarrantySale(sale)).length;
+  const warrantyAmount = sales.reduce((total, sale) => total + (isRealWarrantySale(sale) ? Number(sale.warranty_amount || 0) : 0), 0);
   const averageMargin = sales.length > 0 ? margin / sales.length : 0;
   const warrantyRate = sales.length > 0 ? Math.round((warranties / sales.length) * 100) : 0;
 
@@ -319,7 +341,7 @@ export function Agences() {
       row.sales += 1;
       row.ca += Number(sale.sale_price || 0);
       row.margin += Number(sale.margin_amount || 0);
-      row.warranties += sale.warranty_sold ? 1 : 0;
+      row.warranties += isRealWarrantySale(sale) ? 1 : 0;
     });
 
     return base
@@ -365,7 +387,7 @@ export function Agences() {
         const agentSales = agencySales.filter((sale) => Number(sale.agent_id) === Number(agent.id));
         const ca = agentSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
         const margin = agentSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
-        const warranties = agentSales.filter((sale) => sale.warranty_sold).length;
+        const warranties = agentSales.filter((sale) => isRealWarrantySale(sale)).length;
 
         return {
           name: agent.full_name,
@@ -2500,7 +2522,7 @@ appointment_time: appointmentTime.trim() || null,
     const mandates = filteredLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
     const mandateAlerts = filteredLeads.filter(lead => isMandateAlertLead(lead)).length;
     const sales = filteredLeads.filter(lead => isSoldLead(lead)).length;
-    const warranties = filteredLeads.filter(lead => lead.warranty_sold).length;
+    const warranties = filteredLeads.filter(lead => isRealWarrantyLead(lead)).length;
     const margin = filteredLeads.reduce((totalMargin, lead) => totalMargin + Number(lead.margin_amount || 0), 0);
     const conversionRate = total > 0 ? Math.round((sales / total) * 100) : 0;
 
@@ -3430,12 +3452,12 @@ export function RapportSemaine({
       || lead.status === 'Véhicule vendu'
     )).length;
 
-    const warrantiesFromLeads = filteredLeads.filter(lead => lead.warranty_sold).length;
+    const warrantiesFromLeads = filteredLeads.filter(lead => isRealWarrantyLead(lead)).length;
     const marginFromLeads = filteredLeads.reduce((total, lead) => total + Number(lead.margin_amount || 0), 0);
     const signedPriceTotal = filteredLeads.reduce((total, lead) => total + Number(lead.seller_net_price || 0), 0);
 
     const sales = filteredSales.length;
-    const warranties = filteredSales.filter(sale => sale.warranty_sold).length;
+    const warranties = filteredSales.filter(sale => isRealWarrantySale(sale)).length;
     const ca = filteredSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
     const margin = filteredSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
     const conversionRate = leads > 0 ? Math.round((soldFromLeads / leads) * 100) : 0;
@@ -3505,7 +3527,7 @@ export function RapportSemaine({
 
       const ca = agentSales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
       const margin = agentSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
-      const warranties = agentSales.filter(sale => sale.warranty_sold).length;
+      const warranties = agentSales.filter(sale => isRealWarrantySale(sale)).length;
       const sales = agentSales.length;
       const conversionRate = agentLeads.length > 0 ? Math.round((sales / agentLeads.length) * 100) : 0;
 
@@ -3553,7 +3575,7 @@ export function RapportSemaine({
       sales_count: weeklyStats.sales,
       margin_amount: weeklyStats.margin,
       warranties_count: weeklyStats.warranties,
-      warranties_amount: filteredSales.reduce((total, sale) => total + Number(sale.warranty_amount || 0), 0),
+      warranties_amount: filteredSales.reduce((total, sale) => total + (isRealWarrantySale(sale) ? Number(sale.warranty_amount || 0) : 0), 0),
       positive_points: summary.trim() || null,
       negative_points: actionsDone.join(' | ') || null,
       next_week_goals: nextWeekObjectives.trim() || null,
@@ -4200,7 +4222,7 @@ export function Garanties() {
   }, []);
 
   const totalSales = sales.length;
-  const warrantySales = sales.filter(sale => sale.warranty_sold);
+  const warrantySales = sales.filter(sale => isRealWarrantySale(sale));
   const totalWarranties = warrantySales.length;
   const totalWarrantyAmount = warrantySales.reduce((total, sale) => total + Number(sale.warranty_amount || 0), 0);
   const warrantyRate = totalSales > 0 ? Math.round((totalWarranties / totalSales) * 100) : 0;
@@ -4230,7 +4252,7 @@ export function Garanties() {
 
       current.sales += 1;
 
-      if (sale.warranty_sold) {
+      if (isRealWarrantySale(sale)) {
         current.warranties += 1;
         current.warrantyAmount += Number(sale.warranty_amount || 0);
       }
@@ -4261,7 +4283,7 @@ export function Garanties() {
 
       row.sales += 1;
 
-      if (sale.warranty_sold) {
+      if (isRealWarrantySale(sale)) {
         row.warranties += 1;
         row.warrantyAmount += Number(sale.warranty_amount || 0);
       }
@@ -5336,7 +5358,7 @@ export function Stats() {
       current.sales += 1;
       current.ca += Number(sale.sale_price || 0);
       current.margin += Number(sale.margin_amount || 0);
-      current.warranties += sale.warranty_sold ? 1 : 0;
+      current.warranties += isRealWarrantySale(sale) ? 1 : 0;
 
       map.set(name, current);
     });
@@ -5360,7 +5382,7 @@ export function Stats() {
       row.sales += 1;
       row.ca += Number(sale.sale_price || 0);
       row.margin += Number(sale.margin_amount || 0);
-      row.warranties += sale.warranty_sold ? 1 : 0;
+      row.warranties += isRealWarrantySale(sale) ? 1 : 0;
     });
 
     return base.sort((a, b) => b.margin - a.margin);
