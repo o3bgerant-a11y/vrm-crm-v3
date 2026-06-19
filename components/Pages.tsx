@@ -50,6 +50,8 @@ type VehicleSale = {
   warranty_sold: boolean | null;
   warranty_type: string | null;
   warranty_amount: number | null;
+  sale_to_company?: boolean | null;
+  miscellaneous_fees_ht?: number | null;
   registration: string | null;
   vin: string | null;
   comments: string | null;
@@ -1787,6 +1789,8 @@ export function Leads({
   const [warrantySold, setWarrantySold] = useState(false);
   const [warrantyType, setWarrantyType] = useState('');
   const [warrantyAmount, setWarrantyAmount] = useState('');
+  const [saleToCompany, setSaleToCompany] = useState(false);
+  const [miscellaneousFeesHT, setMiscellaneousFeesHT] = useState('');
   const [comments, setComments] = useState('');
 
   const leadSources = ['Call Center', 'Démarchage Agent', 'Visite spontanée'];
@@ -2061,6 +2065,8 @@ export function Leads({
     setWarrantySold(false);
     setWarrantyType('');
     setWarrantyAmount('');
+    setSaleToCompany(false);
+    setMiscellaneousFeesHT('');
     setComments('');
   }
 
@@ -3752,6 +3758,8 @@ export function Ventes({
   const [warrantySold, setWarrantySold] = useState(false);
   const [warrantyType, setWarrantyType] = useState('');
   const [warrantyAmount, setWarrantyAmount] = useState('');
+  const [saleToCompany, setSaleToCompany] = useState(false);
+  const [miscellaneousFeesHT, setMiscellaneousFeesHT] = useState('');
   const [comments, setComments] = useState('');
 
   const calculatedMargin = useMemo(() => {
@@ -3819,6 +3827,8 @@ export function Ventes({
     setWarrantySold(false);
     setWarrantyType('');
     setWarrantyAmount('');
+    setSaleToCompany(false);
+    setMiscellaneousFeesHT('');
     setComments('');
   }
 
@@ -3840,6 +3850,8 @@ export function Ventes({
     setWarrantySold(Boolean(sale.warranty_sold));
     setWarrantyType(sale.warranty_type || '');
     setWarrantyAmount(String(sale.warranty_amount ?? ''));
+    setSaleToCompany(Boolean(sale.sale_to_company));
+    setMiscellaneousFeesHT(String(sale.miscellaneous_fees_ht ?? ''));
     setComments(sale.comments || sale.notes || '');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3875,6 +3887,8 @@ export function Ventes({
       warranty_sold: warrantySold,
       warranty_type: warrantySold ? warrantyType.trim() || null : null,
       warranty_amount: warrantySold ? Number(warrantyAmount || 0) : 0,
+      sale_to_company: saleToCompany,
+      miscellaneous_fees_ht: Number(miscellaneousFeesHT || 0),
       registration: registration.trim() || null,
       vin: vin.trim() || null,
       comments: comments.trim() || null,
@@ -4003,6 +4017,24 @@ export function Ventes({
             </div>
 
             <div className="item">
+              <strong>Frais de rémunération</strong>
+              <p className="muted" style={{ marginTop: 5 }}>Ces champs servent au calcul de rémunération HT.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 1fr))', gap: 10, marginTop: 10 }}>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="checkbox" checked={saleToCompany} onChange={(e) => setSaleToCompany(e.target.checked)} />
+                  Vente à entreprise
+                </label>
+
+                <input
+                  type="number"
+                  placeholder="Frais divers HT"
+                  value={miscellaneousFeesHT}
+                  onChange={(e) => setMiscellaneousFeesHT(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="item">
               <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="checkbox" checked={warrantySold} onChange={(e) => setWarrantySold(e.target.checked)} />
                 Garantie vendue
@@ -4072,7 +4104,16 @@ export function Ventes({
                 <td>{s.agents?.full_name || '-'}</td>
                 <td><span className="badge">{agencyName(s.agents?.agency_id)}</span></td>
                 <td>{euro(Number(s.sale_price || 0))}</td>
-                <td><strong>{euro(Number(s.margin_amount || 0))}</strong></td>
+                <td>
+                  <strong>{euro(Number(s.margin_amount || 0))}</strong>
+                  {(s.sale_to_company || Number(s.miscellaneous_fees_ht || 0) > 0) && (
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {s.sale_to_company ? 'Entreprise' : ''}
+                      {s.sale_to_company && Number(s.miscellaneous_fees_ht || 0) > 0 ? ' — ' : ''}
+                      {Number(s.miscellaneous_fees_ht || 0) > 0 ? `Frais HT: ${euro(Number(s.miscellaneous_fees_ht || 0))}` : ''}
+                    </div>
+                  )}
+                </td>
                 <td>
                   {s.warranty_sold
                     ? `${s.warranty_type || 'Oui'}${s.warranty_amount ? ` — ${euro(Number(s.warranty_amount))}` : ''}`
@@ -5427,6 +5468,9 @@ export function Remuneration() {
   const TVA_DIVIDER = 1.2;
   const WARRANTY_START_RESPONSABLE_COST_HT = 45;
   const WARRANTY_START_AGENT_COST_HT = 90;
+  const CASH_SENTINEL_TTC = 54;
+  const CASH_SENTINEL_COMPANY_TTC = 18;
+  const VROOM_MARGIN_RATE = 0.09;
   const WARRANTY_COSTS_HT: Record<string, number> = {
     medium_12: 158.01,
     medium_24: 253.01,
@@ -5597,6 +5641,33 @@ export function Remuneration() {
     );
   }
 
+  function saleAgencyId(sale: VehicleSale) {
+    return Number(sale.agents?.agency_id || agentsList.find((agent) => Number(agent.id) === Number(sale.agent_id))?.agency_id || 0);
+  }
+
+  function calculateResponsibleVehicleMarginDetail(sale: VehicleSale) {
+    const marginTTC = Number(sale.margin_amount || 0);
+    const vroomFeeTTC = marginTTC * VROOM_MARGIN_RATE;
+    const marginAfterVroomTTC = marginTTC - vroomFeeTTC;
+    const marginAfterVroomHT = marginAfterVroomTTC / TVA_DIVIDER;
+    const cashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
+    const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
+    const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
+    const netMarginHT = marginAfterVroomHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT;
+
+    return {
+      marginTTC,
+      vroomFeeTTC,
+      marginAfterVroomTTC,
+      marginAfterVroomHT,
+      cashSentinelHT,
+      companyCashSentinelHT,
+      miscellaneousFeesHT,
+      netMarginHT,
+      responsableShareHT: netMarginHT / 2,
+    };
+  }
+
   const remunerationLeads = useMemo(() => {
     if (!selectedAgencyId || !selectedYear || !selectedMonth) return [];
 
@@ -5763,10 +5834,61 @@ export function Remuneration() {
     return warrantyStats.rows.find((row) => row.key === selectedPerson.key) || null;
   }, [warrantyStats.rows, selectedPerson]);
 
+  const responsibleVehicleMarginStats = useMemo(() => {
+    if (!selectedAgencyId || !selectedYear || !selectedMonth) {
+      return {
+        responsibleSales: [] as VehicleSale[],
+        totalMarginTTC: 0,
+        totalVroomFeeTTC: 0,
+        totalAfterVroomHT: 0,
+        totalCashSentinelHT: 0,
+        totalCompanyCashSentinelHT: 0,
+        totalMiscellaneousFeesHT: 0,
+        totalNetMarginHT: 0,
+        responsableShareHT: 0,
+      };
+    }
+
+    const responsibleSales = salesList.filter((sale) => {
+      if (!saleDateMatchesSelectedPeriod(sale)) return false;
+      if (saleAgencyId(sale) !== Number(selectedAgencyId)) return false;
+      return !saleBelongsToCommercialAgent(sale);
+    });
+
+    const totals = responsibleSales.reduce((acc, sale) => {
+      const detail = calculateResponsibleVehicleMarginDetail(sale);
+
+      acc.totalMarginTTC += detail.marginTTC;
+      acc.totalVroomFeeTTC += detail.vroomFeeTTC;
+      acc.totalAfterVroomHT += detail.marginAfterVroomHT;
+      acc.totalCashSentinelHT += detail.cashSentinelHT;
+      acc.totalCompanyCashSentinelHT += detail.companyCashSentinelHT;
+      acc.totalMiscellaneousFeesHT += detail.miscellaneousFeesHT;
+      acc.totalNetMarginHT += detail.netMarginHT;
+
+      return acc;
+    }, {
+      totalMarginTTC: 0,
+      totalVroomFeeTTC: 0,
+      totalAfterVroomHT: 0,
+      totalCashSentinelHT: 0,
+      totalCompanyCashSentinelHT: 0,
+      totalMiscellaneousFeesHT: 0,
+      totalNetMarginHT: 0,
+    });
+
+    return {
+      responsibleSales,
+      ...totals,
+      responsableShareHT: totals.totalNetMarginHT / 2,
+    };
+  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList]);
+
+  const selectedVehicleMarginGainHT = selectedPerson?.type === 'responsable' ? responsibleVehicleMarginStats.responsableShareHT : 0;
   const selectedLeboncoinDeductionHT = selectedPerson?.type === 'agent' ? LEBONCOIN_MONTHLY_AGENT_HT : 0;
   const selectedTotalDeductionsHT = Number(selectedPersonLeadResult?.deductionHT || 0) + selectedLeboncoinDeductionHT;
   const selectedWarrantyGainHT = Number(selectedPersonWarrantyResult?.warrantyGainHT || 0);
-  const selectedProvisionalResultHT = selectedWarrantyGainHT - selectedTotalDeductionsHT;
+  const selectedProvisionalResultHT = selectedWarrantyGainHT + selectedVehicleMarginGainHT - selectedTotalDeductionsHT;
 
   function showRemuneration() {
     if (!selectedAgencyId) {
@@ -5851,7 +5973,7 @@ export function Remuneration() {
       <div className="card">
         <h3>💰 Rémunération</h3>
         <p className="muted">
-          Blocs actifs : Leads, Leboncoin et Garanties HT. Les marges véhicules, commissions finales et frais seront ajoutés ensuite, étape par étape.
+          Blocs actifs : Leads, Leboncoin, Garanties HT et Marge véhicule Responsable. Les règles Agent commercial sur la marge seront ajoutées ensuite, étape par étape.
         </p>
       </div>
 
@@ -5994,17 +6116,47 @@ export function Remuneration() {
             </div>
 
             <div className="card">
-              <h3>Résultat provisoire HT</h3>
+              <h3>REVENU DU MOIS HT</h3>
               <div className="stat-value" style={{ color: selectedProvisionalResultHT >= 0 ? '#22c55e' : '#f97316' }}>
                 {selectedProvisionalResultHT >= 0 ? '+' : ''}{euro(selectedProvisionalResultHT)}
               </div>
-              <p className="muted">Garanties - Leads - Leboncoin. Les marges véhicules et frais viendront ensuite.</p>
+              <p className="muted">Garanties + marge véhicule Responsable - Leads - Leboncoin.</p>
             </div>
 
             <div className="card">
               <h3>Garanties vendues</h3>
               <div className="stat-value">{warrantyStats.totalWarrantySales}</div>
               <p className="muted">Résultat global garanties : {euro(warrantyStats.totalWarrantyGainHT)} HT</p>
+            </div>
+          </div>
+
+          <div className="grid cards3">
+            <div className="card" style={{ borderColor: '#38bdf8' }}>
+              <h3>Marge véhicule Responsable HT</h3>
+              <div className="stat-value" style={{ color: selectedVehicleMarginGainHT >= 0 ? '#22c55e' : '#f97316' }}>
+                {selectedVehicleMarginGainHT >= 0 ? '+' : ''}{euro(selectedVehicleMarginGainHT)}
+              </div>
+              <p className="muted">
+                {selectedPerson?.type === 'responsable'
+                  ? `${responsibleVehicleMarginStats.responsibleSales.length} vente(s) responsable(s), part divisée par deux.`
+                  : 'La règle marge agent commercial sera ajoutée à l’étape suivante.'}
+              </p>
+            </div>
+
+            <div className="card">
+              <h3>CashSentinel HT</h3>
+              <div className="stat-value" style={{ color: '#f97316' }}>
+                -{euro(responsibleVehicleMarginStats.totalCashSentinelHT + responsibleVehicleMarginStats.totalCompanyCashSentinelHT)}
+              </div>
+              <p className="muted">54 € TTC par vente + 18 € TTC si vente entreprise.</p>
+            </div>
+
+            <div className="card">
+              <h3>Frais divers HT</h3>
+              <div className="stat-value" style={{ color: '#f97316' }}>
+                -{euro(responsibleVehicleMarginStats.totalMiscellaneousFeesHT)}
+              </div>
+              <p className="muted">Frais libres enregistrés dans les ventes.</p>
             </div>
           </div>
 
@@ -6046,6 +6198,58 @@ export function Remuneration() {
               <div className="stat-value">{leadStats.visiteLeads.length}</div>
               <p className="muted">Coût total : 0 € HT</p>
             </div>
+          </div>
+
+          <div className="card">
+            <h3>Bloc Marge véhicule Responsable</h3>
+            <p className="muted">
+              Règle validée pour Benoît et Axel : marge TTC - 9 % Vroom, conversion en HT, puis déduction CashSentinel 54 € TTC,
+              18 € TTC supplémentaire si vente à entreprise, et frais divers HT. Le résultat restant est divisé en deux entre Benoît et Axel.
+            </p>
+
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Élément</th>
+                  <th>Montant</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr>
+                  <td>Marge TTC ventes responsables</td>
+                  <td><strong>{euro(responsibleVehicleMarginStats.totalMarginTTC)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Frais Vroom 9 % TTC</td>
+                  <td><strong>-{euro(responsibleVehicleMarginStats.totalVroomFeeTTC)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Marge après Vroom convertie HT</td>
+                  <td><strong>{euro(responsibleVehicleMarginStats.totalAfterVroomHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>CashSentinel 54 € TTC converti HT</td>
+                  <td><strong>-{euro(responsibleVehicleMarginStats.totalCashSentinelHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Ventes à entreprise 18 € TTC converti HT</td>
+                  <td><strong>-{euro(responsibleVehicleMarginStats.totalCompanyCashSentinelHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Frais divers HT</td>
+                  <td><strong>-{euro(responsibleVehicleMarginStats.totalMiscellaneousFeesHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Résultat net HT à partager</td>
+                  <td><strong>{euro(responsibleVehicleMarginStats.totalNetMarginHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Part Benoît / Axel</td>
+                  <td><strong>{euro(responsibleVehicleMarginStats.responsableShareHT)} chacun</strong></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <div className="card">
@@ -6167,6 +6371,10 @@ export function Remuneration() {
         <p className="muted">
           Bloc Garanties : START est une pénalité. Les autres garanties sont calculées sur le prix réel saisi, converti en HT, moins le coût d'achat.
           Agent commercial = 40 % du bénéfice HT, le reste partagé entre Benoît et Axel. Responsable = partage 50/50 entre Benoît et Axel.
+        </p>
+        <p className="muted">
+          Bloc Marge véhicule Responsable : marge TTC - 9 % Vroom, puis conversion HT, déduction CashSentinel 54 € TTC,
+          18 € TTC si vente à entreprise, frais divers HT, puis partage 50/50 entre Benoît et Axel.
         </p>
       </div>
     </div>
