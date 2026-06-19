@@ -5607,6 +5607,7 @@ export function Remuneration() {
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMonth, setSelectedMonth] = useState(String(currentMonth));
   const [selectedPersonKey, setSelectedPersonKey] = useState('');
+  const [selectedVehicleId, setSelectedVehicleId] = useState('all');
   const [showResult, setShowResult] = useState(false);
   const [moneyAnimation, setMoneyAnimation] = useState(false);
 
@@ -6184,6 +6185,96 @@ export function Remuneration() {
   const selectedWarrantyGainHT = Number(selectedPersonWarrantyResult?.warrantyGainHT || 0);
   const selectedProvisionalResultHT = selectedWarrantyGainHT + selectedVehicleMarginGainHT - selectedTotalDeductionsHT;
 
+  function vehicleLabel(sale: VehicleSale) {
+    const date = sale.sale_date ? new Date(sale.sale_date).toLocaleDateString('fr-FR') : '-';
+    const vehicle = sale.vehicle_name || 'Véhicule sans nom';
+    const registration = sale.registration ? ` — ${sale.registration}` : '';
+    return `${date} — ${vehicle}${registration}`;
+  }
+
+  const remunerationVehicleSales = useMemo(() => {
+    if (!selectedAgencyId || !selectedYear || !selectedMonth) return [] as VehicleSale[];
+
+    return salesList
+      .filter((sale) => {
+        if (!saleDateMatchesSelectedPeriod(sale)) return false;
+        return saleAgencyId(sale) === Number(selectedAgencyId);
+      })
+      .sort((a, b) => {
+        const aDate = a.sale_date ? new Date(a.sale_date).getTime() : 0;
+        const bDate = b.sale_date ? new Date(b.sale_date).getTime() : 0;
+        return bDate - aDate;
+      });
+  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList]);
+
+  const selectedVehicleDetailRows = useMemo(() => {
+    if (!selectedPerson) return [];
+
+    return remunerationVehicleSales
+      .filter((sale) => selectedVehicleId === 'all' || Number(sale.id) === Number(selectedVehicleId))
+      .map((sale) => {
+        const soldByAgent = saleBelongsToCommercialAgent(sale);
+        const agentName = sale.agents?.full_name || agentsList.find((agent) => Number(agent.id) === Number(sale.agent_id))?.full_name || 'Responsable';
+        const common = {
+          id: sale.id,
+          date: sale.sale_date ? new Date(sale.sale_date).toLocaleDateString('fr-FR') : '-',
+          vehicle: sale.vehicle_name || '-',
+          registration: sale.registration || '',
+          sellerPrice: Number(sale.seller_price || 0),
+          salePrice: Number(sale.sale_price || 0),
+          marginTTC: Number(sale.margin_amount || 0),
+          warrantyType: sale.warranty_type || '-',
+          warrantyAmount: Number(sale.warranty_amount || 0),
+          saleToCompany: sale.sale_to_company === true,
+          miscellaneousFeesHT: Number(sale.miscellaneous_fees_ht || 0),
+          seller: agentName,
+          soldByAgent,
+        };
+
+        if (soldByAgent) {
+          const detail = calculateCommercialVehicleMarginDetail(sale);
+          const selectedShareHT = selectedPerson.type === 'agent' && Number(selectedPerson.id) === Number(sale.agent_id)
+            ? detail.agentNetHT
+            : selectedPerson.type === 'responsable'
+              ? detail.responsableShareHT
+              : 0;
+
+          return {
+            ...common,
+            typeLabel: 'Vente agent commercial',
+            marginHT: detail.marginHT,
+            agentGrossHT: detail.agentGrossHT,
+            agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
+            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
+            agentNetHT: detail.agentNetHT,
+            responsableGrossHT: detail.responsableGrossHT,
+            vroomFeeHT: detail.vroomFeeHT,
+            responsableNetHT: detail.responsableNetHT,
+            responsableShareHT: detail.responsableShareHT,
+            selectedShareHT,
+          };
+        }
+
+        const detail = calculateResponsibleVehicleMarginDetail(sale);
+        const selectedShareHT = selectedPerson.type === 'responsable' ? detail.responsableShareHT : 0;
+
+        return {
+          ...common,
+          typeLabel: 'Vente responsable',
+          marginHT: detail.marginAfterVroomHT,
+          agentGrossHT: 0,
+          agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
+          deductionsHT: (detail.vroomFeeTTC / TVA_DIVIDER) + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
+          agentNetHT: 0,
+          responsableGrossHT: detail.marginAfterVroomHT,
+          vroomFeeHT: detail.vroomFeeTTC / TVA_DIVIDER,
+          responsableNetHT: detail.netMarginHT,
+          responsableShareHT: detail.responsableShareHT,
+          selectedShareHT,
+        };
+      });
+  }, [remunerationVehicleSales, selectedVehicleId, selectedPerson, agentsList, responsablesList]);
+
   function showRemuneration() {
     if (!selectedAgencyId) {
       alert('Il faut sélectionner une agence.');
@@ -6354,6 +6445,7 @@ export function Remuneration() {
               onClick={() => {
                 setSelectedAgencyId('');
                 setSelectedPersonKey('');
+                setSelectedVehicleId('all');
                 setSelectedYear(String(currentYear));
                 setSelectedMonth(String(currentMonth));
                 setShowResult(false);
@@ -6543,6 +6635,86 @@ export function Remuneration() {
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div className="card" style={{ borderColor: '#38bdf8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div>
+                <h3>Détail par véhicule vendu</h3>
+                <p className="muted">
+                  Choisis tous les véhicules du mois ou un véhicule précis pour contrôler le calcul ligne par ligne.
+                </p>
+              </div>
+
+              <select
+                value={selectedVehicleId}
+                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                style={{ minWidth: 260 }}
+              >
+                <option value="all">Tous les véhicules du mois</option>
+                {remunerationVehicleSales.map((sale) => (
+                  <option key={`vehicle-detail-option-${sale.id}`} value={String(sale.id)}>
+                    {vehicleLabel(sale)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedVehicleDetailRows.length === 0 ? (
+              <p className="muted" style={{ marginTop: 12 }}>
+                Aucun véhicule vendu trouvé pour cette agence et cette période.
+              </p>
+            ) : (
+              <table className="table" style={{ marginTop: 14 }}>
+                <thead>
+                  <tr>
+                    <th>Véhicule</th>
+                    <th>Vendeur</th>
+                    <th>Type</th>
+                    <th>Marge TTC</th>
+                    <th>Marge HT base</th>
+                    <th>Frais / Vroom</th>
+                    <th>Part agent HT</th>
+                    <th>Part Benoît / Axel HT</th>
+                    <th>Part personne sélectionnée</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {selectedVehicleDetailRows.map((row) => {
+                    const fraisOuVroom = Number(row.deductionsHT || 0);
+
+                    return (
+                      <tr key={`vehicle-detail-row-${row.id}`}>
+                        <td>
+                          <strong>{row.vehicle}</strong>
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {row.date}{row.registration ? ` — ${row.registration}` : ''}
+                          </div>
+                        </td>
+                        <td>{row.seller}</td>
+                        <td>{row.typeLabel}</td>
+                        <td><strong>{euro(row.marginTTC)}</strong></td>
+                        <td>{euro(row.marginHT)}</td>
+                        <td>
+                          <strong>-{euro(fraisOuVroom)}</strong>
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {row.saleToCompany ? 'Entreprise' : 'Particulier'} — frais divers {euro(row.miscellaneousFeesHT)}
+                          </div>
+                        </td>
+                        <td>{row.soldByAgent ? <strong>{euro(row.agentNetHT)}</strong> : '-'}</td>
+                        <td><strong>{euro(row.responsableShareHT)} chacun</strong></td>
+                        <td>
+                          <strong style={{ color: row.selectedShareHT >= 0 ? '#22c55e' : '#f97316' }}>
+                            {row.selectedShareHT >= 0 ? '+' : ''}{euro(row.selectedShareHT)}
+                          </strong>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
 
           <div className="card">
