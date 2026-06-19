@@ -224,7 +224,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentAgent) return;
 
-    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels', 'remuneration'].includes(active)) {
+    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels'].includes(active)) {
       setActive('dashboard');
     }
   }, [currentAgent, isResponsable, active]);
