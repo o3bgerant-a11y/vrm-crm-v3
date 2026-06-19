@@ -15,6 +15,7 @@ type Profile = {
   agent_id?: number | null;
   is_admin?: boolean | null;
   account_type?: string | null;
+  remuneration_pin?: string | null;
 };
 
 const MASTER_EMAIL = 'o3b.gerant@gmail.com';
@@ -49,12 +50,18 @@ export default function Parametres() {
   const [myNewPassword, setMyNewPassword] = useState('');
   const [myConfirmPassword, setMyConfirmPassword] = useState('');
   const [changingMyPassword, setChangingMyPassword] = useState(false);
+  const [pinValues, setPinValues] = useState<Record<number, string>>({});
+  const [savingPinProfileId, setSavingPinProfileId] = useState<number | null>(null);
 
   const isResponsable =
     currentProfile?.is_admin === true ||
     currentProfile?.role === 'patron' ||
     currentProfile?.role === 'responsable' ||
     currentProfile?.account_type === 'responsable';
+
+  const isMasterConnected =
+    String(currentUserEmail || '').trim().toLowerCase() === MASTER_EMAIL ||
+    String(currentProfile?.email || '').trim().toLowerCase() === MASTER_EMAIL;
 
   async function loadCurrentProfileAndProfiles() {
     setLoading(true);
@@ -136,8 +143,16 @@ export default function Parametres() {
     if (error) {
       console.error(error);
       setProfiles([]);
+      setPinValues({});
     } else {
-      setProfiles((data || []) as Profile[]);
+      const loadedProfiles = (data || []) as Profile[];
+      setProfiles(loadedProfiles);
+
+      const nextPins: Record<number, string> = {};
+      loadedProfiles.forEach((profile) => {
+        nextPins[profile.id] = profile.remuneration_pin || '';
+      });
+      setPinValues(nextPins);
     }
 
     setLoading(false);
@@ -452,6 +467,54 @@ export default function Parametres() {
     setChangingMyPassword(false);
   }
 
+  function updatePinValue(profileId: number, value: string) {
+    const onlyDigits = value.replace(/\D/g, '').slice(0, 4);
+
+    setPinValues((current) => ({
+      ...current,
+      [profileId]: onlyDigits,
+    }));
+  }
+
+  async function saveRemunerationPin(profile: Profile) {
+    if (!isMasterConnected) {
+      alert('Seul Benoît peut modifier les codes rémunération.');
+      return;
+    }
+
+    const pin = String(pinValues[profile.id] || '').trim();
+
+    if (pin && !/^\d{4}$/.test(pin)) {
+      alert('Le code rémunération doit contenir exactement 4 chiffres.');
+      return;
+    }
+
+    const ok = confirm(
+      pin
+        ? `Enregistrer le code rémunération de ${profile.full_name} ?`
+        : `Effacer le code rémunération de ${profile.full_name} ?`
+    );
+
+    if (!ok) return;
+
+    setSavingPinProfileId(profile.id);
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ remuneration_pin: pin || null })
+      .eq('id', profile.id);
+
+    if (error) {
+      console.error('Erreur sauvegarde code rémunération:', error);
+      alert('Erreur pendant la sauvegarde du code rémunération.');
+    } else {
+      alert('Code rémunération enregistré.');
+      await loadCurrentProfileAndProfiles();
+    }
+
+    setSavingPinProfileId(null);
+  }
+
   function statusLabel(status: string | null) {
     if (status === 'active') return 'Actif';
     if (status === 'blocked') return 'Bloqué';
@@ -710,6 +773,62 @@ export default function Parametres() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {isMasterConnected && (
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
+          <h3>🔒 Codes rémunération</h3>
+          <p className="muted">
+            Espace réservé au compte principal Benoît. Ces codes à 4 chiffres sont séparés du mot de passe CRM
+            et servent uniquement à ouvrir l'onglet Rémunération.
+          </p>
+
+          {profiles.length === 0 ? (
+            <p className="muted">Aucun compte trouvé.</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Email</th>
+                  <th>Rôle</th>
+                  <th>Code rémunération</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {profiles.map((profile) => (
+                  <tr key={`pin-${profile.id}`}>
+                    <td><strong>{profile.full_name}</strong></td>
+                    <td>{profile.email || '-'}</td>
+                    <td>{roleLabel(profile)}</td>
+                    <td>
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={4}
+                        placeholder="4 chiffres"
+                        value={pinValues[profile.id] || ''}
+                        onChange={(e) => updatePinValue(profile.id, e.target.value)}
+                        style={{ maxWidth: 140 }}
+                      />
+                    </td>
+                    <td>
+                      <button
+                        className="btn"
+                        onClick={() => saveRemunerationPin(profile)}
+                        disabled={savingPinProfileId === profile.id}
+                      >
+                        {savingPinProfileId === profile.id ? 'Sauvegarde...' : 'Enregistrer le code'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
