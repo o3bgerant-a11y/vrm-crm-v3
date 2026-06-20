@@ -1825,6 +1825,7 @@ export function Leads({
   const [warrantyType, setWarrantyType] = useState('');
   const [warrantyAmount, setWarrantyAmount] = useState('');
   const [saleToCompany, setSaleToCompany] = useState(false);
+  const [instantTransfer, setInstantTransfer] = useState(false);
   const [miscellaneousFeesHT, setMiscellaneousFeesHT] = useState('');
   const [comments, setComments] = useState('');
 
@@ -2120,6 +2121,7 @@ export function Leads({
     setWarrantyType('');
     setWarrantyAmount('');
     setSaleToCompany(false);
+    setInstantTransfer(false);
     setMiscellaneousFeesHT('');
     setComments('');
   }
@@ -2169,6 +2171,8 @@ export function Leads({
     setWarrantySold(Boolean(lead.warranty_sold));
     setWarrantyType(lead.warranty_sold ? 'Garantie déjà renseignée' : '');
     setWarrantyAmount(String(lead.warranty_amount ?? ''));
+    setSaleToCompany(String(lead.comments || '').toLowerCase().includes('vente à entreprise : oui'));
+    setInstantTransfer(String(lead.comments || '').toLowerCase().includes('virement instantané'));
     setComments(lead.comments || '');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2205,6 +2209,7 @@ export function Leads({
       source === 'Démarchage Agent' && demarchageSource ? `Origine démarchage : ${demarchageSource}` : '',
       saleRoadFees ? `Frais de mise à la route : ${saleRoadFees} €` : '',
       saleToCompany ? 'Vente à entreprise : oui' : '',
+      instantTransfer ? 'Virement instantané : oui — frais 7,58 € HT vendeur' : '',
       miscellaneousFeesHT ? `Frais divers HT : ${miscellaneousFeesHT} €` : '',
       warrantySold && warrantyType ? `Garantie choisie : ${warrantyType}` : '',
     ].filter(Boolean).join('\n');
@@ -2342,6 +2347,7 @@ appointment_time: appointmentTime.trim() || null,
         comments.trim(),
         isResponsibleLeadSeller ? `Responsable lead : ${selectedAgent?.full_name || 'Responsable'}` : '',
         isResponsibleLeadSeller ? `Agence rémunération : ${agencyName(finalAgencyId || 1)}` : '',
+        instantTransfer ? 'Virement instantané : oui — frais 7,58 € HT vendeur' : '',
       ].filter(Boolean).join('\n') || null,
     };
 
@@ -2935,10 +2941,15 @@ appointment_time: appointmentTime.trim() || null,
                           Ces informations sont reprises automatiquement dans la vente pour calculer la rémunération HT.
                         </p>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, .8fr) minmax(180px, 1fr)', gap: 10, marginTop: 10, alignItems: 'center' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, .8fr) minmax(220px, .8fr) minmax(180px, 1fr)', gap: 10, marginTop: 10, alignItems: 'center' }}>
                           <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             <input type="checkbox" checked={saleToCompany} onChange={(e) => setSaleToCompany(e.target.checked)} />
                             Vente à entreprise
+                          </label>
+
+                          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <input type="checkbox" checked={instantTransfer} onChange={(e) => setInstantTransfer(e.target.checked)} />
+                            Virement instantané
                           </label>
 
                           <label style={{ display: 'grid', gap: 6 }}>
@@ -2978,6 +2989,10 @@ appointment_time: appointmentTime.trim() || null,
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                             <span className="muted">Vente à entreprise</span>
                             <strong>{saleToCompany ? 'Oui' : 'Non'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                            <span className="muted">Virement instantané</span>
+                            <strong>{instantTransfer ? '-7,58 € HT vendeur' : 'Non'}</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                             <span className="muted">Frais divers HT</span>
@@ -5632,6 +5647,7 @@ export function Remuneration({
   const WARRANTY_START_AGENT_COST_HT = 90;
   const CASH_SENTINEL_TTC = 54;
   const CASH_SENTINEL_COMPANY_TTC = 18;
+  const INSTANT_TRANSFER_HT = 7.58;
   const VROOM_MARGIN_RATE = 0.09;
   const WARRANTY_COSTS_HT: Record<string, number> = {
     medium_12: 158.01,
@@ -5884,6 +5900,15 @@ export function Remuneration({
     return 0;
   }
 
+  function saleHasInstantTransfer(sale: VehicleSale) {
+    const normalizedComments = String(sale.comments || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '');
+
+    return normalizedComments.includes('virement instantane');
+  }
+
   function calculateResponsibleVehicleMarginDetail(sale: VehicleSale) {
     const marginTTC = Number(sale.margin_amount || 0);
     const vroomFeeTTC = marginTTC * VROOM_MARGIN_RATE;
@@ -5892,7 +5917,8 @@ export function Remuneration({
     const cashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
     const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
     const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
-    const netMarginHT = marginAfterVroomHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT;
+    const instantTransferHT = saleHasInstantTransfer(sale) ? INSTANT_TRANSFER_HT : 0;
+    const netMarginHT = marginAfterVroomHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferHT;
 
     return {
       marginTTC,
@@ -5902,6 +5928,7 @@ export function Remuneration({
       cashSentinelHT,
       companyCashSentinelHT,
       miscellaneousFeesHT,
+      instantTransferHT,
       netMarginHT,
       responsableShareHT: netMarginHT / 2,
     };
@@ -5918,7 +5945,8 @@ export function Remuneration({
     const cashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
     const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
     const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
-    const agentNetHT = agentGrossHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT;
+    const instantTransferHT = saleHasInstantTransfer(sale) ? INSTANT_TRANSFER_HT : 0;
+    const agentNetHT = agentGrossHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferHT;
     const responsableNetHT = responsableGrossHT - vroomFeeHT;
 
     return {
@@ -5931,6 +5959,7 @@ export function Remuneration({
       cashSentinelHT,
       companyCashSentinelHT,
       miscellaneousFeesHT,
+      instantTransferHT,
       agentNetHT,
       responsableNetHT,
       responsableShareHT: responsableNetHT / 2,
@@ -6114,6 +6143,7 @@ export function Remuneration({
         totalCashSentinelHT: 0,
         totalCompanyCashSentinelHT: 0,
         totalMiscellaneousFeesHT: 0,
+        totalInstantTransferHT: 0,
         totalNetMarginHT: 0,
         responsableShareHT: 0,
       };
@@ -6134,6 +6164,7 @@ export function Remuneration({
       acc.totalCashSentinelHT += detail.cashSentinelHT;
       acc.totalCompanyCashSentinelHT += detail.companyCashSentinelHT;
       acc.totalMiscellaneousFeesHT += detail.miscellaneousFeesHT;
+      acc.totalInstantTransferHT += detail.instantTransferHT;
       acc.totalNetMarginHT += detail.netMarginHT;
 
       return acc;
@@ -6144,6 +6175,7 @@ export function Remuneration({
       totalCashSentinelHT: 0,
       totalCompanyCashSentinelHT: 0,
       totalMiscellaneousFeesHT: 0,
+      totalInstantTransferHT: 0,
       totalNetMarginHT: 0,
     });
 
@@ -6164,6 +6196,7 @@ export function Remuneration({
       agentCashSentinelHT: 0,
       agentCompanyCashSentinelHT: 0,
       agentMiscellaneousFeesHT: 0,
+      agentInstantTransferHT: 0,
       agentNetHT: 0,
       responsableGrossHT: 0,
       responsableVroomFeeHT: 0,
@@ -6183,6 +6216,7 @@ export function Remuneration({
         totalCashSentinelHT: 0,
         totalCompanyCashSentinelHT: 0,
         totalMiscellaneousFeesHT: 0,
+        totalInstantTransferHT: 0,
         rows: emptyRow,
       };
     }
@@ -6201,6 +6235,7 @@ export function Remuneration({
     let totalCashSentinelHT = 0;
     let totalCompanyCashSentinelHT = 0;
     let totalMiscellaneousFeesHT = 0;
+    let totalInstantTransferHT = 0;
 
     commercialSales.forEach((sale) => {
       const detail = calculateCommercialVehicleMarginDetail(sale);
@@ -6214,6 +6249,7 @@ export function Remuneration({
       totalCashSentinelHT += detail.cashSentinelHT;
       totalCompanyCashSentinelHT += detail.companyCashSentinelHT;
       totalMiscellaneousFeesHT += detail.miscellaneousFeesHT;
+      totalInstantTransferHT += detail.instantTransferHT;
 
       if (agentRow) {
         agentRow.salesCount += 1;
@@ -6223,6 +6259,7 @@ export function Remuneration({
         agentRow.agentCashSentinelHT += detail.cashSentinelHT;
         agentRow.agentCompanyCashSentinelHT += detail.companyCashSentinelHT;
         agentRow.agentMiscellaneousFeesHT += detail.miscellaneousFeesHT;
+        agentRow.agentInstantTransferHT += detail.instantTransferHT;
         agentRow.agentNetHT += detail.agentNetHT;
       }
 
@@ -6250,6 +6287,7 @@ export function Remuneration({
       totalCashSentinelHT,
       totalCompanyCashSentinelHT,
       totalMiscellaneousFeesHT,
+      totalInstantTransferHT,
       rows: emptyRow,
     };
   }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList, peopleOptions]);
@@ -6312,6 +6350,7 @@ export function Remuneration({
           warrantyAmount: Number(sale.warranty_amount || 0),
           saleToCompany: sale.sale_to_company === true,
           miscellaneousFeesHT: Number(sale.miscellaneous_fees_ht || 0),
+          instantTransferHT: saleHasInstantTransfer(sale) ? INSTANT_TRANSFER_HT : 0,
           seller: agentName,
           soldByAgent,
         };
@@ -6329,8 +6368,8 @@ export function Remuneration({
             typeLabel: 'Vente agent commercial',
             marginHT: detail.marginHT,
             agentGrossHT: detail.agentGrossHT,
-            agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
-            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
+            agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferHT,
+            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferHT,
             agentNetHT: detail.agentNetHT,
             responsableGrossHT: detail.responsableGrossHT,
             vroomFeeHT: detail.vroomFeeHT,
@@ -6348,8 +6387,8 @@ export function Remuneration({
           typeLabel: 'Vente responsable',
           marginHT: detail.marginAfterVroomHT,
           agentGrossHT: 0,
-          agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
-          deductionsHT: (detail.vroomFeeTTC / TVA_DIVIDER) + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
+          agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferHT,
+          deductionsHT: (detail.vroomFeeTTC / TVA_DIVIDER) + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferHT,
           agentNetHT: 0,
           responsableGrossHT: detail.marginAfterVroomHT,
           vroomFeeHT: detail.vroomFeeTTC / TVA_DIVIDER,
@@ -6750,7 +6789,7 @@ export function Remuneration({
           <div className="card">
             <h3>Bloc Marges véhicules</h3>
             <p className="muted">
-              Règle Responsable : marge TTC - 9 % Vroom, conversion HT, puis CashSentinel, vente entreprise et frais divers. Le résultat est partagé entre Benoît et Axel. Règle Agent : marge TTC convertie HT, 40 % pour l’agent moins CashSentinel/entreprise/frais divers ; 60 % pour les responsables, avec les 9 % Vroom à leur charge.
+              Règle Responsable : marge TTC - 9 % Vroom, conversion HT, puis CashSentinel, vente entreprise, virement instantané et frais divers. Le résultat est partagé entre Benoît et Axel. Règle Agent : marge TTC convertie HT, 40 % pour l’agent moins CashSentinel/entreprise/virement instantané/frais divers ; 60 % pour les responsables, avec les 9 % Vroom à leur charge.
             </p>
 
             <table className="table">
@@ -6860,7 +6899,7 @@ export function Remuneration({
                         <td>
                           <strong>-{euro(fraisOuVroom)}</strong>
                           <div className="muted" style={{ fontSize: 12 }}>
-                            {row.saleToCompany ? 'Entreprise' : 'Particulier'} — frais divers {euro(row.miscellaneousFeesHT)}
+                            {row.saleToCompany ? 'Entreprise' : 'Particulier'} — {row.instantTransferHT > 0 ? `virement instantané ${euro(row.instantTransferHT)} HT — ` : ''}frais divers {euro(row.miscellaneousFeesHT)}
                           </div>
                         </td>
                         <td>{row.soldByAgent ? <strong>{euro(row.agentNetHT)}</strong> : '-'}</td>
@@ -6881,7 +6920,7 @@ export function Remuneration({
           <div className="card">
             <h3>Détail marges agents commerciaux</h3>
             <p className="muted">
-              Pour une vente agent : l'agent reçoit 40 % de la marge HT puis paie CashSentinel, vente entreprise et frais divers.
+              Pour une vente agent : l'agent reçoit 40 % de la marge HT puis paie CashSentinel, vente entreprise, virement instantané et frais divers.
               Les responsables reçoivent 60 % de la marge HT, moins les 9 % Vroom HT, puis partagent le reste en deux.
             </p>
 
@@ -7041,7 +7080,7 @@ export function Remuneration({
           Agent commercial = 40 % du bénéfice HT, le reste partagé entre Benoît et Axel. Responsable = partage 50/50 entre Benoît et Axel.
         </p>
         <p className="muted">
-          Bloc Marges véhicules : Responsable = marge TTC - 9 % Vroom, conversion HT, CashSentinel, vente entreprise, frais divers, puis partage 50/50. Agent commercial = marge TTC convertie HT, 40 % agent moins CashSentinel/vente entreprise/frais divers ; 60 % responsables moins 9 % Vroom, puis partage 50/50 entre Benoît et Axel.
+          Bloc Marges véhicules : Responsable = marge TTC - 9 % Vroom, conversion HT, CashSentinel, vente entreprise, virement instantané, frais divers, puis partage 50/50. Agent commercial = marge TTC convertie HT, 40 % agent moins CashSentinel/vente entreprise/virement instantané/frais divers ; 60 % responsables moins 9 % Vroom, puis partage 50/50 entre Benoît et Axel.
         </p>
       </div>
     </div>
