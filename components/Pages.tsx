@@ -244,6 +244,17 @@ function isRealWarrantyLead(lead: any) {
   return lead?.warranty_sold === true && Number(lead?.warranty_amount || 0) > 0;
 }
 
+const INSTANT_TRANSFER_FEE_HT = 7.58;
+
+function hasInstantTransferFee(value: any) {
+  const text = String(value?.comments || value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+
+  return text.includes('virement instantane');
+}
+
 function calculateStats(sales: VehicleSale[]) {
   const ca = sales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
   const margin = sales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
@@ -1935,8 +1946,9 @@ export function Leads({
     const seller = Number(sellerNetPrice || 0);
     const roadFees = Number(saleRoadFees || 0);
     const warranty = warrantySold ? Number(warrantyAmount || 0) : 0;
-    return sale + roadFees + warranty - seller;
-  }, [salePrice, sellerNetPrice, saleRoadFees, warrantySold, warrantyAmount]);
+    const instantTransferFee = instantTransfer ? INSTANT_TRANSFER_FEE_HT : 0;
+    return sale + roadFees + warranty - seller - instantTransferFee;
+  }, [salePrice, sellerNetPrice, saleRoadFees, warrantySold, warrantyAmount, instantTransfer]);
 
   function handleWarrantyTypeChange(value: string) {
     setWarrantyType(value);
@@ -2171,8 +2183,7 @@ export function Leads({
     setWarrantySold(Boolean(lead.warranty_sold));
     setWarrantyType(lead.warranty_sold ? 'Garantie déjà renseignée' : '');
     setWarrantyAmount(String(lead.warranty_amount ?? ''));
-    setSaleToCompany(String(lead.comments || '').toLowerCase().includes('vente à entreprise : oui'));
-    setInstantTransfer(String(lead.comments || '').toLowerCase().includes('virement instantané'));
+    setInstantTransfer(hasInstantTransferFee(lead.comments));
     setComments(lead.comments || '');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2209,7 +2220,7 @@ export function Leads({
       source === 'Démarchage Agent' && demarchageSource ? `Origine démarchage : ${demarchageSource}` : '',
       saleRoadFees ? `Frais de mise à la route : ${saleRoadFees} €` : '',
       saleToCompany ? 'Vente à entreprise : oui' : '',
-      instantTransfer ? 'Virement instantané : oui — frais 7,58 € HT vendeur' : '',
+      instantTransfer ? `Virement instantané : oui (-${INSTANT_TRANSFER_FEE_HT.toFixed(2).replace('.', ',')} € HT)` : '',
       miscellaneousFeesHT ? `Frais divers HT : ${miscellaneousFeesHT} €` : '',
       warrantySold && warrantyType ? `Garantie choisie : ${warrantyType}` : '',
     ].filter(Boolean).join('\n');
@@ -2347,7 +2358,6 @@ appointment_time: appointmentTime.trim() || null,
         comments.trim(),
         isResponsibleLeadSeller ? `Responsable lead : ${selectedAgent?.full_name || 'Responsable'}` : '',
         isResponsibleLeadSeller ? `Agence rémunération : ${agencyName(finalAgencyId || 1)}` : '',
-        instantTransfer ? 'Virement instantané : oui — frais 7,58 € HT vendeur' : '',
       ].filter(Boolean).join('\n') || null,
     };
 
@@ -2876,18 +2886,32 @@ appointment_time: appointmentTime.trim() || null,
                 <div
                   className="card"
                   style={{
-                    border: '1px solid rgba(34, 197, 94, 0.45)',
-                    boxShadow: '0 0 0 1px rgba(34, 197, 94, 0.08), 0 18px 45px rgba(0, 0, 0, 0.22)',
+                    border: '1px solid rgba(34, 197, 94, 0.55)',
+                    boxShadow: '0 0 0 1px rgba(34, 197, 94, 0.10), 0 22px 55px rgba(0, 0, 0, 0.28)',
+                    padding: 18,
                   }}
                 >
-                  <h4>✅ Transformation automatique en vente</h4>
-                  <p className="muted">
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 10,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                      color: 'white',
+                      fontWeight: 900,
+                    }}>✓</span>
+                    Transformation automatique en vente
+                  </h4>
+                  <p className="muted" style={{ marginBottom: 16 }}>
                     En enregistrant ce lead, le CRM créera ou mettra à jour une vente dans l’onglet Ventes avec le même agent, véhicule, plaque, prix, marge et garantie.
                   </p>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 14, alignItems: 'start' }}>
-                    <div style={{ display: 'grid', gap: 12 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(150px, 1fr))', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 18, alignItems: 'start' }}>
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(150px, 1fr))', gap: 12 }}>
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Prix net vendeur</span>
                           <input type="number" placeholder="Ex : 12000" value={sellerNetPrice} onChange={(e) => setSellerNetPrice(e.target.value)} />
@@ -2904,7 +2928,7 @@ appointment_time: appointmentTime.trim() || null,
                         </label>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1.2fr) minmax(180px, 0.8fr)', gap: 10, alignItems: 'start' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1.2fr) minmax(180px, 0.8fr)', gap: 12, alignItems: 'start' }}>
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Garantie vendue</span>
                           <select value={warrantyType} onChange={(e) => handleWarrantyTypeChange(e.target.value)}>
@@ -2925,7 +2949,7 @@ appointment_time: appointmentTime.trim() || null,
                           <span className="muted">Prix garantie (modifiable)</span>
                           <input
                             type="number"
-                            placeholder="Prix garantie"
+                            placeholder="Ex : 0"
                             value={warrantyAmount}
                             onChange={(e) => {
                               setWarrantyAmount(e.target.value);
@@ -2935,21 +2959,61 @@ appointment_time: appointmentTime.trim() || null,
                         </label>
                       </div>
 
-                      <div className="item">
-                        <strong>Frais de rémunération</strong>
-                        <p className="muted" style={{ marginTop: 5 }}>
-                          Ces informations sont reprises automatiquement dans la vente pour calculer la rémunération HT.
-                        </p>
+                      <div
+                        className="item"
+                        style={{
+                          border: '1px solid rgba(59, 130, 246, 0.35)',
+                          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.72))',
+                          padding: 14,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                          <div>
+                            <strong style={{ fontSize: 16 }}>Frais de rémunération</strong>
+                            <p className="muted" style={{ marginTop: 5, marginBottom: 0 }}>
+                              Ces informations sont reprises automatiquement dans la vente pour calculer la rémunération HT.
+                            </p>
+                          </div>
+                          <span className="badge">Automatique</span>
+                        </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, .8fr) minmax(220px, .8fr) minmax(180px, 1fr)', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(170px, 1fr))', gap: 12, marginTop: 14, alignItems: 'stretch' }}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              gap: 10,
+                              alignItems: 'center',
+                              padding: 14,
+                              borderRadius: 14,
+                              border: saleToCompany ? '1px solid rgba(59, 130, 246, 0.95)' : '1px solid rgba(148, 163, 184, 0.22)',
+                              background: saleToCompany ? 'rgba(37, 99, 235, 0.18)' : 'rgba(15, 23, 42, 0.35)',
+                              cursor: 'pointer',
+                            }}
+                          >
                             <input type="checkbox" checked={saleToCompany} onChange={(e) => setSaleToCompany(e.target.checked)} />
-                            Vente à entreprise
+                            <span>
+                              <strong>Vente à entreprise</strong>
+                              <span className="muted" style={{ display: 'block', fontSize: 12 }}>TVA non récupérable</span>
+                            </span>
                           </label>
 
-                          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <label
+                            style={{
+                              display: 'flex',
+                              gap: 10,
+                              alignItems: 'center',
+                              padding: 14,
+                              borderRadius: 14,
+                              border: instantTransfer ? '1px solid rgba(245, 158, 11, 0.95)' : '1px solid rgba(148, 163, 184, 0.22)',
+                              background: instantTransfer ? 'rgba(245, 158, 11, 0.12)' : 'rgba(15, 23, 42, 0.35)',
+                              cursor: 'pointer',
+                            }}
+                          >
                             <input type="checkbox" checked={instantTransfer} onChange={(e) => setInstantTransfer(e.target.checked)} />
-                            Virement instantané
+                            <span>
+                              <strong style={{ color: instantTransfer ? '#facc15' : undefined }}>Virement instantané</strong>
+                              <span style={{ display: 'block', fontSize: 12, color: '#facc15', fontWeight: 800 }}>- 7,58 € HT sur la marge</span>
+                            </span>
                           </label>
 
                           <label style={{ display: 'grid', gap: 6 }}>
@@ -2966,14 +3030,28 @@ appointment_time: appointmentTime.trim() || null,
                     </div>
 
                     <div style={{ display: 'grid', gap: 12 }}>
-                      <div className="item" style={{ minHeight: 88 }}>
+                      <div
+                        className="item"
+                        style={{
+                          minHeight: 92,
+                          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.84))',
+                          border: '1px solid rgba(148, 163, 184, 0.22)',
+                        }}
+                      >
                         <span className="muted">Marge calculée</span>
-                        <div style={{ fontSize: 26, fontWeight: 900, color: '#4ade80', marginTop: 6 }}>{euro(calculatedLeadMargin)}</div>
+                        <div style={{ fontSize: 28, fontWeight: 900, color: '#4ade80', marginTop: 8 }}>{euro(calculatedLeadMargin)}</div>
                       </div>
 
-                      <div className="item">
-                        <strong>Détail du calcul de la marge</strong>
-                        <div style={{ display: 'grid', gap: 5, marginTop: 10 }}>
+                      <div
+                        className="item"
+                        style={{
+                          border: '1px solid rgba(148, 163, 184, 0.26)',
+                          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.86))',
+                          padding: 16,
+                        }}
+                      >
+                        <strong style={{ fontSize: 16 }}>Détail du calcul de la marge</strong>
+                        <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                             <span className="muted">Prix de vente</span>
                             <strong>{euro(Number(salePrice || 0))}</strong>
@@ -2987,23 +3065,33 @@ appointment_time: appointmentTime.trim() || null,
                             <strong>{euro(warrantySold ? Number(warrantyAmount || 0) : 0)}</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                            <span className="muted">Vente à entreprise</span>
-                            <strong>{saleToCompany ? 'Oui' : 'Non'}</strong>
+                            <span className="muted">- Vente à entreprise</span>
+                            <strong>{saleToCompany ? 'Oui' : '0 €'}</strong>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              gap: 12,
+                              padding: '6px 8px',
+                              borderRadius: 10,
+                              border: instantTransfer ? '1px solid rgba(245, 158, 11, 0.65)' : '1px solid transparent',
+                              background: instantTransfer ? 'rgba(245, 158, 11, 0.10)' : 'transparent',
+                            }}
+                          >
+                            <span style={{ color: instantTransfer ? '#facc15' : undefined }}>- Virement instantané</span>
+                            <strong style={{ color: instantTransfer ? '#f87171' : undefined }}>{instantTransfer ? `- ${euro(INSTANT_TRANSFER_FEE_HT)}` : euro(0)}</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                            <span className="muted">Virement instantané</span>
-                            <strong>{instantTransfer ? '-7,58 € HT vendeur' : 'Non'}</strong>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                            <span className="muted">Frais divers HT</span>
+                            <span className="muted">- Frais divers HT</span>
                             <strong>{euro(Number(miscellaneousFeesHT || 0))}</strong>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                             <span className="muted">- Prix net vendeur</span>
                             <strong>{euro(Number(sellerNetPrice || 0))}</strong>
                           </div>
-                          <div style={{ height: 1, background: 'rgba(148, 163, 184, 0.28)', margin: '6px 0' }} />
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 16 }}>
+                          <div style={{ height: 1, background: 'rgba(148, 163, 184, 0.28)', margin: '8px 0' }} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 18 }}>
                             <strong>= Marge</strong>
                             <strong style={{ color: '#4ade80' }}>{euro(calculatedLeadMargin)}</strong>
                           </div>
@@ -5647,7 +5735,6 @@ export function Remuneration({
   const WARRANTY_START_AGENT_COST_HT = 90;
   const CASH_SENTINEL_TTC = 54;
   const CASH_SENTINEL_COMPANY_TTC = 18;
-  const INSTANT_TRANSFER_HT = 7.58;
   const VROOM_MARGIN_RATE = 0.09;
   const WARRANTY_COSTS_HT: Record<string, number> = {
     medium_12: 158.01,
@@ -5900,15 +5987,6 @@ export function Remuneration({
     return 0;
   }
 
-  function saleHasInstantTransfer(sale: VehicleSale) {
-    const normalizedComments = String(sale.comments || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '');
-
-    return normalizedComments.includes('virement instantane');
-  }
-
   function calculateResponsibleVehicleMarginDetail(sale: VehicleSale) {
     const marginTTC = Number(sale.margin_amount || 0);
     const vroomFeeTTC = marginTTC * VROOM_MARGIN_RATE;
@@ -5917,8 +5995,8 @@ export function Remuneration({
     const cashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
     const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
     const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
-    const instantTransferHT = saleHasInstantTransfer(sale) ? INSTANT_TRANSFER_HT : 0;
-    const netMarginHT = marginAfterVroomHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferHT;
+    const instantTransferFeeHT = hasInstantTransferFee(sale) ? INSTANT_TRANSFER_FEE_HT : 0;
+    const netMarginHT = marginAfterVroomHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferFeeHT;
 
     return {
       marginTTC,
@@ -5928,7 +6006,7 @@ export function Remuneration({
       cashSentinelHT,
       companyCashSentinelHT,
       miscellaneousFeesHT,
-      instantTransferHT,
+      instantTransferFeeHT,
       netMarginHT,
       responsableShareHT: netMarginHT / 2,
     };
@@ -5945,8 +6023,8 @@ export function Remuneration({
     const cashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
     const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
     const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
-    const instantTransferHT = saleHasInstantTransfer(sale) ? INSTANT_TRANSFER_HT : 0;
-    const agentNetHT = agentGrossHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferHT;
+    const instantTransferFeeHT = hasInstantTransferFee(sale) ? INSTANT_TRANSFER_FEE_HT : 0;
+    const agentNetHT = agentGrossHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferFeeHT;
     const responsableNetHT = responsableGrossHT - vroomFeeHT;
 
     return {
@@ -5959,7 +6037,7 @@ export function Remuneration({
       cashSentinelHT,
       companyCashSentinelHT,
       miscellaneousFeesHT,
-      instantTransferHT,
+      instantTransferFeeHT,
       agentNetHT,
       responsableNetHT,
       responsableShareHT: responsableNetHT / 2,
@@ -6143,7 +6221,6 @@ export function Remuneration({
         totalCashSentinelHT: 0,
         totalCompanyCashSentinelHT: 0,
         totalMiscellaneousFeesHT: 0,
-        totalInstantTransferHT: 0,
         totalNetMarginHT: 0,
         responsableShareHT: 0,
       };
@@ -6164,7 +6241,6 @@ export function Remuneration({
       acc.totalCashSentinelHT += detail.cashSentinelHT;
       acc.totalCompanyCashSentinelHT += detail.companyCashSentinelHT;
       acc.totalMiscellaneousFeesHT += detail.miscellaneousFeesHT;
-      acc.totalInstantTransferHT += detail.instantTransferHT;
       acc.totalNetMarginHT += detail.netMarginHT;
 
       return acc;
@@ -6175,7 +6251,6 @@ export function Remuneration({
       totalCashSentinelHT: 0,
       totalCompanyCashSentinelHT: 0,
       totalMiscellaneousFeesHT: 0,
-      totalInstantTransferHT: 0,
       totalNetMarginHT: 0,
     });
 
@@ -6196,7 +6271,6 @@ export function Remuneration({
       agentCashSentinelHT: 0,
       agentCompanyCashSentinelHT: 0,
       agentMiscellaneousFeesHT: 0,
-      agentInstantTransferHT: 0,
       agentNetHT: 0,
       responsableGrossHT: 0,
       responsableVroomFeeHT: 0,
@@ -6216,7 +6290,6 @@ export function Remuneration({
         totalCashSentinelHT: 0,
         totalCompanyCashSentinelHT: 0,
         totalMiscellaneousFeesHT: 0,
-        totalInstantTransferHT: 0,
         rows: emptyRow,
       };
     }
@@ -6235,7 +6308,6 @@ export function Remuneration({
     let totalCashSentinelHT = 0;
     let totalCompanyCashSentinelHT = 0;
     let totalMiscellaneousFeesHT = 0;
-    let totalInstantTransferHT = 0;
 
     commercialSales.forEach((sale) => {
       const detail = calculateCommercialVehicleMarginDetail(sale);
@@ -6249,7 +6321,6 @@ export function Remuneration({
       totalCashSentinelHT += detail.cashSentinelHT;
       totalCompanyCashSentinelHT += detail.companyCashSentinelHT;
       totalMiscellaneousFeesHT += detail.miscellaneousFeesHT;
-      totalInstantTransferHT += detail.instantTransferHT;
 
       if (agentRow) {
         agentRow.salesCount += 1;
@@ -6259,7 +6330,6 @@ export function Remuneration({
         agentRow.agentCashSentinelHT += detail.cashSentinelHT;
         agentRow.agentCompanyCashSentinelHT += detail.companyCashSentinelHT;
         agentRow.agentMiscellaneousFeesHT += detail.miscellaneousFeesHT;
-        agentRow.agentInstantTransferHT += detail.instantTransferHT;
         agentRow.agentNetHT += detail.agentNetHT;
       }
 
@@ -6287,7 +6357,6 @@ export function Remuneration({
       totalCashSentinelHT,
       totalCompanyCashSentinelHT,
       totalMiscellaneousFeesHT,
-      totalInstantTransferHT,
       rows: emptyRow,
     };
   }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList, peopleOptions]);
@@ -6349,8 +6418,8 @@ export function Remuneration({
           warrantyType: sale.warranty_type || '-',
           warrantyAmount: Number(sale.warranty_amount || 0),
           saleToCompany: sale.sale_to_company === true,
+          instantTransferFeeHT: hasInstantTransferFee(sale) ? INSTANT_TRANSFER_FEE_HT : 0,
           miscellaneousFeesHT: Number(sale.miscellaneous_fees_ht || 0),
-          instantTransferHT: saleHasInstantTransfer(sale) ? INSTANT_TRANSFER_HT : 0,
           seller: agentName,
           soldByAgent,
         };
@@ -6368,8 +6437,8 @@ export function Remuneration({
             typeLabel: 'Vente agent commercial',
             marginHT: detail.marginHT,
             agentGrossHT: detail.agentGrossHT,
-            agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferHT,
-            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferHT,
+            agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
+            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
             agentNetHT: detail.agentNetHT,
             responsableGrossHT: detail.responsableGrossHT,
             vroomFeeHT: detail.vroomFeeHT,
@@ -6387,8 +6456,8 @@ export function Remuneration({
           typeLabel: 'Vente responsable',
           marginHT: detail.marginAfterVroomHT,
           agentGrossHT: 0,
-          agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferHT,
-          deductionsHT: (detail.vroomFeeTTC / TVA_DIVIDER) + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferHT,
+          agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
+          deductionsHT: (detail.vroomFeeTTC / TVA_DIVIDER) + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
           agentNetHT: 0,
           responsableGrossHT: detail.marginAfterVroomHT,
           vroomFeeHT: detail.vroomFeeTTC / TVA_DIVIDER,
@@ -6789,7 +6858,7 @@ export function Remuneration({
           <div className="card">
             <h3>Bloc Marges véhicules</h3>
             <p className="muted">
-              Règle Responsable : marge TTC - 9 % Vroom, conversion HT, puis CashSentinel, vente entreprise, virement instantané et frais divers. Le résultat est partagé entre Benoît et Axel. Règle Agent : marge TTC convertie HT, 40 % pour l’agent moins CashSentinel/entreprise/virement instantané/frais divers ; 60 % pour les responsables, avec les 9 % Vroom à leur charge.
+              Règle Responsable : marge TTC - 9 % Vroom, conversion HT, puis CashSentinel, vente entreprise et frais divers. Le résultat est partagé entre Benoît et Axel. Règle Agent : marge TTC convertie HT, 40 % pour l’agent moins CashSentinel/entreprise/frais divers ; 60 % pour les responsables, avec les 9 % Vroom à leur charge.
             </p>
 
             <table className="table">
@@ -6899,7 +6968,7 @@ export function Remuneration({
                         <td>
                           <strong>-{euro(fraisOuVroom)}</strong>
                           <div className="muted" style={{ fontSize: 12 }}>
-                            {row.saleToCompany ? 'Entreprise' : 'Particulier'} — {row.instantTransferHT > 0 ? `virement instantané ${euro(row.instantTransferHT)} HT — ` : ''}frais divers {euro(row.miscellaneousFeesHT)}
+                            {row.saleToCompany ? 'Entreprise' : 'Particulier'} — frais divers {euro(row.miscellaneousFeesHT)}
                           </div>
                         </td>
                         <td>{row.soldByAgent ? <strong>{euro(row.agentNetHT)}</strong> : '-'}</td>
@@ -6920,7 +6989,7 @@ export function Remuneration({
           <div className="card">
             <h3>Détail marges agents commerciaux</h3>
             <p className="muted">
-              Pour une vente agent : l'agent reçoit 40 % de la marge HT puis paie CashSentinel, vente entreprise, virement instantané et frais divers.
+              Pour une vente agent : l'agent reçoit 40 % de la marge HT puis paie CashSentinel, vente entreprise et frais divers.
               Les responsables reçoivent 60 % de la marge HT, moins les 9 % Vroom HT, puis partagent le reste en deux.
             </p>
 
@@ -7080,7 +7149,7 @@ export function Remuneration({
           Agent commercial = 40 % du bénéfice HT, le reste partagé entre Benoît et Axel. Responsable = partage 50/50 entre Benoît et Axel.
         </p>
         <p className="muted">
-          Bloc Marges véhicules : Responsable = marge TTC - 9 % Vroom, conversion HT, CashSentinel, vente entreprise, virement instantané, frais divers, puis partage 50/50. Agent commercial = marge TTC convertie HT, 40 % agent moins CashSentinel/vente entreprise/virement instantané/frais divers ; 60 % responsables moins 9 % Vroom, puis partage 50/50 entre Benoît et Axel.
+          Bloc Marges véhicules : Responsable = marge TTC - 9 % Vroom, conversion HT, CashSentinel, vente entreprise, frais divers, puis partage 50/50. Agent commercial = marge TTC convertie HT, 40 % agent moins CashSentinel/vente entreprise/frais divers ; 60 % responsables moins 9 % Vroom, puis partage 50/50 entre Benoît et Axel.
         </p>
       </div>
     </div>
