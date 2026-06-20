@@ -245,6 +245,7 @@ function isRealWarrantyLead(lead: any) {
 }
 
 const INSTANT_TRANSFER_FEE_HT = 7.58;
+const COMPANY_SALE_FEE_HT = 18 / 1.2;
 
 function hasInstantTransferFee(value: any) {
   const text = String(value?.comments || value || '')
@@ -1947,8 +1948,11 @@ export function Leads({
     const roadFees = Number(saleRoadFees || 0);
     const warranty = warrantySold ? Number(warrantyAmount || 0) : 0;
     const instantTransferFee = instantTransfer ? INSTANT_TRANSFER_FEE_HT : 0;
-    return sale + roadFees + warranty - seller - instantTransferFee;
-  }, [salePrice, sellerNetPrice, saleRoadFees, warrantySold, warrantyAmount, instantTransfer]);
+    const companySaleFee = saleToCompany ? COMPANY_SALE_FEE_HT : 0;
+    const miscellaneousFees = Number(miscellaneousFeesHT || 0);
+
+    return sale + roadFees + warranty - seller - instantTransferFee - companySaleFee - miscellaneousFees;
+  }, [salePrice, sellerNetPrice, saleRoadFees, warrantySold, warrantyAmount, instantTransfer, saleToCompany, miscellaneousFeesHT]);
 
   function handleWarrantyTypeChange(value: string) {
     setWarrantyType(value);
@@ -2219,7 +2223,7 @@ export function Leads({
       source ? `Source lead : ${source}` : '',
       source === 'Démarchage Agent' && demarchageSource ? `Origine démarchage : ${demarchageSource}` : '',
       saleRoadFees ? `Frais de mise à la route : ${saleRoadFees} €` : '',
-      saleToCompany ? 'Vente à entreprise : oui' : '',
+      saleToCompany ? `Vente à entreprise : oui (-${COMPANY_SALE_FEE_HT.toFixed(2).replace('.', ',')} € HT)` : '',
       instantTransfer ? `Virement instantané : oui (-${INSTANT_TRANSFER_FEE_HT.toFixed(2).replace('.', ',')} € HT)` : '',
       miscellaneousFeesHT ? `Frais divers HT : ${miscellaneousFeesHT} €` : '',
       warrantySold && warrantyType ? `Garantie choisie : ${warrantyType}` : '',
@@ -2909,7 +2913,7 @@ appointment_time: appointmentTime.trim() || null,
                     En enregistrant ce lead, le CRM créera ou mettra à jour une vente dans l’onglet Ventes avec le même agent, véhicule, plaque, prix, marge et garantie.
                   </p>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 18, alignItems: 'start' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 18, alignItems: 'start' }}>
                     <div style={{ display: 'grid', gap: 14 }}>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(150px, 1fr))', gap: 12 }}>
                         <label style={{ display: 'grid', gap: 6 }}>
@@ -2977,7 +2981,7 @@ appointment_time: appointmentTime.trim() || null,
                           <span className="badge">Automatique</span>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(170px, 1fr))', gap: 12, marginTop: 14, alignItems: 'stretch' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 12, marginTop: 14, alignItems: 'stretch' }}>
                           <label
                             style={{
                               display: 'flex',
@@ -2992,8 +2996,8 @@ appointment_time: appointmentTime.trim() || null,
                           >
                             <input type="checkbox" checked={saleToCompany} onChange={(e) => setSaleToCompany(e.target.checked)} />
                             <span>
-                              <strong>Vente à entreprise</strong>
-                              <span className="muted" style={{ display: 'block', fontSize: 12 }}>TVA non récupérable</span>
+                              <strong style={{ color: saleToCompany ? '#60a5fa' : undefined }}>Vente à entreprise</strong>
+                              <span style={{ display: 'block', fontSize: 12, color: saleToCompany ? '#93c5fd' : '#94a3b8', fontWeight: 800 }}>- {euro(COMPANY_SALE_FEE_HT)} HT sur la marge</span>
                             </span>
                           </label>
 
@@ -3029,7 +3033,7 @@ appointment_time: appointmentTime.trim() || null,
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 0.75fr) minmax(320px, 1.25fr)', gap: 14, alignItems: 'start' }}>
                       <div
                         className="item"
                         style={{
@@ -3064,9 +3068,19 @@ appointment_time: appointmentTime.trim() || null,
                             <span className="muted">+ Garantie vendue</span>
                             <strong>{euro(warrantySold ? Number(warrantyAmount || 0) : 0)}</strong>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                            <span className="muted">- Vente à entreprise</span>
-                            <strong>{saleToCompany ? 'Oui' : '0 €'}</strong>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              gap: 12,
+                              padding: '6px 8px',
+                              borderRadius: 10,
+                              border: saleToCompany ? '1px solid rgba(59, 130, 246, 0.65)' : '1px solid transparent',
+                              background: saleToCompany ? 'rgba(59, 130, 246, 0.10)' : 'transparent',
+                            }}
+                          >
+                            <span style={{ color: saleToCompany ? '#93c5fd' : undefined }}>- Vente à entreprise</span>
+                            <strong style={{ color: saleToCompany ? '#f87171' : undefined }}>{saleToCompany ? `- ${euro(COMPANY_SALE_FEE_HT)}` : euro(0)}</strong>
                           </div>
                           <div
                             style={{
