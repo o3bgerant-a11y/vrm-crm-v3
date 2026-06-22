@@ -1971,7 +1971,7 @@ export function Leads({
   async function loadAgents() {
     const { data: agentsData, error: agentsError } = await supabase
       .from('agents')
-      .select('id, full_name, agency_id')
+      .select('id, full_name, agency_id, email')
       .order('full_name', { ascending: true });
 
     const { data: responsablesData, error: responsablesError } = await supabase
@@ -1988,15 +1988,33 @@ export function Leads({
       console.error('Erreur chargement responsables leads:', responsablesError);
     }
 
-    const agents = (agentsData || []) as AgentOption[];
+    const normalizePerson = (value: any) => String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ');
+
     const responsables = (responsablesData || [])
       .filter((responsable: any) => responsable.status === 'active')
       .map((responsable: any) => ({
         id: -Number(responsable.id),
         full_name: responsable.full_name || responsable.email || 'Responsable',
         agency_id: Number(responsable.agency_id || 1),
+        email: responsable.email || null,
         role: 'Responsable',
       })) as AgentOption[];
+
+    const responsableNames = new Set(responsables.map((responsable) => normalizePerson(responsable.full_name)).filter(Boolean));
+    const responsableEmails = new Set(responsables.map((responsable) => normalizePerson(responsable.email)).filter(Boolean));
+
+    const agents = ((agentsData || []) as AgentOption[])
+      .filter((agent) => {
+        const sameNameAsResponsable = responsableNames.has(normalizePerson(agent.full_name));
+        const sameEmailAsResponsable = agent.email ? responsableEmails.has(normalizePerson(agent.email)) : false;
+
+        return !sameNameAsResponsable && !sameEmailAsResponsable;
+      });
 
     setAgentOptions([...responsables, ...agents]);
   }
@@ -2153,7 +2171,7 @@ export function Leads({
     setMonthNumber(String(lead.month_number || currentMonth));
     setWeekNumber(String(lead.week_number || ''));
     setAgencyId(lead.agency_id || lead.agents?.agency_id || '');
-    setAgentId(lead.agent_id || '');
+    setAgentId(getLeadSellerOptionId(lead) || '');
 
     const oldDemarchageSources = ['Leboncoin', 'Facebook', 'Google', 'Recommandation', 'Passage agence', 'Autre'];
     if (lead.source && oldDemarchageSources.includes(lead.source)) {
@@ -2329,12 +2347,14 @@ export function Leads({
 
     setSaving(true);
 
+    const responsableProfileId = isResponsibleLeadSeller ? responsableProfileIdFromOption(agentId) : null;
+
     const payload = {
       year_number: Number(yearNumber || currentYear),
       month_number: Number(monthNumber || currentMonth),
       week_number: weekNumber ? Number(weekNumber) : null,
       agency_id: finalAgencyId ? Number(finalAgencyId) : null,
-      agent_id: Number(agentId),
+      agent_id: isResponsibleLeadSeller ? null : Number(agentId),
       source,
       demarchage_source: source === 'Démarchage Agent' ? demarchageSource || null : null,
       status: getStatusFromMandate(),
@@ -2361,6 +2381,7 @@ appointment_time: appointmentTime.trim() || null,
       comments: [
         comments.trim(),
         isResponsibleLeadSeller ? `Responsable lead : ${selectedAgent?.full_name || 'Responsable'}` : '',
+        isResponsibleLeadSeller && responsableProfileId ? `Responsable profile id : ${responsableProfileId}` : '',
         isResponsibleLeadSeller ? `Agence rémunération : ${agencyName(finalAgencyId || 1)}` : '',
       ].filter(Boolean).join('\n') || null,
     };
@@ -2528,12 +2549,56 @@ appointment_time: appointmentTime.trim() || null,
     }
   }, [historyWeekOptions, historyWeek]);
 
+  function getLeadResponsableProfileId(lead: LeadItem) {
+    const match = String(lead.comments || '').match(/Responsable profile id\s*:\s*(\d+)/i);
+    return match?.[1] ? Number(match[1]) : null;
+  }
+
+  function getLeadResponsableName(lead: LeadItem) {
+    const match = String(lead.comments || '').match(/Responsable lead\s*:\s*([^\n]+)/i);
+    return match?.[1]?.trim() || null;
+  }
+
+  function getLeadSellerOptionId(lead: LeadItem) {
+    if (lead.agent_id) return Number(lead.agent_id);
+
+    const profileId = getLeadResponsableProfileId(lead);
+    if (profileId) return -Number(profileId);
+
+    const responsableName = getLeadResponsableName(lead);
+    if (responsableName) {
+      const matchingResponsable = agentOptions.find((agent) =>
+        isResponsableOptionId(agent.id) &&
+        String(agent.full_name || '').trim().toLowerCase() === responsableName.trim().toLowerCase()
+      );
+
+      if (matchingResponsable) return Number(matchingResponsable.id);
+    }
+
+    return null;
+  }
+
+  function getLeadSellerOption(lead: LeadItem) {
+    const optionId = getLeadSellerOptionId(lead);
+    if (!optionId) return null;
+
+    return agentOptions.find((agent) => Number(agent.id) === Number(optionId)) || null;
+  }
+
+  function getLeadSellerName(lead: LeadItem) {
+    return lead.agents?.full_name || getLeadSellerOption(lead)?.full_name || getLeadResponsableName(lead) || '-';
+  }
+
+  function getLeadAgencyId(lead: LeadItem) {
+    return lead.agency_id || lead.agents?.agency_id || getLeadSellerOption(lead)?.agency_id || null;
+  }
+
   const filteredLeads = leads.filter((lead) => {
-    const leadAgencyId = lead.agency_id || lead.agents?.agency_id || null;
+    const leadAgencyId = getLeadAgencyId(lead);
     const agencyToUse = lockedAgencyId || leadAgencyFilter;
 
     if (agencyToUse !== 'all' && Number(leadAgencyId) !== Number(agencyToUse)) return false;
-    if (leadAgentFilter !== 'all' && Number(lead.agent_id) !== Number(leadAgentFilter)) return false;
+    if (leadAgentFilter !== 'all' && Number(getLeadSellerOptionId(lead)) !== Number(leadAgentFilter)) return false;
 
     if (historyFilter === 'archived') {
       if (!isArchivedLead(lead)) return false;
@@ -2570,8 +2635,8 @@ appointment_time: appointmentTime.trim() || null,
       lead.mandate_status,
       getMandateStatusLabel(lead.mandate_status),
       lead.vehicle_entered ? 'véhicule sur parc véhicule rentré sur parc' : '',
-      lead.agents?.full_name,
-      agencyName(lead.agency_id || lead.agents?.agency_id),
+      getLeadSellerName(lead),
+      agencyName(getLeadAgencyId(lead)),
       lead.comments,
     ].join(' ').toLowerCase();
 
@@ -3259,8 +3324,8 @@ appointment_time: appointmentTime.trim() || null,
                     )}
                   </td>
                   <td>
-                    {lead.agents?.full_name || agentOptions.find((agent) => Number(agent.id) === Number(lead.agent_id))?.full_name || '-'}
-                    <div className="muted" style={{ fontSize: 12 }}>{agencyName(lead.agency_id || lead.agents?.agency_id || agentOptions.find((agent) => Number(agent.id) === Number(lead.agent_id))?.agency_id)}</div>
+                    {getLeadSellerName(lead)}
+                    <div className="muted" style={{ fontSize: 12 }}>{agencyName(getLeadAgencyId(lead))}</div>
                   </td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
