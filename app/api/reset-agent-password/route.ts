@@ -26,13 +26,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: profile, error: profileError } = await adminSupabase
-      .from('profiles')
-      .select('id, user_id, auth_user_id, email, role, full_name')
-      .eq('id', profile_id)
-      .single();
+    let profile: any = null;
 
-    if (profileError || !profile) {
+    const { data: profileById } = await adminSupabase
+      .from('profiles')
+      .select('*')
+      .eq('id', profile_id)
+      .maybeSingle();
+
+    profile = profileById;
+
+    if (!profile) {
+      const { data: profileByUserId } = await adminSupabase
+        .from('profiles')
+        .select('*')
+        .or(`user_id.eq.${profile_id},auth_user_id.eq.${profile_id}`)
+        .maybeSingle();
+
+      profile = profileByUserId;
+    }
+
+    if (!profile) {
       return NextResponse.json(
         { error: 'Profil introuvable.' },
         { status: 404 }
@@ -78,7 +92,7 @@ export async function POST(request: Request) {
     await adminSupabase
       .from('profiles')
       .update({ must_change_password: true })
-      .eq('id', profile_id);
+      .eq('id', profile.id);
 
     return NextResponse.json({
       success: true,
