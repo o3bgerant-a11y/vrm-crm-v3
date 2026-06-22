@@ -3641,6 +3641,31 @@ export function RapportSemaine({
   const filteredLeads = useMemo(() => leadsList.filter(leadMatchesFilters), [leadsList, selectedYear, selectedMonth, selectedWeek, selectedAgency, selectedAgent, responsableMode, currentAgent?.id]);
   const filteredSales = useMemo(() => salesList.filter(saleMatchesFilters), [salesList, selectedYear, selectedMonth, selectedWeek, selectedAgency, selectedAgent, responsableMode, currentAgent?.id]);
 
+  function isReportSoldLead(lead: LeadItem) {
+    return Boolean(lead.sale_done) || lead.status === 'Véhicule vendu';
+  }
+
+  function isReportMandateSignedLead(lead: LeadItem) {
+    return Boolean(lead.mandate_signed) || lead.mandate_status === 'signé' || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '');
+  }
+
+  function isReportMandateAlertLead(lead: LeadItem) {
+    return lead.status === 'Mandat alerte' || lead.status === 'À relancer' || lead.mandate_status === 'relance';
+  }
+
+  function isReportMandateUnsignedLead(lead: LeadItem) {
+    return (
+      !isReportMandateSignedLead(lead)
+      && !isReportSoldLead(lead)
+      && !Boolean(lead.vehicle_entered)
+      && (lead.mandate_status === 'non_signé' || lead.mandate_status === 'relance' || lead.status === 'Mandat alerte' || lead.status === 'Nouveau' || !lead.status)
+    );
+  }
+
+  function isReportVehicleOnParkLead(lead: LeadItem) {
+    return !isReportSoldLead(lead) && Boolean(lead.vehicle_entered);
+  }
+
   const weeklyStats = useMemo(() => {
     const leads = filteredLeads.length;
 
@@ -3649,33 +3674,11 @@ export function RapportSemaine({
       || ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')
     )).length;
 
-    const signedMandates = filteredLeads.filter(lead => (
-      lead.mandate_status === 'signé'
-      || lead.mandate_signed
-      || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')
-    )).length;
-
-    const unsignedMandates = filteredLeads.filter(lead => (
-      lead.mandate_status === 'non_signé'
-      && !lead.mandate_signed
-      && !lead.sale_done
-      && lead.status !== 'Véhicule vendu'
-    )).length;
-
-    const alertMandates = filteredLeads.filter(lead => (
-      lead.mandate_status === 'relance'
-      || lead.status === 'À relancer'
-    )).length;
-
-    const vehiclesOnPark = filteredLeads.filter(lead => (
-      lead.vehicle_entered
-      || ['Véhicule rentré', 'Mandat signé'].includes(lead.status || '')
-    )).length;
-
-    const soldFromLeads = filteredLeads.filter(lead => (
-      lead.sale_done
-      || lead.status === 'Véhicule vendu'
-    )).length;
+    const signedMandates = filteredLeads.filter(lead => isReportMandateSignedLead(lead)).length;
+    const unsignedMandates = filteredLeads.filter(lead => isReportMandateUnsignedLead(lead)).length;
+    const alertMandates = filteredLeads.filter(lead => isReportMandateAlertLead(lead)).length;
+    const vehiclesOnPark = filteredLeads.filter(lead => isReportVehicleOnParkLead(lead)).length;
+    const soldFromLeads = filteredLeads.filter(lead => isReportSoldLead(lead)).length;
 
     const warrantiesFromLeads = filteredLeads.filter(lead => isRealWarrantyLead(lead)).length;
     const marginFromLeads = filteredLeads.reduce((total, lead) => total + Number(lead.margin_amount || 0), 0);
@@ -3759,9 +3762,9 @@ export function RapportSemaine({
       return {
         agent,
         leads: agentLeads.length,
-        rdv: agentLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
-        vehicles: agentLeads.filter(lead => lead.vehicle_entered || ['Véhicule rentré', 'Véhicule sur parc', 'Véhicule vendu'].includes(lead.status || '')).length,
-        mandates: agentLeads.filter(lead => lead.mandate_signed || ['Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
+        rdv: agentLeads.filter(lead => Boolean(lead.appointment_time) || ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length,
+        vehicles: agentLeads.filter(lead => isReportVehicleOnParkLead(lead)).length,
+        mandates: agentLeads.filter(lead => isReportMandateSignedLead(lead)).length,
         sales,
         warranties,
         ca,
