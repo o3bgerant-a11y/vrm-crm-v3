@@ -3,13 +3,13 @@ import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const MASTER_EMAIL = 'o3b.gerant@gmail.com';
 
 const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-
     const { profile_id, new_password } = body;
 
     if (!profile_id || !new_password) {
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
-      .select('id, user_id, email, role, full_name')
+      .select('id, user_id, auth_user_id, email, role, full_name')
       .eq('id', profile_id)
       .single();
 
@@ -39,14 +39,18 @@ export async function POST(request: Request) {
       );
     }
 
-    if (profile.role === 'patron' || profile.role === 'responsable') {
+    const email = String(profile.email || '').trim().toLowerCase();
+
+    if (email === MASTER_EMAIL) {
       return NextResponse.json(
-        { error: 'Le mot de passe du compte Responsable ne peut pas être modifié ici.' },
+        { error: 'Le compte principal Benoît est protégé. Son mot de passe ne peut pas être réinitialisé ici.' },
         { status: 403 }
       );
     }
 
-    if (!profile.user_id) {
+    const authUserId = profile.user_id || profile.auth_user_id;
+
+    if (!authUserId) {
       return NextResponse.json(
         { error: "Ce profil n'est pas relié à un compte de connexion Supabase Auth." },
         { status: 400 }
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     const { error: updateError } = await adminSupabase.auth.admin.updateUserById(
-      profile.user_id,
+      authUserId,
       {
         password: new_password,
         user_metadata: {
@@ -73,9 +77,7 @@ export async function POST(request: Request) {
 
     await adminSupabase
       .from('profiles')
-      .update({
-        must_change_password: true,
-      })
+      .update({ must_change_password: true })
       .eq('id', profile_id);
 
     return NextResponse.json({
