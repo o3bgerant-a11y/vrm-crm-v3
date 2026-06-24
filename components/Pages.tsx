@@ -260,8 +260,7 @@ function hasInstantTransferFee(value: any) {
 function getTextAfterLabel(value: any, label: string) {
   const text = String(value || '');
   const line = text
-    .split('
-')
+    .split('\n')
     .find(item => item.toLowerCase().startsWith(label.toLowerCase()));
 
   if (!line) return '';
@@ -386,7 +385,7 @@ export function Agences() {
     });
 
     filteredSales.forEach((sale) => {
-      const agencyId = Number(sale.agents?.agency_id);
+      const agencyId = Number(getSaleAgencyId(sale));
       const row = base.find(item => item.id === agencyId);
 
       if (!row) return;
@@ -431,7 +430,7 @@ export function Agences() {
     warrantyRate: number;
     averageMargin: number;
   }) {
-    const agencySales = filteredSales.filter((sale) => Number(sale.agents?.agency_id) === Number(agency.id));
+    const agencySales = filteredSales.filter((sale) => Number(getSaleAgencyId(sale)) === Number(agency.id));
     const agencyAgents = agentsList.filter((agent) => Number(agent.agency_id) === Number(agency.id));
     const selectedMonthName = monthNames[Number(selectedMonth) - 1] || selectedMonth;
 
@@ -458,7 +457,7 @@ export function Agences() {
       .map((sale) => ({
         date: formatPdfDate(sale.sale_date),
         vehicle: sale.vehicle_name || '-',
-        agent: sale.agents?.full_name || '-',
+        agent: getSaleSellerName(sale) || '-',
         price: Number(sale.sale_price || 0),
         margin: Number(sale.margin_amount || 0),
         warranty: sale.warranty_sold ? 'Oui' : 'Non',
