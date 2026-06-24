@@ -34,6 +34,8 @@ type Sale = {
   warranty_sold: boolean | null;
   warranty_amount: number | null;
   sale_date: string | null;
+  comments?: string | null;
+  notes?: string | null;
   agents?: {
     full_name: string | null;
     agency_id: number | null;
@@ -50,6 +52,39 @@ type MonthlyObjective = {
   margin_target: number;
   warranty_target: number;
 };
+
+function getTextLineValue(value: any, label: string) {
+  const text = String(value || '');
+  const line = text
+    .split(/\r?\n/)
+    .find(item => item.toLowerCase().startsWith(label.toLowerCase()));
+
+  if (!line) return '';
+
+  return line
+    .replace(new RegExp(`^${label}\\s*:?\\s*`, 'i'), '')
+    .trim();
+}
+
+function getSaleSellerName(sale: Sale) {
+  const agentName = sale.agents?.full_name;
+  if (agentName) return agentName;
+
+  const responsableName = getTextLineValue(sale.comments || sale.notes, 'Responsable vente');
+  if (responsableName) return responsableName;
+
+  return 'Agent non renseigné';
+}
+
+function getSaleAgencyName(sale: Sale) {
+  const agentAgency = agencyName(sale.agents?.agency_id);
+  if (agentAgency !== '-') return agentAgency;
+
+  const remunerationAgency = getTextLineValue(sale.comments || sale.notes, 'Agence rémunération');
+  if (remunerationAgency) return remunerationAgency;
+
+  return '-';
+}
 
 export default function Dashboard({
   currentAgent = null,
@@ -172,8 +207,8 @@ export default function Dashboard({
     const map = new Map<string, { name: string; agency: string; sales: number; ca: number; margin: number; warranties: number }>();
 
     sales.forEach((sale) => {
-      const name = sale.agents?.full_name || 'Agent non renseigné';
-      const agency = agencyName(sale.agents?.agency_id);
+      const name = getSaleSellerName(sale);
+      const agency = getSaleAgencyName(sale);
       const current = map.get(name) || {
         name,
         agency,
@@ -202,7 +237,7 @@ export default function Dashboard({
     ];
 
     sales.forEach((sale) => {
-      const agency = agencyName(sale.agents?.agency_id);
+      const agency = getSaleAgencyName(sale);
       const row = base.find(item => item.agency === agency);
 
       if (!row) return;
@@ -379,8 +414,8 @@ export default function Dashboard({
                 {latestSales.map(s => (
                   <tr key={s.id}>
                     <td>{s.vehicle_name}</td>
-                    <td>{s.agents?.full_name || '-'}</td>
-                    <td>{agencyName(s.agents?.agency_id)}</td>
+                    <td>{getSaleSellerName(s)}</td>
+                    <td>{getSaleAgencyName(s)}</td>
                     <td><strong>{euro(Number(s.margin_amount || 0))}</strong></td>
                   </tr>
                 ))}
