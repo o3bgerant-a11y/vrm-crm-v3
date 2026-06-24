@@ -6993,11 +6993,13 @@ export function Remuneration({
               <p className="muted">Garanties + marges véhicules - Leads - Leboncoin.</p>
             </div>
 
-            <div className="card">
-              <h3>Garanties vendues</h3>
-              <div className="stat-value">{warrantyStats.totalWarrantySales}</div>
-              <p className="muted">Résultat global garanties : {euro(warrantyStats.totalWarrantyGainHT)} HT</p>
-            </div>
+            {selectedPerson?.type === 'responsable' && (
+              <div className="card">
+                <h3>Garanties vendues</h3>
+                <div className="stat-value">{warrantyStats.totalWarrantySales}</div>
+                <p className="muted">Résultat global garanties : {euro(warrantyStats.totalWarrantyGainHT)} HT</p>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14, alignItems: 'stretch', width: '100%' }}>
@@ -7061,8 +7063,8 @@ export function Remuneration({
 
             <div className="card">
               <h3>Leads Call Center</h3>
-              <div className="stat-value">{leadStats.callCenterLeads.length}</div>
-              <p className="muted">Coût total : {euro(leadStats.totalCallCenterCostHT)} HT</p>
+              <div className="stat-value">{selectedPersonLeadResult?.callCenterCount || 0}</div>
+              <p className="muted">Déduction personne sélectionnée : {euro(Number(selectedPersonLeadResult?.deductionHT || 0))} HT</p>
             </div>
 
             <div className="card">
@@ -7078,6 +7080,7 @@ export function Remuneration({
             </div>
           </div>
 
+          {selectedPerson?.type === 'responsable' && (
           <div className="card">
             <h3>Bloc Marges véhicules</h3>
             <p className="muted">
@@ -7132,6 +7135,7 @@ export function Remuneration({
               </tbody>
             </table>
           </div>
+          )}
 
           {selectedPerson?.type === 'agent' && (
             <div className="card" style={{ borderColor: '#22c55e' }}>
@@ -7183,6 +7187,8 @@ export function Remuneration({
             </div>
           )}
 
+          {selectedPerson?.type === 'responsable' && (
+            <>
           <div className="card" style={{ borderColor: '#38bdf8', maxWidth: '100%', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div>
@@ -7416,6 +7422,8 @@ export function Remuneration({
                 {leadStats.otherLeads.length} lead(s) ont une source non reconnue. Ils ne sont pas facturés dans ce bloc pour éviter un mauvais calcul.
               </p>
             </div>
+          )}
+            </>
           )}
         </>
       )}
