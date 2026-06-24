@@ -6254,10 +6254,13 @@ export function Remuneration({
       }
 
       if (warrantyKey === 'start') {
+        // START ne compte pas comme une garantie vendue dans les stats.
+        // C'est une pénalité de rémunération.
+        // Si la vente est faite par un agent commercial : -90 € HT uniquement pour cet agent.
+        // Si la vente est faite par un responsable : -45 € HT pour chaque responsable.
         if (soldByAgent) {
           const agentRow = baseRows.find((row) => row.type === 'agent' && Number(row.id) === Number(sale.agent_id));
           if (agentRow) {
-            agentRow.warrantiesCount += 1;
             agentRow.warrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
           }
           totalWarrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
@@ -6265,7 +6268,6 @@ export function Remuneration({
           baseRows
             .filter((row) => row.type === 'responsable')
             .forEach((row) => {
-              row.warrantiesCount += 1;
               row.warrantyGainHT -= WARRANTY_START_RESPONSABLE_COST_HT;
             });
           totalWarrantyGainHT -= WARRANTY_START_RESPONSABLE_COST_HT * 2;
@@ -6308,7 +6310,10 @@ export function Remuneration({
     });
 
     return {
-      totalWarrantySales: remunerationWarrantySales.length,
+      totalWarrantySales: remunerationWarrantySales.filter((sale) => {
+        const key = normalizeWarrantyType(sale.warranty_type);
+        return key !== 'start' && key !== 'unknown';
+      }).length,
       totalWarrantyGainHT,
       unknownWarranties,
       rows: baseRows,
@@ -6411,19 +6416,7 @@ export function Remuneration({
     const commercialSales = salesList.filter((sale) => {
       if (!saleDateMatchesSelectedPeriod(sale)) return false;
       if (saleAgencyId(sale) !== Number(selectedAgencyId)) return false;
-      if (!saleBelongsToCommercialAgent(sale)) return false;
-
-      // Sécurité : si un agent est sélectionné ou connecté, les calculs commerciaux
-      // ne doivent porter que sur cet agent précis.
-      if (selectedPerson?.type === 'agent') {
-        return Number(sale.agent_id || 0) === Number(selectedPerson.id);
-      }
-
-      if (lockedAgentId) {
-        return Number(sale.agent_id || 0) === Number(lockedAgentId);
-      }
-
-      return true;
+      return saleBelongsToCommercialAgent(sale);
     });
 
     let totalMarginTTC = 0;
@@ -6489,7 +6482,7 @@ export function Remuneration({
       totalInstantTransferFeeHT,
       rows: emptyRow,
     };
-  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList, peopleOptions, selectedPerson, lockedAgentId]);
+  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList, peopleOptions]);
 
   const selectedCommercialMarginResult = useMemo(() => {
     if (!selectedPerson) return null;
@@ -6519,33 +6512,97 @@ export function Remuneration({
     return salesList
       .filter((sale) => {
         if (!saleDateMatchesSelectedPeriod(sale)) return false;
-        if (saleAgencyId(sale) !== Number(selectedAgencyId)) return false;
-
-        // Sécurité rémunération agent : dès qu'un agent commercial est la personne sélectionnée,
-        // on ne garde que SES véhicules. Cela évite qu'il voie les ventes des autres agents
-        // ou les ventes responsables dans le détail véhicule.
-        if (selectedPerson?.type === 'agent') {
-          return saleBelongsToCommercialAgent(sale) && Number(sale.agent_id || 0) === Number(selectedPerson.id);
-        }
-
-        if (lockedAgentId) {
-          return saleBelongsToCommercialAgent(sale) && Number(sale.agent_id || 0) === Number(lockedAgentId);
-        }
-
-        return true;
+        if (lockedAgentId && Number(sale.agent_id || 0) !== Number(lockedAgentId)) return false;
+        return saleAgencyId(sale) === Number(selectedAgencyId);
       })
       .sort((a, b) => {
         const aDate = a.sale_date ? new Date(a.sale_date).getTime() : 0;
         const bDate = b.sale_date ? new Date(b.sale_date).getTime() : 0;
         return bDate - aDate;
       });
-  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, selectedPerson, lockedAgentId, agentsList, responsablesList]);
+  }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList]);
+
+  function calculateWarrantyDetailForSelectedPerson(sale: VehicleSale, person: any) {
+    const warrantyKey = normalizeWarrantyType(sale.warranty_type);
+    const soldByAgent = saleBelongsToCommercialAgent(sale);
+    const warrantyAmountTTC = Number(sale.warranty_amount || 0);
+    const warrantyAmountHT = warrantyAmountTTC / TVA_DIVIDER;
+
+    if (!sale.warranty_sold || warrantyKey === 'unknown') {
+      return {
+        warrantyKey,
+        warrantyCountsInStats: false,
+        warrantyAmountHT,
+        warrantyPurchaseCostHT: 0,
+        warrantyProfitHT: 0,
+        selectedWarrantyShareHT: 0,
+        warrantyDetailLabel: sale.warranty_sold ? 'Garantie non reconnue' : 'Aucune garantie',
+      };
+    }
+
+    if (warrantyKey === 'start') {
+      let selectedWarrantyShareHT = 0;
+
+      if (soldByAgent && person.type === 'agent' && Number(person.id) === Number(sale.agent_id)) {
+        selectedWarrantyShareHT = -WARRANTY_START_AGENT_COST_HT;
+      }
+
+      if (!soldByAgent && person.type === 'responsable') {
+        selectedWarrantyShareHT = -WARRANTY_START_RESPONSABLE_COST_HT;
+      }
+
+      return {
+        warrantyKey,
+        warrantyCountsInStats: false,
+        warrantyAmountHT,
+        warrantyPurchaseCostHT: 0,
+        warrantyProfitHT: selectedWarrantyShareHT,
+        selectedWarrantyShareHT,
+        warrantyDetailLabel: soldByAgent
+          ? `START : -${euro(WARRANTY_START_AGENT_COST_HT)} HT agent uniquement`
+          : `START : -${euro(WARRANTY_START_RESPONSABLE_COST_HT)} HT par responsable`,
+      };
+    }
+
+    const warrantyPurchaseCostHT = WARRANTY_COSTS_HT[warrantyKey] || 0;
+    const warrantyProfitHT = warrantyAmountHT - warrantyPurchaseCostHT;
+    let selectedWarrantyShareHT = 0;
+
+    if (soldByAgent) {
+      if (person.type === 'agent' && Number(person.id) === Number(sale.agent_id)) {
+        selectedWarrantyShareHT = warrantyProfitHT * 0.4;
+      }
+
+      if (person.type === 'responsable') {
+        selectedWarrantyShareHT = warrantyProfitHT * 0.3;
+      }
+    } else if (person.type === 'responsable') {
+      selectedWarrantyShareHT = warrantyProfitHT / 2;
+    }
+
+    return {
+      warrantyKey,
+      warrantyCountsInStats: true,
+      warrantyAmountHT,
+      warrantyPurchaseCostHT,
+      warrantyProfitHT,
+      selectedWarrantyShareHT,
+      warrantyDetailLabel: `Garantie : bénéfice HT ${euro(warrantyProfitHT)}`,
+    };
+  }
 
   const selectedVehicleDetailRows = useMemo(() => {
     if (!selectedPerson) return [];
 
     return remunerationVehicleSales
       .filter((sale) => selectedVehicleId === 'all' || Number(sale.id) === Number(selectedVehicleId))
+      .filter((sale) => {
+        if (selectedPerson.type === 'agent') {
+          return Number(sale.agent_id || 0) === Number(selectedPerson.id);
+        }
+
+        return true;
+      })
       .map((sale) => {
         const soldByAgent = saleBelongsToCommercialAgent(sale);
         const agentName = sale.agents?.full_name || agentsList.find((agent) => Number(agent.id) === Number(sale.agent_id))?.full_name || 'Responsable';
@@ -6568,11 +6625,13 @@ export function Remuneration({
 
         if (soldByAgent) {
           const detail = calculateCommercialVehicleMarginDetail(sale);
-          const selectedShareHT = selectedPerson.type === 'agent' && Number(selectedPerson.id) === Number(sale.agent_id)
+          const warrantyDetail = calculateWarrantyDetailForSelectedPerson(sale, selectedPerson);
+          const marginShareHT = selectedPerson.type === 'agent' && Number(selectedPerson.id) === Number(sale.agent_id)
             ? detail.agentNetHT
             : selectedPerson.type === 'responsable'
               ? detail.responsableShareHT
               : 0;
+          const selectedShareHT = marginShareHT + warrantyDetail.selectedWarrantyShareHT;
 
           return {
             ...common,
@@ -6588,12 +6647,18 @@ export function Remuneration({
             vroomFeeHT: detail.vroomFeeHT,
             responsableNetHT: detail.responsableNetHT,
             responsableShareHT: detail.responsableShareHT,
+            marginShareHT,
+            warrantySelectedShareHT: warrantyDetail.selectedWarrantyShareHT,
+            warrantyCountsInStats: warrantyDetail.warrantyCountsInStats,
+            warrantyDetailLabel: warrantyDetail.warrantyDetailLabel,
             selectedShareHT,
           };
         }
 
         const detail = calculateResponsibleVehicleMarginDetail(sale);
-        const selectedShareHT = selectedPerson.type === 'responsable' ? detail.responsableShareHT : 0;
+        const warrantyDetail = calculateWarrantyDetailForSelectedPerson(sale, selectedPerson);
+        const marginShareHT = selectedPerson.type === 'responsable' ? detail.responsableShareHT : 0;
+        const selectedShareHT = marginShareHT + warrantyDetail.selectedWarrantyShareHT;
 
         return {
           ...common,
@@ -6609,6 +6674,10 @@ export function Remuneration({
           vroomFeeHT: detail.vroomFeeTTC / TVA_DIVIDER,
           responsableNetHT: detail.netMarginHT,
           responsableShareHT: detail.responsableShareHT,
+          marginShareHT,
+          warrantySelectedShareHT: warrantyDetail.selectedWarrantyShareHT,
+          warrantyCountsInStats: warrantyDetail.warrantyCountsInStats,
+          warrantyDetailLabel: warrantyDetail.warrantyDetailLabel,
           selectedShareHT,
         };
       });
@@ -6875,7 +6944,7 @@ export function Remuneration({
 
       {showResult && (
         <>
-          <div className="grid cards3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14, alignItems: 'stretch', width: '100%' }}>
             <div className="card">
               <h3>Personne concernée</h3>
               <div className="stat-value" style={{ fontSize: 24 }}>
@@ -6905,7 +6974,7 @@ export function Remuneration({
             </div>
           </div>
 
-          <div className="grid cards3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14, alignItems: 'stretch', width: '100%' }}>
             <div className="card">
               <h3>Résultat garanties HT</h3>
               <div className="stat-value" style={{ color: selectedWarrantyGainHT >= 0 ? '#22c55e' : '#f97316' }}>
@@ -6916,7 +6985,7 @@ export function Remuneration({
               </p>
             </div>
 
-            <div className="card">
+            <div className="card" style={{ borderColor: selectedProvisionalResultHT >= 0 ? '#22c55e' : '#f97316', boxShadow: '0 0 0 1px rgba(34, 197, 94, 0.18)' }}>
               <h3>REVENU DU MOIS HT</h3>
               <div className="stat-value" style={{ color: selectedProvisionalResultHT >= 0 ? '#22c55e' : '#f97316' }}>
                 {selectedProvisionalResultHT >= 0 ? '+' : ''}{euro(selectedProvisionalResultHT)}
@@ -6931,7 +7000,7 @@ export function Remuneration({
             </div>
           </div>
 
-          <div className="grid cards3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14, alignItems: 'stretch', width: '100%' }}>
             <div className="card" style={{ borderColor: '#38bdf8' }}>
               <h3>Marge véhicule HT</h3>
               <div className="stat-value" style={{ color: selectedVehicleMarginGainHT >= 0 ? '#22c55e' : '#f97316' }}>
@@ -6969,7 +7038,7 @@ export function Remuneration({
             </div>
           </div>
 
-          <div className="grid cards3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14, alignItems: 'stretch', width: '100%' }}>
             <div className="card">
               <h3>Déduction Leboncoin HT</h3>
               <div className="stat-value" style={{ color: '#f97316' }}>
@@ -7009,62 +7078,60 @@ export function Remuneration({
             </div>
           </div>
 
-          {selectedPerson?.type === 'responsable' && (
-            <div className="card">
-              <h3>Bloc Marges véhicules responsables</h3>
-              <p className="muted">
-                Règle Responsable : marge TTC - 9 % Vroom, conversion HT, puis CashSentinel, vente entreprise, frais divers et virement instantané. Le résultat est partagé entre Benoît et Axel.
-              </p>
+          <div className="card">
+            <h3>Bloc Marges véhicules</h3>
+            <p className="muted">
+              Règle Responsable : marge TTC - 9 % Vroom, conversion HT, puis CashSentinel, vente entreprise, frais divers et virement instantané. Le résultat est partagé entre Benoît et Axel. Règle Agent : marge TTC convertie HT, 40 % pour l’agent moins CashSentinel/entreprise/frais divers/virement instantané ; 60 % pour les responsables, avec les 9 % Vroom à leur charge.
+            </p>
 
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Élément</th>
-                    <th>Montant</th>
-                  </tr>
-                </thead>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Élément</th>
+                  <th>Montant</th>
+                </tr>
+              </thead>
 
-                <tbody>
-                  <tr>
-                    <td>Marge TTC ventes responsables</td>
-                    <td><strong>{euro(responsibleVehicleMarginStats.totalMarginTTC)}</strong></td>
-                  </tr>
-                  <tr>
-                    <td>Frais Vroom 9 % TTC</td>
-                    <td><strong>-{euro(responsibleVehicleMarginStats.totalVroomFeeTTC)}</strong></td>
-                  </tr>
-                  <tr>
-                    <td>Marge après Vroom convertie HT</td>
-                    <td><strong>{euro(responsibleVehicleMarginStats.totalAfterVroomHT)}</strong></td>
-                  </tr>
-                  <tr>
-                    <td>CashSentinel 54 € TTC converti HT</td>
-                    <td><strong>-{euro(responsibleVehicleMarginStats.totalCashSentinelHT)}</strong></td>
-                  </tr>
-                  <tr>
-                    <td>Ventes à entreprise 18 € TTC converti HT</td>
-                    <td><strong>-{euro(responsibleVehicleMarginStats.totalCompanyCashSentinelHT)}</strong></td>
-                  </tr>
-                  <tr>
-                    <td>Frais divers HT</td>
-                    <td><strong>-{euro(responsibleVehicleMarginStats.totalMiscellaneousFeesHT)}</strong></td>
-                  </tr>
-                  <tr>
-                    <td>Virement instantané HT</td>
-                    <td><strong>-{euro(Number(responsibleVehicleMarginStats.totalInstantTransferFeeHT || 0))}</strong></td>
-                  </tr>
-                  <tr>
-                    <td>Résultat net HT à partager</td>
-                    <td><strong>{euro(responsibleVehicleMarginStats.totalNetMarginHT)}</strong></td>
-                  </tr>
-                  <tr>
-                    <td>Part Benoît / Axel</td>
-                    <td><strong>{euro(responsibleVehicleMarginStats.responsableShareHT)} chacun</strong></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
+              <tbody>
+                <tr>
+                  <td>Marge TTC ventes responsables</td>
+                  <td><strong>{euro(responsibleVehicleMarginStats.totalMarginTTC)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Frais Vroom 9 % TTC</td>
+                  <td><strong>-{euro(responsibleVehicleMarginStats.totalVroomFeeTTC)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Marge après Vroom convertie HT</td>
+                  <td><strong>{euro(responsibleVehicleMarginStats.totalAfterVroomHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>CashSentinel 54 € TTC converti HT</td>
+                  <td><strong>-{euro(responsibleVehicleMarginStats.totalCashSentinelHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Ventes à entreprise 18 € TTC converti HT</td>
+                  <td><strong>-{euro(responsibleVehicleMarginStats.totalCompanyCashSentinelHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Frais divers HT</td>
+                  <td><strong>-{euro(responsibleVehicleMarginStats.totalMiscellaneousFeesHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Virement instantané HT</td>
+                  <td><strong>-{euro(Number(responsibleVehicleMarginStats.totalInstantTransferFeeHT || 0))}</strong></td>
+                </tr>
+                <tr>
+                  <td>Résultat net HT à partager</td>
+                  <td><strong>{euro(responsibleVehicleMarginStats.totalNetMarginHT)}</strong></td>
+                </tr>
+                <tr>
+                  <td>Part Benoît / Axel</td>
+                  <td><strong>{euro(responsibleVehicleMarginStats.responsableShareHT)} chacun</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           {selectedPerson?.type === 'agent' && (
             <div className="card" style={{ borderColor: '#22c55e' }}>
@@ -7094,6 +7161,13 @@ export function Remuneration({
                           {row.companyCashSentinelHT > 0 && <span>Vente entreprise : <strong>-{euro(row.companyCashSentinelHT)}</strong></span>}
                           {row.instantTransferFeeHT > 0 && <span>Virement instantané : <strong>-{euro(row.instantTransferFeeHT)}</strong></span>}
                           {row.miscellaneousFeesHT > 0 && <span>Frais divers : <strong>-{euro(row.miscellaneousFeesHT)}</strong></span>}
+                          {Number(row.warrantySelectedShareHT || 0) !== 0 && (
+                            <span>
+                              {row.warrantyDetailLabel} : <strong style={{ color: row.warrantySelectedShareHT >= 0 ? '#22c55e' : '#f97316' }}>
+                                {row.warrantySelectedShareHT >= 0 ? '+' : ''}{euro(row.warrantySelectedShareHT)}
+                              </strong>
+                            </span>
+                          )}
                         </div>
 
                         <div style={{ borderTop: '1px solid rgba(148, 163, 184, 0.22)', paddingTop: 8 }}>
@@ -7109,14 +7183,12 @@ export function Remuneration({
             </div>
           )}
 
-          <div className="card" style={{ borderColor: '#38bdf8' }}>
+          <div className="card" style={{ borderColor: '#38bdf8', maxWidth: '100%', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div>
-                <h3>{selectedPerson?.type === 'agent' ? 'Mes véhicules rémunérés' : 'Détail par véhicule vendu'}</h3>
+                <h3>Détail par véhicule vendu</h3>
                 <p className="muted">
-                  {selectedPerson?.type === 'agent'
-                    ? 'Vue limitée aux véhicules de l’agent sélectionné. Les ventes responsables et les autres agents sont masqués.'
-                    : 'Choisis tous les véhicules du mois ou un véhicule précis pour contrôler le calcul ligne par ligne.'}
+                  Choisis tous les véhicules du mois ou un véhicule précis pour contrôler le calcul ligne par ligne.
                 </p>
               </div>
 
@@ -7138,101 +7210,61 @@ export function Remuneration({
               <p className="muted" style={{ marginTop: 12 }}>
                 Aucun véhicule vendu trouvé pour cette agence et cette période.
               </p>
-            ) : selectedPerson?.type === 'agent' ? (
+            ) : (
               <div style={{ overflowX: 'auto', marginTop: 14, width: '100%' }}>
-                <table className="table" style={{ minWidth: 760, marginTop: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Véhicule</th>
-                      <th>Marge TTC</th>
-                      <th>Marge HT</th>
-                      <th>40 % agent</th>
-                      <th>Frais agent HT</th>
-                      <th>Gain réel agent</th>
-                    </tr>
-                  </thead>
+                <table className="table" style={{ minWidth: 920, marginTop: 0 }}>
+                <thead>
+                  <tr>
+                    <th>Véhicule</th>
+                    <th>Vendeur</th>
+                    <th>Type</th>
+                    <th>Marge TTC</th>
+                    <th>Marge HT base</th>
+                    <th>Frais / Vroom</th>
+                    <th>Part agent HT</th>
+                    <th>Part Benoît / Axel HT</th>
+                    <th>Part personne sélectionnée</th>
+                  </tr>
+                </thead>
 
-                  <tbody>
-                    {selectedVehicleDetailRows.map((row) => (
-                      <tr key={`vehicle-detail-row-agent-${row.id}`}>
+                <tbody>
+                  {selectedVehicleDetailRows.map((row) => {
+                    const fraisOuVroom = Number(row.deductionsHT || 0);
+
+                    return (
+                      <tr key={`vehicle-detail-row-${row.id}`}>
                         <td>
                           <strong>{row.vehicle}</strong>
                           <div className="muted" style={{ fontSize: 12 }}>
                             {row.date}{row.registration ? ` — ${row.registration}` : ''}
                           </div>
                         </td>
+                        <td>{row.seller}</td>
+                        <td>{row.typeLabel}</td>
                         <td><strong>{euro(row.marginTTC)}</strong></td>
                         <td>{euro(row.marginHT)}</td>
-                        <td>{euro(row.agentGrossHT)}</td>
                         <td>
-                          <strong>-{euro(Number(row.agentFeesHT || 0))}</strong>
+                          <strong>-{euro(fraisOuVroom)}</strong>
                           <div className="muted" style={{ fontSize: 12 }}>
-                            CashSentinel {euro(row.cashSentinelHT)}
-                            {row.companyCashSentinelHT > 0 ? ` — entreprise ${euro(row.companyCashSentinelHT)}` : ''}
-                            {row.instantTransferFeeHT > 0 ? ` — virement ${euro(row.instantTransferFeeHT)}` : ''}
-                            {row.miscellaneousFeesHT > 0 ? ` — divers ${euro(row.miscellaneousFeesHT)}` : ''}
+                            {row.saleToCompany ? 'Entreprise' : 'Particulier'} — frais divers {euro(row.miscellaneousFeesHT)}
                           </div>
                         </td>
+                        <td>{row.soldByAgent ? <strong>{euro(row.agentNetHT)}</strong> : '-'}</td>
+                        <td><strong>{euro(row.responsableShareHT)} chacun</strong></td>
                         <td>
-                          <strong style={{ color: row.agentNetHT >= 0 ? '#22c55e' : '#f97316' }}>
-                            {row.agentNetHT >= 0 ? '+' : ''}{euro(row.agentNetHT)}
+                          <strong style={{ color: row.selectedShareHT >= 0 ? '#22c55e' : '#f97316' }}>
+                            {row.selectedShareHT >= 0 ? '+' : ''}{euro(row.selectedShareHT)}
                           </strong>
+                          {Number(row.warrantySelectedShareHT || 0) !== 0 && (
+                            <div className="muted" style={{ fontSize: 12 }}>
+                              dont garantie : {row.warrantySelectedShareHT >= 0 ? '+' : ''}{euro(row.warrantySelectedShareHT)}
+                            </div>
+                          )}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto', marginTop: 14, width: '100%' }}>
-                <table className="table" style={{ minWidth: 1120, marginTop: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Véhicule</th>
-                      <th>Vendeur</th>
-                      <th>Type</th>
-                      <th>Marge TTC</th>
-                      <th>Marge HT base</th>
-                      <th>Frais / Vroom</th>
-                      <th>Part agent HT</th>
-                      <th>Part Benoît / Axel HT</th>
-                      <th>Part personne sélectionnée</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {selectedVehicleDetailRows.map((row) => {
-                      const fraisOuVroom = Number(row.deductionsHT || 0);
-
-                      return (
-                        <tr key={`vehicle-detail-row-${row.id}`}>
-                          <td>
-                            <strong>{row.vehicle}</strong>
-                            <div className="muted" style={{ fontSize: 12 }}>
-                              {row.date}{row.registration ? ` — ${row.registration}` : ''}
-                            </div>
-                          </td>
-                          <td>{row.seller}</td>
-                          <td>{row.typeLabel}</td>
-                          <td><strong>{euro(row.marginTTC)}</strong></td>
-                          <td>{euro(row.marginHT)}</td>
-                          <td>
-                            <strong>-{euro(fraisOuVroom)}</strong>
-                            <div className="muted" style={{ fontSize: 12 }}>
-                              {row.saleToCompany ? 'Entreprise' : 'Particulier'} — frais divers {euro(row.miscellaneousFeesHT)}
-                            </div>
-                          </td>
-                          <td>{row.soldByAgent ? <strong>{euro(row.agentNetHT)}</strong> : '-'}</td>
-                          <td><strong>{euro(row.responsableShareHT)} chacun</strong></td>
-                          <td>
-                            <strong style={{ color: row.selectedShareHT >= 0 ? '#22c55e' : '#f97316' }}>
-                              {row.selectedShareHT >= 0 ? '+' : ''}{euro(row.selectedShareHT)}
-                            </strong>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
+                    );
+                  })}
+                </tbody>
                 </table>
               </div>
             )}
@@ -7246,7 +7278,7 @@ export function Remuneration({
             </p>
 
             <div style={{ overflowX: 'auto', width: '100%' }}>
-              <table className="table" style={{ minWidth: 820 }}>
+              <table className="table" style={{ minWidth: 780 }}>
               <thead>
                 <tr>
                   <th>Personne</th>
@@ -7259,26 +7291,24 @@ export function Remuneration({
               </thead>
 
               <tbody>
-                {commercialVehicleMarginStats.rows
-                  .filter((row) => selectedPerson?.type !== 'agent' || row.key === selectedPerson.key)
-                  .map((row) => {
-                    const fraisAgent = Number(row.agentCashSentinelHT || 0) + Number(row.agentCompanyCashSentinelHT || 0) + Number(row.agentMiscellaneousFeesHT || 0) + Number(row.agentInstantTransferHT || 0);
-                    const fraisResponsable = Number(row.responsableVroomFeeHT || 0);
-                    const part = row.type === 'agent' ? Number(row.agentNetHT || 0) : Number(row.responsableShareHT || 0);
-                    const base = row.type === 'agent' ? Number(row.agentGrossHT || 0) : Number(row.responsableGrossHT || 0);
-                    const frais = row.type === 'agent' ? fraisAgent : fraisResponsable;
+                {commercialVehicleMarginStats.rows.map((row) => {
+                  const fraisAgent = Number(row.agentCashSentinelHT || 0) + Number(row.agentCompanyCashSentinelHT || 0) + Number(row.agentMiscellaneousFeesHT || 0) + Number(row.agentInstantTransferHT || 0);
+                  const fraisResponsable = Number(row.responsableVroomFeeHT || 0);
+                  const part = row.type === 'agent' ? Number(row.agentNetHT || 0) : Number(row.responsableShareHT || 0);
+                  const base = row.type === 'agent' ? Number(row.agentGrossHT || 0) : Number(row.responsableGrossHT || 0);
+                  const frais = row.type === 'agent' ? fraisAgent : fraisResponsable;
 
-                    return (
-                      <tr key={`commercial-margin-${row.key}`}>
-                        <td><strong>{row.full_name}</strong></td>
-                        <td>{row.label_type}</td>
-                        <td>{row.salesCount}</td>
-                        <td>{euro(base)}</td>
-                        <td><strong>-{euro(frais)}</strong></td>
-                        <td><strong>{part >= 0 ? '+' : ''}{euro(part)}</strong></td>
-                      </tr>
-                    );
-                  })}
+                  return (
+                    <tr key={`commercial-margin-${row.key}`}>
+                      <td><strong>{row.full_name}</strong></td>
+                      <td>{row.label_type}</td>
+                      <td>{row.salesCount}</td>
+                      <td>{euro(base)}</td>
+                      <td><strong>-{euro(frais)}</strong></td>
+                      <td><strong>{part >= 0 ? '+' : ''}{euro(part)}</strong></td>
+                    </tr>
+                  );
+                })}
               </tbody>
               </table>
             </div>
@@ -7289,7 +7319,7 @@ export function Remuneration({
             <p className="muted">
               Règle validée : calcul sur le prix garantie réellement enregistré dans la vente. Le prix est converti en HT, puis on retire le coût d'achat de la garantie.
               Pour les agents commerciaux : 40 % du bénéfice HT revient à l'agent et 60 % est partagé entre Benoît et Axel. Pour les responsables : partage 50/50.
-              START : -45 € HT par responsable si vendu par un responsable, ou -90 € HT pour l'agent si vendu par un agent commercial.
+              START ne compte pas comme une garantie vendue dans les statistiques. Si elle est vendue par un agent commercial, elle retire -90 € HT uniquement à cet agent. Si elle est vendue par un responsable, elle retire -45 € HT à chaque responsable.
             </p>
 
             <table className="table">
@@ -7401,7 +7431,7 @@ export function Remuneration({
           Les responsables ne sont pas concernés.
         </p>
         <p className="muted">
-          Bloc Garanties : START est une pénalité. Les autres garanties sont calculées sur le prix réel saisi, converti en HT, moins le coût d'achat.
+          Bloc Garanties : START est une pénalité et ne compte pas comme une garantie vendue. Les autres garanties sont calculées sur le prix réel saisi, converti en HT, moins le coût d'achat.
           Agent commercial = 40 % du bénéfice HT, le reste partagé entre Benoît et Axel. Responsable = partage 50/50 entre Benoît et Axel.
         </p>
         <p className="muted">
