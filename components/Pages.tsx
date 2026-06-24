@@ -7427,25 +7427,6 @@ export function Remuneration({
           )}
         </>
       )}
-
-      <div className="card">
-        <h3>Règles validées — Rémunération V1</h3>
-        <p className="muted">
-          Bloc Leads : le lead est facturé dès sa création, même s'il est non signé, archivé, perdu ou jamais vendu.
-          Call Center = 99 € HT. Démarchage Agent et Visite spontanée = 0 € HT.
-        </p>
-        <p className="muted">
-          Bloc Leboncoin : chaque agent commercial est déduit automatiquement de 978,37 € HT par mois.
-          Les responsables ne sont pas concernés.
-        </p>
-        <p className="muted">
-          Bloc Garanties : START est une pénalité et ne compte pas comme une garantie vendue. Les autres garanties sont calculées sur le prix réel saisi, converti en HT, moins le coût d'achat.
-          Agent commercial = 40 % du bénéfice HT, le reste partagé entre Benoît et Axel. Responsable = partage 50/50 entre Benoît et Axel.
-        </p>
-        <p className="muted">
-          Bloc Marges véhicules : Responsable = marge TTC - 9 % Vroom, conversion HT, CashSentinel, vente entreprise, frais divers, puis partage 50/50. Agent commercial = marge TTC convertie HT, 40 % agent moins CashSentinel/vente entreprise/frais divers/virement instantané ; 60 % responsables moins 9 % Vroom, puis partage 50/50 entre Benoît et Axel.
-        </p>
-      </div>
     </div>
   );
 }
