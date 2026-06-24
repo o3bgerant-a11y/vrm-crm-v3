@@ -256,6 +256,34 @@ function hasInstantTransferFee(value: any) {
   return text.includes('virement instantane');
 }
 
+
+function getTextAfterLabel(value: any, label: string) {
+  const text = String(value || '');
+  const line = text
+    .split('
+')
+    .find(item => item.toLowerCase().startsWith(label.toLowerCase()));
+
+  if (!line) return '';
+
+  return line
+    .slice(label.length)
+    .replace(/^\s*:\s*/, '')
+    .trim();
+}
+
+function getSaleSellerName(sale: any) {
+  return sale?.agents?.full_name || getTextAfterLabel(sale?.comments, 'Responsable vente') || 'Agent non renseigné';
+}
+
+function getSaleAgencyId(sale: any) {
+  return sale?.agents?.agency_id || agencyIdFromName(getTextAfterLabel(sale?.comments, 'Agence rémunération'));
+}
+
+function getSaleAgencyName(sale: any) {
+  return agencyName(getSaleAgencyId(sale));
+}
+
 function calculateStats(sales: VehicleSale[]) {
   const ca = sales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
   const margin = sales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
@@ -4512,8 +4540,8 @@ export function Garanties() {
     }>();
 
     sales.forEach((sale) => {
-      const name = sale.agents?.full_name || 'Agent non renseigné';
-      const agency = agencyName(sale.agents?.agency_id);
+      const name = getSaleSellerName(sale);
+      const agency = getSaleAgencyName(sale);
 
       const current = map.get(name) || {
         name,
@@ -4550,7 +4578,7 @@ export function Garanties() {
     ];
 
     sales.forEach((sale) => {
-      const agency = agencyName(sale.agents?.agency_id);
+      const agency = getSaleAgencyName(sale);
       const row = base.find(item => item.agency === agency);
 
       if (!row) return;
@@ -5617,8 +5645,8 @@ export function Stats() {
     }>();
 
     monthSales.forEach((sale) => {
-      const name = sale.agents?.full_name || 'Agent non renseigné';
-      const agency = agencyName(sale.agents?.agency_id);
+      const name = getSaleSellerName(sale);
+      const agency = getSaleAgencyName(sale);
 
       const current = map.get(name) || {
         name,
@@ -5648,7 +5676,7 @@ export function Stats() {
     ];
 
     monthSales.forEach((sale) => {
-      const agency = agencyName(sale.agents?.agency_id);
+      const agency = getSaleAgencyName(sale);
       const row = base.find(item => item.agency === agency);
 
       if (!row) return;
