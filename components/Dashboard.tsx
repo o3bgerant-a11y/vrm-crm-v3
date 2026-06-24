@@ -32,6 +32,7 @@ type Sale = {
   sale_price: number | null;
   margin_amount: number | null;
   warranty_sold: boolean | null;
+  warranty_type?: string | null;
   warranty_amount: number | null;
   sale_date: string | null;
   comments?: string | null;
@@ -84,6 +85,23 @@ function getSaleAgencyName(sale: Sale) {
   if (remunerationAgency) return remunerationAgency;
 
   return '-';
+}
+
+function normalizeWarrantyLabel(value: any) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function isStartWarrantyType(value: any) {
+  const normalized = normalizeWarrantyLabel(value);
+  return normalized.includes('start');
+}
+
+function isRealWarrantySale(sale: Sale) {
+  return sale.warranty_sold === true && !isStartWarrantyType(sale.warranty_type);
 }
 
 export default function Dashboard({
@@ -174,8 +192,8 @@ export default function Dashboard({
   const stats = useMemo(() => {
     const ca = sales.reduce((total, sale) => total + Number(sale.sale_price || 0), 0);
     const margin = sales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
-    const warranties = sales.filter(sale => sale.warranty_sold).length;
-    const warrantyAmount = sales.reduce((total, sale) => total + Number(sale.warranty_amount || 0), 0);
+    const warranties = sales.filter(sale => isRealWarrantySale(sale)).length;
+    const warrantyAmount = sales.reduce((total, sale) => total + (isRealWarrantySale(sale) ? Number(sale.warranty_amount || 0) : 0), 0);
     const averageMargin = sales.length > 0 ? margin / sales.length : 0;
     const warrantyRate = sales.length > 0 ? Math.round((warranties / sales.length) * 100) : 0;
 
@@ -194,7 +212,7 @@ export default function Dashboard({
     const monthSales = sales.filter(sale => isCurrentMonth(sale.sale_date));
 
     const margin = monthSales.reduce((total, sale) => total + Number(sale.margin_amount || 0), 0);
-    const warranties = monthSales.filter(sale => sale.warranty_sold).length;
+    const warranties = monthSales.filter(sale => isRealWarrantySale(sale)).length;
 
     return {
       salesCount: monthSales.length,
@@ -221,7 +239,7 @@ export default function Dashboard({
       current.sales += 1;
       current.ca += Number(sale.sale_price || 0);
       current.margin += Number(sale.margin_amount || 0);
-      current.warranties += sale.warranty_sold ? 1 : 0;
+      current.warranties += isRealWarrantySale(sale) ? 1 : 0;
 
       map.set(name, current);
     });
@@ -245,7 +263,7 @@ export default function Dashboard({
       row.sales += 1;
       row.ca += Number(sale.sale_price || 0);
       row.margin += Number(sale.margin_amount || 0);
-      row.warranties += sale.warranty_sold ? 1 : 0;
+      row.warranties += isRealWarrantySale(sale) ? 1 : 0;
     });
 
     return base.sort((a, b) => b.margin - a.margin);
@@ -340,7 +358,7 @@ export default function Dashboard({
                   <tr key={s.id}>
                     <td>{s.vehicle_name}</td>
                     <td><strong>{euro(Number(s.margin_amount || 0))}</strong></td>
-                    <td>{s.warranty_sold ? 'Oui' : 'Non'}</td>
+                    <td>{isRealWarrantySale(s) ? 'Oui' : 'Non'}</td>
                   </tr>
                 ))}
               </tbody>
