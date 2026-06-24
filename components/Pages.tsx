@@ -6330,6 +6330,7 @@ export function Remuneration({
         totalCashSentinelHT: 0,
         totalCompanyCashSentinelHT: 0,
         totalMiscellaneousFeesHT: 0,
+        totalInstantTransferFeeHT: 0,
         totalNetMarginHT: 0,
         responsableShareHT: 0,
       };
@@ -6350,6 +6351,7 @@ export function Remuneration({
       acc.totalCashSentinelHT += detail.cashSentinelHT;
       acc.totalCompanyCashSentinelHT += detail.companyCashSentinelHT;
       acc.totalMiscellaneousFeesHT += detail.miscellaneousFeesHT;
+      acc.totalInstantTransferFeeHT += detail.instantTransferFeeHT;
       acc.totalNetMarginHT += detail.netMarginHT;
 
       return acc;
@@ -6360,6 +6362,7 @@ export function Remuneration({
       totalCashSentinelHT: 0,
       totalCompanyCashSentinelHT: 0,
       totalMiscellaneousFeesHT: 0,
+      totalInstantTransferFeeHT: 0,
       totalNetMarginHT: 0,
     });
 
@@ -6380,6 +6383,7 @@ export function Remuneration({
       agentCashSentinelHT: 0,
       agentCompanyCashSentinelHT: 0,
       agentMiscellaneousFeesHT: 0,
+      agentInstantTransferHT: 0,
       agentNetHT: 0,
       responsableGrossHT: 0,
       responsableVroomFeeHT: 0,
@@ -6399,6 +6403,7 @@ export function Remuneration({
         totalCashSentinelHT: 0,
         totalCompanyCashSentinelHT: 0,
         totalMiscellaneousFeesHT: 0,
+        totalInstantTransferFeeHT: 0,
         rows: emptyRow,
       };
     }
@@ -6417,6 +6422,7 @@ export function Remuneration({
     let totalCashSentinelHT = 0;
     let totalCompanyCashSentinelHT = 0;
     let totalMiscellaneousFeesHT = 0;
+    let totalInstantTransferFeeHT = 0;
 
     commercialSales.forEach((sale) => {
       const detail = calculateCommercialVehicleMarginDetail(sale);
@@ -6430,6 +6436,7 @@ export function Remuneration({
       totalCashSentinelHT += detail.cashSentinelHT;
       totalCompanyCashSentinelHT += detail.companyCashSentinelHT;
       totalMiscellaneousFeesHT += detail.miscellaneousFeesHT;
+      totalInstantTransferFeeHT += detail.instantTransferFeeHT;
 
       if (agentRow) {
         agentRow.salesCount += 1;
@@ -6439,6 +6446,7 @@ export function Remuneration({
         agentRow.agentCashSentinelHT += detail.cashSentinelHT;
         agentRow.agentCompanyCashSentinelHT += detail.companyCashSentinelHT;
         agentRow.agentMiscellaneousFeesHT += detail.miscellaneousFeesHT;
+        agentRow.agentInstantTransferHT += detail.instantTransferFeeHT;
         agentRow.agentNetHT += detail.agentNetHT;
       }
 
@@ -6466,6 +6474,7 @@ export function Remuneration({
       totalCashSentinelHT,
       totalCompanyCashSentinelHT,
       totalMiscellaneousFeesHT,
+      totalInstantTransferFeeHT,
       rows: emptyRow,
     };
   }, [salesList, selectedAgencyId, selectedYear, selectedMonth, agentsList, responsablesList, peopleOptions]);
@@ -6546,6 +6555,8 @@ export function Remuneration({
             typeLabel: 'Vente agent commercial',
             marginHT: detail.marginHT,
             agentGrossHT: detail.agentGrossHT,
+            cashSentinelHT: detail.cashSentinelHT,
+            companyCashSentinelHT: detail.companyCashSentinelHT,
             agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
             deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
             agentNetHT: detail.agentNetHT,
@@ -6565,8 +6576,10 @@ export function Remuneration({
           typeLabel: 'Vente responsable',
           marginHT: detail.marginAfterVroomHT,
           agentGrossHT: 0,
-          agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
-          deductionsHT: (detail.vroomFeeTTC / TVA_DIVIDER) + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT,
+          cashSentinelHT: detail.cashSentinelHT,
+          companyCashSentinelHT: detail.companyCashSentinelHT,
+          agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
+          deductionsHT: (detail.vroomFeeTTC / TVA_DIVIDER) + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
           agentNetHT: 0,
           responsableGrossHT: detail.marginAfterVroomHT,
           vroomFeeHT: detail.vroomFeeTTC / TVA_DIVIDER,
@@ -6922,6 +6935,14 @@ export function Remuneration({
               </div>
               <p className="muted">Frais libres enregistrés dans les ventes.</p>
             </div>
+
+            <div className="card">
+              <h3>Virement instantané HT</h3>
+              <div className="stat-value" style={{ color: '#f97316' }}>
+                -{euro(selectedPerson?.type === 'agent' ? Number(selectedCommercialMarginResult?.agentInstantTransferHT || 0) : Number(responsibleVehicleMarginStats.totalInstantTransferFeeHT || 0))}
+              </div>
+              <p className="muted">7,58 € HT déduit quand l'option est cochée sur une vente.</p>
+            </div>
           </div>
 
           <div className="grid cards3">
@@ -6967,7 +6988,7 @@ export function Remuneration({
           <div className="card">
             <h3>Bloc Marges véhicules</h3>
             <p className="muted">
-              Règle Responsable : marge TTC - 9 % Vroom, conversion HT, puis CashSentinel, vente entreprise et frais divers. Le résultat est partagé entre Benoît et Axel. Règle Agent : marge TTC convertie HT, 40 % pour l’agent moins CashSentinel/entreprise/frais divers ; 60 % pour les responsables, avec les 9 % Vroom à leur charge.
+              Règle Responsable : marge TTC - 9 % Vroom, conversion HT, puis CashSentinel, vente entreprise, frais divers et virement instantané. Le résultat est partagé entre Benoît et Axel. Règle Agent : marge TTC convertie HT, 40 % pour l’agent moins CashSentinel/entreprise/frais divers/virement instantané ; 60 % pour les responsables, avec les 9 % Vroom à leur charge.
             </p>
 
             <table className="table">
@@ -7004,6 +7025,10 @@ export function Remuneration({
                   <td><strong>-{euro(responsibleVehicleMarginStats.totalMiscellaneousFeesHT)}</strong></td>
                 </tr>
                 <tr>
+                  <td>Virement instantané HT</td>
+                  <td><strong>-{euro(Number(responsibleVehicleMarginStats.totalInstantTransferFeeHT || 0))}</strong></td>
+                </tr>
+                <tr>
                   <td>Résultat net HT à partager</td>
                   <td><strong>{euro(responsibleVehicleMarginStats.totalNetMarginHT)}</strong></td>
                 </tr>
@@ -7014,6 +7039,49 @@ export function Remuneration({
               </tbody>
             </table>
           </div>
+
+          {selectedPerson?.type === 'agent' && (
+            <div className="card" style={{ borderColor: '#22c55e' }}>
+              <h3>Gain réel par véhicule</h3>
+              <p className="muted">
+                L'agent voit ici ce qu'il gagne réellement sur chaque véhicule : marge TTC convertie HT, 40 % agent, puis déduction des frais liés à la vente.
+              </p>
+
+              {selectedVehicleDetailRows.filter((row) => row.soldByAgent && Number(row.selectedShareHT || 0) !== 0).length === 0 ? (
+                <p className="muted" style={{ marginTop: 12 }}>Aucun véhicule vendu par cet agent sur la période sélectionnée.</p>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 14 }}>
+                  {selectedVehicleDetailRows
+                    .filter((row) => row.soldByAgent && Number(row.selectedShareHT || 0) !== 0)
+                    .map((row) => (
+                      <div className="item" key={`agent-real-gain-${row.id}`} style={{ display: 'grid', gap: 7 }}>
+                        <div>
+                          <strong>{row.vehicle}</strong>
+                          <p className="muted" style={{ marginTop: 3, marginBottom: 0 }}>{row.date}{row.registration ? ` — ${row.registration}` : ''}</p>
+                        </div>
+
+                        <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                          <span>Marge TTC : <strong>{euro(row.marginTTC)}</strong></span>
+                          <span>Marge HT : <strong>{euro(row.marginHT)}</strong></span>
+                          <span>40 % agent : <strong>{euro(row.agentGrossHT)}</strong></span>
+                          <span>CashSentinel : <strong>-{euro(row.cashSentinelHT)}</strong></span>
+                          {row.companyCashSentinelHT > 0 && <span>Vente entreprise : <strong>-{euro(row.companyCashSentinelHT)}</strong></span>}
+                          {row.instantTransferFeeHT > 0 && <span>Virement instantané : <strong>-{euro(row.instantTransferFeeHT)}</strong></span>}
+                          {row.miscellaneousFeesHT > 0 && <span>Frais divers : <strong>-{euro(row.miscellaneousFeesHT)}</strong></span>}
+                        </div>
+
+                        <div style={{ borderTop: '1px solid rgba(148, 163, 184, 0.22)', paddingTop: 8 }}>
+                          <span className="muted">Gain réel agent</span>
+                          <div className="stat-value" style={{ color: row.selectedShareHT >= 0 ? '#22c55e' : '#f97316', fontSize: 24 }}>
+                            {row.selectedShareHT >= 0 ? '+' : ''}{euro(row.selectedShareHT)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card" style={{ borderColor: '#38bdf8' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -7027,7 +7095,7 @@ export function Remuneration({
               <select
                 value={selectedVehicleId}
                 onChange={(e) => setSelectedVehicleId(e.target.value)}
-                style={{ minWidth: 260 }}
+                style={{ minWidth: 260, maxWidth: '100%' }}
               >
                 <option value="all">Tous les véhicules du mois</option>
                 {remunerationVehicleSales.map((sale) => (
@@ -7043,7 +7111,8 @@ export function Remuneration({
                 Aucun véhicule vendu trouvé pour cette agence et cette période.
               </p>
             ) : (
-              <table className="table" style={{ marginTop: 14 }}>
+              <div style={{ overflowX: 'auto', marginTop: 14, width: '100%' }}>
+                <table className="table" style={{ minWidth: 1120, marginTop: 0 }}>
                 <thead>
                   <tr>
                     <th>Véhicule</th>
@@ -7091,18 +7160,20 @@ export function Remuneration({
                     );
                   })}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
 
           <div className="card">
             <h3>Détail marges agents commerciaux</h3>
             <p className="muted">
-              Pour une vente agent : l'agent reçoit 40 % de la marge HT puis paie CashSentinel, vente entreprise et frais divers.
+              Pour une vente agent : l'agent reçoit 40 % de la marge HT puis paie CashSentinel, vente entreprise, frais divers et virement instantané.
               Les responsables reçoivent 60 % de la marge HT, moins les 9 % Vroom HT, puis partagent le reste en deux.
             </p>
 
-            <table className="table">
+            <div style={{ overflowX: 'auto', width: '100%' }}>
+              <table className="table" style={{ minWidth: 820 }}>
               <thead>
                 <tr>
                   <th>Personne</th>
@@ -7116,7 +7187,7 @@ export function Remuneration({
 
               <tbody>
                 {commercialVehicleMarginStats.rows.map((row) => {
-                  const fraisAgent = Number(row.agentCashSentinelHT || 0) + Number(row.agentCompanyCashSentinelHT || 0) + Number(row.agentMiscellaneousFeesHT || 0);
+                  const fraisAgent = Number(row.agentCashSentinelHT || 0) + Number(row.agentCompanyCashSentinelHT || 0) + Number(row.agentMiscellaneousFeesHT || 0) + Number(row.agentInstantTransferHT || 0);
                   const fraisResponsable = Number(row.responsableVroomFeeHT || 0);
                   const part = row.type === 'agent' ? Number(row.agentNetHT || 0) : Number(row.responsableShareHT || 0);
                   const base = row.type === 'agent' ? Number(row.agentGrossHT || 0) : Number(row.responsableGrossHT || 0);
@@ -7134,7 +7205,8 @@ export function Remuneration({
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
 
           <div className="card">
@@ -7258,7 +7330,7 @@ export function Remuneration({
           Agent commercial = 40 % du bénéfice HT, le reste partagé entre Benoît et Axel. Responsable = partage 50/50 entre Benoît et Axel.
         </p>
         <p className="muted">
-          Bloc Marges véhicules : Responsable = marge TTC - 9 % Vroom, conversion HT, CashSentinel, vente entreprise, frais divers, puis partage 50/50. Agent commercial = marge TTC convertie HT, 40 % agent moins CashSentinel/vente entreprise/frais divers ; 60 % responsables moins 9 % Vroom, puis partage 50/50 entre Benoît et Axel.
+          Bloc Marges véhicules : Responsable = marge TTC - 9 % Vroom, conversion HT, CashSentinel, vente entreprise, frais divers, puis partage 50/50. Agent commercial = marge TTC convertie HT, 40 % agent moins CashSentinel/vente entreprise/frais divers/virement instantané ; 60 % responsables moins 9 % Vroom, puis partage 50/50 entre Benoît et Axel.
         </p>
       </div>
     </div>
