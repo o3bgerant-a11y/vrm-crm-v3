@@ -270,6 +270,7 @@ export default function Dashboard({
   }, [sales]);
 
   const latestSales = sales.slice(0, 6);
+  const showMaverykAirpodsChallenge = !isResponsable && String(currentAgent?.full_name || '').toLowerCase().includes('maveryk');
 
   if (loading) {
     return (
@@ -337,6 +338,56 @@ export default function Dashboard({
             <p className="muted">Ventes rattachées à mon compte</p>
           </div>
         </div>
+
+        {showMaverykAirpodsChallenge && (
+          <div
+            className="card"
+            style={{
+              border: '1px solid rgba(56, 189, 248, 0.55)',
+              background: 'radial-gradient(circle at 18% 20%, rgba(56, 189, 248, 0.24), rgba(15, 23, 42, 0.96) 46%, rgba(2, 6, 23, 0.98) 100%)',
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                right: 18,
+                top: 14,
+                width: 135,
+                height: 105,
+                opacity: 0.22,
+                borderRadius: 28,
+                background: 'linear-gradient(145deg, rgba(255,255,255,.98), rgba(148,163,184,.45))',
+                boxShadow: '0 0 32px rgba(56,189,248,.45)',
+              }}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 18, alignItems: 'center' }}>
+              <div>
+                <div className="badge" style={{ marginBottom: 12 }}>Défi spécial Maveryk</div>
+                <h3 style={{ fontSize: 30, marginBottom: 8 }}>🎧 Tu les veux ???</h3>
+                <p className="muted" style={{ maxWidth: 640 }}>
+                  Chaque vente compte. Garde le rythme, va chercher tes objectifs du mois et montre que tu peux les gagner.
+                </p>
+              </div>
+
+              <div
+                aria-label="AirPods stylisés"
+                style={{
+                  width: 150,
+                  minHeight: 120,
+                  display: 'grid',
+                  placeItems: 'center',
+                  position: 'relative',
+                }}
+              >
+                <div style={{ fontSize: 64, filter: 'drop-shadow(0 0 16px rgba(56,189,248,.55))' }}>🎧</div>
+                <div style={{ color: '#facc15', fontWeight: 900, fontSize: 18, marginTop: -12 }}>GO !</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="card">
           <h3>Mes dernières ventes</h3>
