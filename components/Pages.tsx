@@ -7066,18 +7066,6 @@ export function Remuneration({
               <div className="stat-value">{selectedPersonLeadResult?.callCenterCount || 0}</div>
               <p className="muted">Déduction personne sélectionnée : {euro(Number(selectedPersonLeadResult?.deductionHT || 0))} HT</p>
             </div>
-
-            <div className="card">
-              <h3>Démarchage Agent</h3>
-              <div className="stat-value">{leadStats.demarchageLeads.length}</div>
-              <p className="muted">Coût total : 0 € HT</p>
-            </div>
-
-            <div className="card">
-              <h3>Visites spontanées</h3>
-              <div className="stat-value">{leadStats.visiteLeads.length}</div>
-              <p className="muted">Coût total : 0 € HT</p>
-            </div>
           </div>
 
           {selectedPerson?.type === 'responsable' && (
