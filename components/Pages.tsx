@@ -4463,8 +4463,8 @@ export function Ventes({
                     </div>
                   )}
                 </td>
-                <td>{s.agents?.full_name || '-'}</td>
-                <td><span className="badge">{agencyName(s.agents?.agency_id)}</span></td>
+                <td>{getSaleSellerName(s)}</td>
+                <td><span className="badge">{agencyName(getSaleDisplayAgencyId(s))}</span></td>
                 <td>{euro(Number(s.sale_price || 0))}</td>
                 <td>
                   <strong>{euro(Number(s.margin_amount || 0))}</strong>
@@ -7065,6 +7065,18 @@ export function Remuneration({
               <h3>Leads Call Center</h3>
               <div className="stat-value">{selectedPersonLeadResult?.callCenterCount || 0}</div>
               <p className="muted">Déduction personne sélectionnée : {euro(Number(selectedPersonLeadResult?.deductionHT || 0))} HT</p>
+            </div>
+
+            <div className="card">
+              <h3>Démarchage Agent</h3>
+              <div className="stat-value">{leadStats.demarchageLeads.length}</div>
+              <p className="muted">Coût total : 0 € HT</p>
+            </div>
+
+            <div className="card">
+              <h3>Visites spontanées</h3>
+              <div className="stat-value">{leadStats.visiteLeads.length}</div>
+              <p className="muted">Coût total : 0 € HT</p>
             </div>
           </div>
 
