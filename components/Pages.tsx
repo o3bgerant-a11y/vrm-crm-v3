@@ -7189,240 +7189,240 @@ export function Remuneration({
 
           {selectedPerson?.type === 'responsable' && (
             <>
-          <div className="card" style={{ borderColor: '#38bdf8', maxWidth: '100%', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div>
-                <h3>Détail par véhicule vendu</h3>
+              <div className="card" style={{ borderColor: '#38bdf8', maxWidth: 1120, margin: '0 auto', width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div>
+                    <h3>Vue Responsable — synthèse claire</h3>
+                    <p className="muted">
+                      Vue recentrée pour contrôler rapidement la rémunération responsable sur la période sélectionnée.
+                    </p>
+                  </div>
+
+                  <select
+                    value={selectedVehicleId}
+                    onChange={(e) => setSelectedVehicleId(e.target.value)}
+                    style={{ minWidth: 260, maxWidth: '100%' }}
+                  >
+                    <option value="all">Tous les véhicules du mois</option>
+                    {remunerationVehicleSales.map((sale) => (
+                      <option key={`vehicle-detail-option-${sale.id}`} value={String(sale.id)}>
+                        {vehicleLabel(sale)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, maxWidth: 1120, margin: '0 auto', width: '100%' }}>
+                <div className="card" style={{ borderColor: selectedProvisionalResultHT >= 0 ? '#22c55e' : '#f97316' }}>
+                  <h3>Revenu responsable HT</h3>
+                  <div className="stat-value" style={{ color: selectedProvisionalResultHT >= 0 ? '#22c55e' : '#f97316' }}>
+                    {selectedProvisionalResultHT >= 0 ? '+' : ''}{euro(selectedProvisionalResultHT)}
+                  </div>
+                  <p className="muted">Part de {selectedPerson?.full_name || 'responsable'} sur le mois.</p>
+                </div>
+
+                <div className="card">
+                  <h3>Marges véhicules HT</h3>
+                  <div className="stat-value" style={{ color: selectedVehicleMarginGainHT >= 0 ? '#22c55e' : '#f97316' }}>
+                    {selectedVehicleMarginGainHT >= 0 ? '+' : ''}{euro(selectedVehicleMarginGainHT)}
+                  </div>
+                  <p className="muted">
+                    {responsibleVehicleMarginStats.responsibleSales.length} vente(s) responsable(s) + {commercialVehicleMarginStats.commercialSales.length} vente(s) agent(s).
+                  </p>
+                </div>
+
+                <div className="card">
+                  <h3>Garanties HT</h3>
+                  <div className="stat-value" style={{ color: selectedWarrantyGainHT >= 0 ? '#22c55e' : '#f97316' }}>
+                    {selectedWarrantyGainHT >= 0 ? '+' : ''}{euro(selectedWarrantyGainHT)}
+                  </div>
+                  <p className="muted">{selectedPersonWarrantyResult?.warrantiesCount || 0} garantie(s) prise(s) en compte. START exclue des stats.</p>
+                </div>
+
+                <div className="card">
+                  <h3>Leads Call Center</h3>
+                  <div className="stat-value" style={{ color: '#f97316' }}>
+                    -{euro(Number(selectedPersonLeadResult?.deductionHT || 0))}
+                  </div>
+                  <p className="muted">{selectedPersonLeadResult?.callCenterCount || 0} lead(s) facturé(s) sur la période.</p>
+                </div>
+              </div>
+
+              <div className="card" style={{ maxWidth: 1120, margin: '0 auto', width: '100%' }}>
+                <h3>Liste des voitures — gain réel par véhicule</h3>
                 <p className="muted">
-                  Choisis tous les véhicules du mois ou un véhicule précis pour contrôler le calcul ligne par ligne.
+                  Chaque carte détaille la marge, les frais, la part agent éventuelle et la part réellement gagnée par le responsable sélectionné.
                 </p>
-              </div>
 
-              <select
-                value={selectedVehicleId}
-                onChange={(e) => setSelectedVehicleId(e.target.value)}
-                style={{ minWidth: 260, maxWidth: '100%' }}
-              >
-                <option value="all">Tous les véhicules du mois</option>
-                {remunerationVehicleSales.map((sale) => (
-                  <option key={`vehicle-detail-option-${sale.id}`} value={String(sale.id)}>
-                    {vehicleLabel(sale)}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {selectedVehicleDetailRows.length === 0 ? (
+                  <p className="muted" style={{ marginTop: 12 }}>
+                    Aucun véhicule vendu trouvé pour cette agence et cette période.
+                  </p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))', gap: 12, marginTop: 14 }}>
+                    {selectedVehicleDetailRows.map((row) => {
+                      const fraisOuVroom = Number(row.deductionsHT || 0);
 
-            {selectedVehicleDetailRows.length === 0 ? (
-              <p className="muted" style={{ marginTop: 12 }}>
-                Aucun véhicule vendu trouvé pour cette agence et cette période.
-              </p>
-            ) : (
-              <div style={{ overflowX: 'auto', marginTop: 14, width: '100%' }}>
-                <table className="table" style={{ minWidth: 920, marginTop: 0 }}>
-                <thead>
-                  <tr>
-                    <th>Véhicule</th>
-                    <th>Vendeur</th>
-                    <th>Type</th>
-                    <th>Marge TTC</th>
-                    <th>Marge HT base</th>
-                    <th>Frais / Vroom</th>
-                    <th>Part agent HT</th>
-                    <th>Part Benoît / Axel HT</th>
-                    <th>Part personne sélectionnée</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {selectedVehicleDetailRows.map((row) => {
-                    const fraisOuVroom = Number(row.deductionsHT || 0);
-
-                    return (
-                      <tr key={`vehicle-detail-row-${row.id}`}>
-                        <td>
-                          <strong>{row.vehicle}</strong>
-                          <div className="muted" style={{ fontSize: 12 }}>
-                            {row.date}{row.registration ? ` — ${row.registration}` : ''}
-                          </div>
-                        </td>
-                        <td>{row.seller}</td>
-                        <td>{row.typeLabel}</td>
-                        <td><strong>{euro(row.marginTTC)}</strong></td>
-                        <td>{euro(row.marginHT)}</td>
-                        <td>
-                          <strong>-{euro(fraisOuVroom)}</strong>
-                          <div className="muted" style={{ fontSize: 12 }}>
-                            {row.saleToCompany ? 'Entreprise' : 'Particulier'} — frais divers {euro(row.miscellaneousFeesHT)}
-                          </div>
-                        </td>
-                        <td>{row.soldByAgent ? <strong>{euro(row.agentNetHT)}</strong> : '-'}</td>
-                        <td><strong>{euro(row.responsableShareHT)} chacun</strong></td>
-                        <td>
-                          <strong style={{ color: row.selectedShareHT >= 0 ? '#22c55e' : '#f97316' }}>
-                            {row.selectedShareHT >= 0 ? '+' : ''}{euro(row.selectedShareHT)}
-                          </strong>
-                          {Number(row.warrantySelectedShareHT || 0) !== 0 && (
-                            <div className="muted" style={{ fontSize: 12 }}>
-                              dont garantie : {row.warrantySelectedShareHT >= 0 ? '+' : ''}{euro(row.warrantySelectedShareHT)}
+                      return (
+                        <div className="item" key={`responsable-vehicle-card-${row.id}`} style={{ display: 'grid', gap: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                            <div>
+                              <strong>{row.vehicle}</strong>
+                              <p className="muted" style={{ marginTop: 3, marginBottom: 0, fontSize: 12 }}>
+                                {row.date}{row.registration ? ` — ${row.registration}` : ''}
+                              </p>
                             </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                </table>
+                            <span className="badge">{row.typeLabel}</span>
+                          </div>
+
+                          <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                            <span>Vendeur : <strong>{row.seller}</strong></span>
+                            <span>Marge TTC : <strong>{euro(row.marginTTC)}</strong></span>
+                            <span>Marge HT base : <strong>{euro(row.marginHT)}</strong></span>
+                            <span>Frais / Vroom / coûts : <strong style={{ color: '#f97316' }}>-{euro(fraisOuVroom)}</strong></span>
+                            <span>CashSentinel : <strong>-{euro(row.cashSentinelHT + row.companyCashSentinelHT)}</strong></span>
+                            {row.miscellaneousFeesHT > 0 && <span>Frais divers : <strong>-{euro(row.miscellaneousFeesHT)}</strong></span>}
+                            {row.instantTransferFeeHT > 0 && <span>Virement instantané : <strong>-{euro(row.instantTransferFeeHT)}</strong></span>}
+                            {row.soldByAgent && <span>Part agent HT : <strong>{euro(row.agentNetHT)}</strong></span>}
+                            <span>Part responsable : <strong>{euro(row.responsableShareHT)} chacun</strong></span>
+                            {Number(row.warrantySelectedShareHT || 0) !== 0 && (
+                              <span>
+                                Garantie : <strong style={{ color: row.warrantySelectedShareHT >= 0 ? '#22c55e' : '#f97316' }}>
+                                  {row.warrantySelectedShareHT >= 0 ? '+' : ''}{euro(row.warrantySelectedShareHT)}
+                                </strong>
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ borderTop: '1px solid rgba(148, 163, 184, 0.22)', paddingTop: 8 }}>
+                            <span className="muted">Gain réel pour {selectedPerson?.full_name || 'ce responsable'}</span>
+                            <div className="stat-value" style={{ color: row.selectedShareHT >= 0 ? '#22c55e' : '#f97316', fontSize: 24 }}>
+                              {row.selectedShareHT >= 0 ? '+' : ''}{euro(row.selectedShareHT)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="card">
-            <h3>Détail marges agents commerciaux</h3>
-            <p className="muted">
-              Pour une vente agent : l'agent reçoit 40 % de la marge HT puis paie CashSentinel, vente entreprise, frais divers et virement instantané.
-              Les responsables reçoivent 60 % de la marge HT, moins les 9 % Vroom HT, puis partagent le reste en deux.
-            </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, maxWidth: 1120, margin: '0 auto', width: '100%' }}>
+                <div className="card">
+                  <h3>Détail marges agents commerciaux</h3>
+                  <p className="muted">
+                    Vue simplifiée : base HT, frais déduits et part de marge véhicule HT.
+                  </p>
 
-            <div style={{ overflowX: 'auto', width: '100%' }}>
-              <table className="table" style={{ minWidth: 780 }}>
-              <thead>
-                <tr>
-                  <th>Personne</th>
-                  <th>Type</th>
-                  <th>Ventes agents</th>
-                  <th>Marge HT base</th>
-                  <th>Frais déduits</th>
-                  <th>Part marge véhicule HT</th>
-                </tr>
-              </thead>
+                  <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <table className="table" style={{ minWidth: 620 }}>
+                      <thead>
+                        <tr>
+                          <th>Personne</th>
+                          <th>Ventes</th>
+                          <th>Base HT</th>
+                          <th>Frais</th>
+                          <th>Part HT</th>
+                        </tr>
+                      </thead>
 
-              <tbody>
-                {commercialVehicleMarginStats.rows.map((row) => {
-                  const fraisAgent = Number(row.agentCashSentinelHT || 0) + Number(row.agentCompanyCashSentinelHT || 0) + Number(row.agentMiscellaneousFeesHT || 0) + Number(row.agentInstantTransferHT || 0);
-                  const fraisResponsable = Number(row.responsableVroomFeeHT || 0);
-                  const part = row.type === 'agent' ? Number(row.agentNetHT || 0) : Number(row.responsableShareHT || 0);
-                  const base = row.type === 'agent' ? Number(row.agentGrossHT || 0) : Number(row.responsableGrossHT || 0);
-                  const frais = row.type === 'agent' ? fraisAgent : fraisResponsable;
+                      <tbody>
+                        {commercialVehicleMarginStats.rows.map((row) => {
+                          const fraisAgent = Number(row.agentCashSentinelHT || 0) + Number(row.agentCompanyCashSentinelHT || 0) + Number(row.agentMiscellaneousFeesHT || 0) + Number(row.agentInstantTransferHT || 0);
+                          const fraisResponsable = Number(row.responsableVroomFeeHT || 0);
+                          const part = row.type === 'agent' ? Number(row.agentNetHT || 0) : Number(row.responsableShareHT || 0);
+                          const base = row.type === 'agent' ? Number(row.agentGrossHT || 0) : Number(row.responsableGrossHT || 0);
+                          const frais = row.type === 'agent' ? fraisAgent : fraisResponsable;
 
-                  return (
-                    <tr key={`commercial-margin-${row.key}`}>
-                      <td><strong>{row.full_name}</strong></td>
-                      <td>{row.label_type}</td>
-                      <td>{row.salesCount}</td>
-                      <td>{euro(base)}</td>
-                      <td><strong>-{euro(frais)}</strong></td>
-                      <td><strong>{part >= 0 ? '+' : ''}{euro(part)}</strong></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              </table>
-            </div>
-          </div>
+                          return (
+                            <tr key={`commercial-margin-${row.key}`}>
+                              <td><strong>{row.full_name}</strong></td>
+                              <td>{row.salesCount}</td>
+                              <td>{euro(base)}</td>
+                              <td><strong>-{euro(frais)}</strong></td>
+                              <td><strong>{part >= 0 ? '+' : ''}{euro(part)}</strong></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-          <div className="card">
-            <h3>Bloc Garanties</h3>
-            <p className="muted">
-              Règle validée : calcul sur le prix garantie réellement enregistré dans la vente. Le prix est converti en HT, puis on retire le coût d'achat de la garantie.
-              Pour les agents commerciaux : 40 % du bénéfice HT revient à l'agent et 60 % est partagé entre Benoît et Axel. Pour les responsables : partage 50/50.
-              START ne compte pas comme une garantie vendue dans les statistiques. Si elle est vendue par un agent commercial, elle retire -90 € HT uniquement à cet agent. Si elle est vendue par un responsable, elle retire -45 € HT à chaque responsable.
-            </p>
+                <div className="card">
+                  <h3>Garanties</h3>
+                  <p className="muted">START ne compte pas comme garantie vendue dans les statistiques.</p>
 
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Personne</th>
-                  <th>Type</th>
-                  <th>Garanties prises en compte</th>
-                  <th>Résultat garanties HT</th>
-                </tr>
-              </thead>
+                  <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <table className="table" style={{ minWidth: 520 }}>
+                      <thead>
+                        <tr>
+                          <th>Personne</th>
+                          <th>Garanties</th>
+                          <th>Résultat HT</th>
+                        </tr>
+                      </thead>
 
-              <tbody>
-                {warrantyStats.rows.map((row) => (
-                  <tr key={`warranty-${row.key}`}>
-                    <td><strong>{row.full_name}</strong></td>
-                    <td>{row.label_type}</td>
-                    <td>{row.warrantiesCount}</td>
-                    <td><strong>{row.warrantyGainHT >= 0 ? '+' : ''}{euro(row.warrantyGainHT)}</strong></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <tbody>
+                        {warrantyStats.rows.map((row) => (
+                          <tr key={`warranty-${row.key}`}>
+                            <td><strong>{row.full_name}</strong></td>
+                            <td>{row.warrantiesCount}</td>
+                            <td><strong>{row.warrantyGainHT >= 0 ? '+' : ''}{euro(row.warrantyGainHT)}</strong></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-            {warrantyStats.unknownWarranties > 0 && (
-              <p className="muted" style={{ color: '#f97316', fontWeight: 800 }}>
-                Attention : {warrantyStats.unknownWarranties} garantie(s) ont un type non reconnu et ne sont pas intégrées au calcul.
-              </p>
-            )}
-          </div>
+                  {warrantyStats.unknownWarranties > 0 && (
+                    <p className="muted" style={{ color: '#f97316', fontWeight: 800 }}>
+                      Attention : {warrantyStats.unknownWarranties} garantie(s) ont un type non reconnu et ne sont pas intégrées au calcul.
+                    </p>
+                  )}
+                </div>
+              </div>
 
-          <div className="card">
-            <h3>Bloc Leboncoin</h3>
-            <p className="muted">
-              Règle validée : chaque agent commercial est déduit automatiquement de 978,37 € HT par mois pour Leboncoin.
-              Les responsables ne sont pas concernés par cette déduction.
-            </p>
+              <div className="card" style={{ maxWidth: 1120, margin: '0 auto', width: '100%' }}>
+                <h3>Répartition du coût des leads Call Center</h3>
+                <p className="muted">
+                  Agent commercial = 40 € HT par lead Call Center. Benoît et Axel supportent chacun 29,50 € HT par lead agent, ou 49,50 € HT chacun si le lead est responsable/non rattaché.
+                </p>
 
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Personne</th>
-                  <th>Type</th>
-                  <th>Déduction Leboncoin HT</th>
-                </tr>
-              </thead>
+                <div style={{ overflowX: 'auto', width: '100%' }}>
+                  <table className="table" style={{ minWidth: 560 }}>
+                    <thead>
+                      <tr>
+                        <th>Personne</th>
+                        <th>Type</th>
+                        <th>Leads Call Center</th>
+                        <th>Déduction HT</th>
+                      </tr>
+                    </thead>
 
-              <tbody>
-                {leadStats.rows.map((row) => (
-                  <tr key={`leboncoin-${row.key}`}>
-                    <td><strong>{row.full_name}</strong></td>
-                    <td>{row.label_type}</td>
-                    <td><strong>-{euro(row.type === 'agent' ? LEBONCOIN_MONTHLY_AGENT_HT : 0)}</strong></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <tbody>
+                      {leadStats.rows.map((row) => (
+                        <tr key={row.key}>
+                          <td><strong>{row.full_name}</strong></td>
+                          <td>{row.label_type}</td>
+                          <td>{row.callCenterCount}</td>
+                          <td><strong>-{euro(row.deductionHT)}</strong></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          <div className="card">
-            <h3>Répartition du coût des leads Call Center</h3>
-            <p className="muted">
-              Règle Blois actuelle : Agent commercial = 40 € HT par lead Call Center.
-              Benoît et Axel supportent chacun 29,50 € HT par lead Call Center agent, ou 49,50 € HT chacun si le lead est responsable/non rattaché à un agent.
-            </p>
-
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Personne</th>
-                  <th>Type</th>
-                  <th>Leads Call Center</th>
-                  <th>Déduction HT</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {leadStats.rows.map((row) => (
-                  <tr key={row.key}>
-                    <td><strong>{row.full_name}</strong></td>
-                    <td>{row.label_type}</td>
-                    <td>{row.callCenterCount}</td>
-                    <td><strong>-{euro(row.deductionHT)}</strong></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {leadStats.otherLeads.length > 0 && (
-            <div className="card">
-              <h3>Sources non classées</h3>
-              <p className="muted">
-                {leadStats.otherLeads.length} lead(s) ont une source non reconnue. Ils ne sont pas facturés dans ce bloc pour éviter un mauvais calcul.
-              </p>
-            </div>
-          )}
+              {leadStats.otherLeads.length > 0 && (
+                <div className="card" style={{ maxWidth: 1120, margin: '0 auto', width: '100%' }}>
+                  <h3>Sources non classées</h3>
+                  <p className="muted">
+                    {leadStats.otherLeads.length} lead(s) ont une source non reconnue. Ils ne sont pas facturés dans ce bloc pour éviter un mauvais calcul.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </>
