@@ -6270,20 +6270,15 @@ export function Remuneration({
 
       if (warrantyKey === 'start') {
         // START ne compte pas comme une garantie vendue dans les stats.
-        // C'est uniquement une pénalité de rémunération pour le vendeur.
+        // Règle validée : -90 € HT uniquement pour un agent commercial vendeur.
+        // Côté responsables, Benoît et Axel doivent rester strictement identiques :
+        // aucune pénalité START individuelle n'est appliquée à un responsable.
         if (soldByAgent) {
           const agentRow = baseRows.find((row) => row.type === 'agent' && Number(row.id) === Number(sale.agent_id));
           if (agentRow) {
             agentRow.warrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
           }
           totalWarrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
-        } else {
-          const sellerName = getSaleSellerName(sale).toLowerCase();
-          const responsableRow = baseRows.find((row) => row.type === 'responsable' && String(row.full_name || '').toLowerCase() === sellerName);
-          if (responsableRow) {
-            responsableRow.warrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
-            totalWarrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
-          }
         }
 
         return;
@@ -6545,18 +6540,9 @@ export function Remuneration({
     }
 
     if (warrantyKey === 'start') {
-      let selectedWarrantyShareHT = 0;
-
-      if (soldByAgent && person.type === 'agent' && Number(person.id) === Number(sale.agent_id)) {
-        selectedWarrantyShareHT = -WARRANTY_START_AGENT_COST_HT;
-      }
-
-      if (!soldByAgent && person.type === 'responsable') {
-        const sellerName = getSaleSellerName(sale).toLowerCase();
-        if (String(person.full_name || '').toLowerCase() === sellerName) {
-          selectedWarrantyShareHT = -WARRANTY_START_AGENT_COST_HT;
-        }
-      }
+      const selectedWarrantyShareHT = soldByAgent && person.type === 'agent' && Number(person.id) === Number(sale.agent_id)
+        ? -WARRANTY_START_AGENT_COST_HT
+        : 0;
 
       return {
         warrantyKey,
@@ -6565,7 +6551,9 @@ export function Remuneration({
         warrantyPurchaseCostHT: 0,
         warrantyProfitHT: selectedWarrantyShareHT,
         selectedWarrantyShareHT,
-        warrantyDetailLabel: `START : -${euro(WARRANTY_START_AGENT_COST_HT)} HT vendeur uniquement`,
+        warrantyDetailLabel: selectedWarrantyShareHT < 0
+          ? `START : -${euro(WARRANTY_START_AGENT_COST_HT)} HT agent commercial uniquement`
+          : 'START : ne compte pas en garantie et aucun impact individuel responsable',
       };
     }
 
