@@ -6059,6 +6059,17 @@ export function Remuneration({
     return 'unknown';
   }
 
+
+  function getWarrantyPurchaseCostHT(sale: VehicleSale) {
+    if (!sale.warranty_sold) return 0;
+
+    const warrantyKey = normalizeWarrantyType(sale.warranty_type);
+
+    if (warrantyKey === 'start' || warrantyKey === 'unknown') return 0;
+
+    return WARRANTY_COSTS_HT[warrantyKey] || 0;
+  }
+
   function isResponsableName(name: string | null | undefined) {
     const value = String(name || '').trim().toLowerCase();
     return responsablesList.some((responsable: any) => {
@@ -6098,20 +6109,24 @@ export function Remuneration({
 
   function calculateResponsibleVehicleMarginDetail(sale: VehicleSale) {
     const marginTTC = Number(sale.margin_amount || 0);
+    const warrantyPurchaseCostHT = getWarrantyPurchaseCostHT(sale);
     const vroomFeeTTC = marginTTC * VROOM_MARGIN_RATE;
     const marginAfterVroomTTC = marginTTC - vroomFeeTTC;
     const marginAfterVroomHT = marginAfterVroomTTC / TVA_DIVIDER;
+    const marginAfterWarrantyCostHT = marginAfterVroomHT - warrantyPurchaseCostHT;
     const cashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
     const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
     const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
     const instantTransferFeeHT = hasInstantTransferFee(sale) ? INSTANT_TRANSFER_FEE_HT : 0;
-    const netMarginHT = marginAfterVroomHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferFeeHT;
+    const netMarginHT = marginAfterWarrantyCostHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferFeeHT;
 
     return {
       marginTTC,
+      warrantyPurchaseCostHT,
       vroomFeeTTC,
       marginAfterVroomTTC,
       marginAfterVroomHT,
+      marginAfterWarrantyCostHT,
       cashSentinelHT,
       companyCashSentinelHT,
       miscellaneousFeesHT,
@@ -6124,7 +6139,8 @@ export function Remuneration({
 
   function calculateCommercialVehicleMarginDetail(sale: VehicleSale) {
     const marginTTC = Number(sale.margin_amount || 0);
-    const marginHT = marginTTC / TVA_DIVIDER;
+    const warrantyPurchaseCostHT = getWarrantyPurchaseCostHT(sale);
+    const marginHT = (marginTTC / TVA_DIVIDER) - warrantyPurchaseCostHT;
     const agentGrossHT = marginHT * 0.4;
     const responsableGrossHT = marginHT * 0.6;
     const vroomFeeTTC = marginTTC * VROOM_MARGIN_RATE;
@@ -6138,6 +6154,7 @@ export function Remuneration({
 
     return {
       marginTTC,
+      warrantyPurchaseCostHT,
       marginHT,
       agentGrossHT,
       responsableGrossHT,
@@ -6245,8 +6262,6 @@ export function Remuneration({
     remunerationWarrantySales.forEach((sale) => {
       const warrantyKey = normalizeWarrantyType(sale.warranty_type);
       const soldByAgent = saleBelongsToCommercialAgent(sale);
-      const warrantyAmountTTC = Number(sale.warranty_amount || 0);
-      let profitHT = 0;
 
       if (warrantyKey === 'unknown') {
         unknownWarranties += 1;
@@ -6255,9 +6270,7 @@ export function Remuneration({
 
       if (warrantyKey === 'start') {
         // START ne compte pas comme une garantie vendue dans les stats.
-        // C'est une pénalité de rémunération.
-        // Si la vente est faite par un agent commercial : -90 € HT uniquement pour cet agent.
-        // Si la vente est faite par un responsable : -45 € HT pour chaque responsable.
+        // C'est uniquement une pénalité de rémunération pour le vendeur.
         if (soldByAgent) {
           const agentRow = baseRows.find((row) => row.type === 'agent' && Number(row.id) === Number(sale.agent_id));
           if (agentRow) {
@@ -6265,46 +6278,37 @@ export function Remuneration({
           }
           totalWarrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
         } else {
-          baseRows
-            .filter((row) => row.type === 'responsable')
-            .forEach((row) => {
-              row.warrantyGainHT -= WARRANTY_START_RESPONSABLE_COST_HT;
-            });
-          totalWarrantyGainHT -= WARRANTY_START_RESPONSABLE_COST_HT * 2;
+          const sellerName = getSaleSellerName(sale).toLowerCase();
+          const responsableRow = baseRows.find((row) => row.type === 'responsable' && String(row.full_name || '').toLowerCase() === sellerName);
+          if (responsableRow) {
+            responsableRow.warrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
+            totalWarrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
+          }
         }
 
         return;
       }
 
-      const purchaseCostHT = WARRANTY_COSTS_HT[warrantyKey] || 0;
-      const warrantyAmountHT = warrantyAmountTTC / TVA_DIVIDER;
-      profitHT = warrantyAmountHT - purchaseCostHT;
-      totalWarrantyGainHT += profitHT;
-
+      // Les garanties MED/PREM/PRESTIGE sont déjà incluses dans la marge TTC.
+      // On ne rajoute donc plus de bonus garantie ici, pour éviter le double comptage.
+      // Leur coût d'achat HT est déduit directement dans le calcul de marge véhicule.
       if (soldByAgent) {
-        const agentShare = profitHT * 0.4;
-        const responsableShare = profitHT * 0.3;
         const agentRow = baseRows.find((row) => row.type === 'agent' && Number(row.id) === Number(sale.agent_id));
 
         if (agentRow) {
           agentRow.warrantiesCount += 1;
-          agentRow.warrantyGainHT += agentShare;
         }
 
         baseRows
           .filter((row) => row.type === 'responsable')
           .forEach((row) => {
             row.warrantiesCount += 1;
-            row.warrantyGainHT += responsableShare;
           });
       } else {
-        const responsableShare = profitHT / 2;
-
         baseRows
           .filter((row) => row.type === 'responsable')
           .forEach((row) => {
             row.warrantiesCount += 1;
-            row.warrantyGainHT += responsableShare;
           });
       }
     });
@@ -6548,7 +6552,10 @@ export function Remuneration({
       }
 
       if (!soldByAgent && person.type === 'responsable') {
-        selectedWarrantyShareHT = -WARRANTY_START_RESPONSABLE_COST_HT;
+        const sellerName = getSaleSellerName(sale).toLowerCase();
+        if (String(person.full_name || '').toLowerCase() === sellerName) {
+          selectedWarrantyShareHT = -WARRANTY_START_AGENT_COST_HT;
+        }
       }
 
       return {
@@ -6558,36 +6565,20 @@ export function Remuneration({
         warrantyPurchaseCostHT: 0,
         warrantyProfitHT: selectedWarrantyShareHT,
         selectedWarrantyShareHT,
-        warrantyDetailLabel: soldByAgent
-          ? `START : -${euro(WARRANTY_START_AGENT_COST_HT)} HT agent uniquement`
-          : `START : -${euro(WARRANTY_START_RESPONSABLE_COST_HT)} HT par responsable`,
+        warrantyDetailLabel: `START : -${euro(WARRANTY_START_AGENT_COST_HT)} HT vendeur uniquement`,
       };
     }
 
     const warrantyPurchaseCostHT = WARRANTY_COSTS_HT[warrantyKey] || 0;
-    const warrantyProfitHT = warrantyAmountHT - warrantyPurchaseCostHT;
-    let selectedWarrantyShareHT = 0;
-
-    if (soldByAgent) {
-      if (person.type === 'agent' && Number(person.id) === Number(sale.agent_id)) {
-        selectedWarrantyShareHT = warrantyProfitHT * 0.4;
-      }
-
-      if (person.type === 'responsable') {
-        selectedWarrantyShareHT = warrantyProfitHT * 0.3;
-      }
-    } else if (person.type === 'responsable') {
-      selectedWarrantyShareHT = warrantyProfitHT / 2;
-    }
 
     return {
       warrantyKey,
       warrantyCountsInStats: true,
       warrantyAmountHT,
       warrantyPurchaseCostHT,
-      warrantyProfitHT,
-      selectedWarrantyShareHT,
-      warrantyDetailLabel: `Garantie : bénéfice HT ${euro(warrantyProfitHT)}`,
+      warrantyProfitHT: 0,
+      selectedWarrantyShareHT: 0,
+      warrantyDetailLabel: `Coût achat garantie déduit de la marge : -${euro(warrantyPurchaseCostHT)} HT`,
     };
   }
 
@@ -6637,6 +6628,7 @@ export function Remuneration({
             ...common,
             typeLabel: 'Vente agent commercial',
             marginHT: detail.marginHT,
+            warrantyPurchaseCostHT: detail.warrantyPurchaseCostHT,
             agentGrossHT: detail.agentGrossHT,
             cashSentinelHT: detail.cashSentinelHT,
             companyCashSentinelHT: detail.companyCashSentinelHT,
@@ -6664,6 +6656,8 @@ export function Remuneration({
           ...common,
           typeLabel: 'Vente responsable',
           marginHT: detail.marginAfterVroomHT,
+          warrantyPurchaseCostHT: detail.warrantyPurchaseCostHT,
+          marginAfterWarrantyCostHT: detail.marginAfterWarrantyCostHT,
           agentGrossHT: 0,
           cashSentinelHT: detail.cashSentinelHT,
           companyCashSentinelHT: detail.companyCashSentinelHT,
@@ -7164,7 +7158,8 @@ export function Remuneration({
 
                         <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
                           <span>Marge TTC : <strong>{euro(row.marginTTC)}</strong></span>
-                          <span>Marge HT : <strong>{euro(row.marginHT)}</strong></span>
+                          <span>Marge HT après coût garantie : <strong>{euro(row.marginHT)}</strong></span>
+                          {row.warrantyPurchaseCostHT > 0 && <span>Coût achat garantie : <strong>-{euro(row.warrantyPurchaseCostHT)}</strong></span>}
                           <span>40 % agent : <strong>{euro(row.agentGrossHT)}</strong></span>
                           <span>CashSentinel : <strong>-{euro(row.cashSentinelHT)}</strong></span>
                           {row.companyCashSentinelHT > 0 && <span>Vente entreprise : <strong>-{euro(row.companyCashSentinelHT)}</strong></span>}
