@@ -560,7 +560,12 @@ export default function Home() {
             isResponsable={isResponsable}
           />
         )}
-        {active === 'leads' && <Leads />}
+        {active === 'leads' && (
+          <Leads
+            currentAgent={currentAgent}
+            isResponsable={isResponsable}
+          />
+        )}
         {active === 'rapport-semaine' && (
           <RapportSemaine
             currentAgent={currentAgent}
