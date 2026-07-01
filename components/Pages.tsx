@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const euro = (n: number) => n.toLocaleString('fr-FR') + ' €';
@@ -1833,6 +1833,7 @@ export function Leads({
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
   const [detectedCurrentAgent, setDetectedCurrentAgent] = useState<CurrentAgentForPages | null>(null);
   const [detectedIsResponsable, setDetectedIsResponsable] = useState<boolean | null>(null);
+  const customerNameInputRef = useRef<HTMLInputElement | null>(null);
 
   const [yearNumber, setYearNumber] = useState(String(currentYear));
   const [monthNumber, setMonthNumber] = useState(String(currentMonth));
@@ -1919,12 +1920,16 @@ export function Leads({
   useEffect(() => {
     if (!showForm || editingLead || effectiveIsResponsable || !effectiveCurrentAgent) return;
 
-    if (!agentId && effectiveCurrentAgent.id) {
-      setAgentId(Number(effectiveCurrentAgent.id));
+    const connectedAgentOption = getConnectedAgentOption();
+    const connectedAgentId = connectedAgentOption?.id || effectiveCurrentAgent.id;
+    const connectedAgencyId = connectedAgentOption?.agency_id || effectiveCurrentAgent.agency_id;
+
+    if (connectedAgentId && Number(agentId || 0) !== Number(connectedAgentId)) {
+      setAgentId(Number(connectedAgentId));
     }
 
-    if (!agencyId && effectiveCurrentAgent.agency_id) {
-      setAgencyId(Number(effectiveCurrentAgent.agency_id));
+    if (connectedAgencyId && Number(agencyId || 0) !== Number(connectedAgencyId)) {
+      setAgencyId(Number(connectedAgencyId));
     }
   }, [
     showForm,
@@ -1932,6 +1937,8 @@ export function Leads({
     effectiveIsResponsable,
     effectiveCurrentAgent?.id,
     effectiveCurrentAgent?.agency_id,
+    effectiveCurrentAgent?.full_name,
+    agentOptions,
     agentId,
     agencyId,
   ]);
@@ -2143,13 +2150,34 @@ export function Leads({
     loadConnectedLeadContext();
   }, []);
 
+  function getConnectedAgentOption() {
+    if (effectiveIsResponsable || !effectiveCurrentAgent) return null;
+
+    const byId = effectiveCurrentAgent.id
+      ? agentOptions.find(agent => Number(agent.id) === Number(effectiveCurrentAgent.id))
+      : null;
+
+    if (byId) return byId;
+
+    const currentName = String(effectiveCurrentAgent.full_name || '').trim().toLowerCase();
+    if (!currentName) return null;
+
+    return agentOptions.find(agent => String(agent.full_name || '').trim().toLowerCase() === currentName) || null;
+  }
+
   function resetForm() {
-    const defaultAgentId = !effectiveIsResponsable && effectiveCurrentAgent?.id
-      ? Number(effectiveCurrentAgent.id)
-      : '';
-    const defaultAgencyId = !effectiveIsResponsable && effectiveCurrentAgent?.agency_id
-      ? Number(effectiveCurrentAgent.agency_id)
-      : '';
+    const connectedAgentOption = getConnectedAgentOption();
+
+    const defaultAgentId = !effectiveIsResponsable && connectedAgentOption?.id
+      ? Number(connectedAgentOption.id)
+      : !effectiveIsResponsable && effectiveCurrentAgent?.id
+        ? Number(effectiveCurrentAgent.id)
+        : '';
+    const defaultAgencyId = !effectiveIsResponsable && connectedAgentOption?.agency_id
+      ? Number(connectedAgentOption.agency_id)
+      : !effectiveIsResponsable && effectiveCurrentAgent?.agency_id
+        ? Number(effectiveCurrentAgent.agency_id)
+        : '';
 
     setEditingLead(null);
     setYearNumber(String(currentYear));
@@ -2190,6 +2218,10 @@ export function Leads({
   function openNewLeadForm() {
     resetForm();
     setShowForm(true);
+
+    window.setTimeout(() => {
+      customerNameInputRef.current?.focus();
+    }, 80);
   }
 
   function openEditLeadForm(lead: LeadItem) {
@@ -2844,24 +2876,41 @@ appointment_time: appointmentTime.trim() || null,
                   </select>
                 )}
 
-                <select value={agentId} onChange={(e) => {
-                  const value = e.target.value ? Number(e.target.value) : '';
-                  setAgentId(value);
-                  const selectedAgent = agentOptions.find(agent => Number(agent.id) === Number(value));
-                  if (selectedAgent?.agency_id) setAgencyId(Number(selectedAgent.agency_id));
-                }}>
+                <select
+                  value={agentId}
+                  disabled={!effectiveIsResponsable}
+                  onChange={(e) => {
+                    const value = e.target.value ? Number(e.target.value) : '';
+                    setAgentId(value);
+                    const selectedAgent = agentOptions.find(agent => Number(agent.id) === Number(value));
+                    if (selectedAgent?.agency_id) setAgencyId(Number(selectedAgent.agency_id));
+                  }}
+                >
                   <option value="">Sélectionner un agent</option>
                   {agentOptions.map((agent) => (
                     <option key={agent.id} value={agent.id}>{agent.full_name} — {agencyName(agent.agency_id)}</option>
                   ))}
                 </select>
 
-                <select value={agencyId} onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}>
+                <select
+                  value={agencyId}
+                  disabled={!effectiveIsResponsable}
+                  onChange={(e) => setAgencyId(e.target.value ? Number(e.target.value) : '')}
+                >
                   <option value="">Agence</option>
                   <option value={1}>Blois</option>
                   <option value={2}>Tours</option>
                   <option value={3}>Bourges</option>
                 </select>
+
+                {!effectiveIsResponsable && (
+                  <div className="item" style={{ gridColumn: '1 / -1' }}>
+                    <strong>Agent connecté : {getConnectedAgentOption()?.full_name || effectiveCurrentAgent?.full_name || 'Agent commercial'}</strong>
+                    <p className="muted" style={{ marginTop: 4 }}>
+                      Agence : {agencyName(getConnectedAgentOption()?.agency_id || effectiveCurrentAgent?.agency_id)} — rempli automatiquement pour gagner du temps.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="item">
@@ -2869,7 +2918,12 @@ appointment_time: appointmentTime.trim() || null,
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 10 }}>
-                <input placeholder="Nom client" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                <input
+                  ref={customerNameInputRef}
+                  placeholder="Nom client"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
                 <input placeholder="Téléphone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
                 <input placeholder="Email facultatif" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
               </div>
