@@ -2694,6 +2694,10 @@ appointment_time: appointmentTime.trim() || null,
     return lead.agency_id || lead.agents?.agency_id || getLeadSellerOption(lead)?.agency_id || null;
   }
 
+  function getLeadMiscellaneousFeesHT(lead: LeadItem) {
+    return Number(getNumberAfterLabel(lead.comments, 'Frais divers HT') || 0);
+  }
+
   const filteredLeads = leads.filter((lead) => {
     const leadAgencyId = getLeadAgencyId(lead);
     const agencyToUse = lockedAgencyId || leadAgencyFilter;
@@ -3480,6 +3484,15 @@ appointment_time: appointmentTime.trim() || null,
                         {lead.margin_amount ? `Marge ${euro(Number(lead.margin_amount))}` : ''}
                         {lead.margin_amount && lead.warranty_sold ? ' — ' : ''}
                         {lead.warranty_sold ? 'Garantie' : ''}
+                      </div>
+                    )}
+                    {(getLeadMiscellaneousFeesHT(lead) > 0 || hasSaleToCompanyFee(lead.comments) || hasInstantTransferFee(lead.comments)) && (
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {getLeadMiscellaneousFeesHT(lead) > 0 ? `Frais divers HT ${euro(getLeadMiscellaneousFeesHT(lead))}` : ''}
+                        {getLeadMiscellaneousFeesHT(lead) > 0 && (hasSaleToCompanyFee(lead.comments) || hasInstantTransferFee(lead.comments)) ? ' — ' : ''}
+                        {hasSaleToCompanyFee(lead.comments) ? 'Entreprise' : ''}
+                        {hasSaleToCompanyFee(lead.comments) && hasInstantTransferFee(lead.comments) ? ' — ' : ''}
+                        {hasInstantTransferFee(lead.comments) ? 'Virement instantané' : ''}
                       </div>
                     )}
                   </td>
