@@ -1981,12 +1981,12 @@ export function Leads({
     const seller = Number(sellerNetPrice || 0);
     const roadFees = Number(saleRoadFees || 0);
     const warranty = warrantySold ? Number(warrantyAmount || 0) : 0;
-    const instantTransferFee = instantTransfer ? INSTANT_TRANSFER_FEE_HT : 0;
-    const companySaleFee = saleToCompany ? COMPANY_SALE_FEE_HT : 0;
-    const miscellaneousFees = Number(miscellaneousFeesHT || 0);
 
-    return sale + roadFees + warranty - seller - instantTransferFee - companySaleFee - miscellaneousFees;
-  }, [salePrice, sellerNetPrice, saleRoadFees, warrantySold, warrantyAmount, instantTransfer, saleToCompany, miscellaneousFeesHT]);
+    // La marge TTC de la vente doit rester la marge commerciale brute.
+    // Les frais de rémunération (entreprise, virement instantané, frais divers HT)
+    // sont stockés à part puis déduits une seule fois dans l'onglet Rémunération.
+    return sale + roadFees + warranty - seller;
+  }, [salePrice, sellerNetPrice, saleRoadFees, warrantySold, warrantyAmount]);
 
   function handleWarrantyTypeChange(value: string) {
     setWarrantyType(value);
