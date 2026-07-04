@@ -2261,7 +2261,7 @@ export function Leads({
     }, 80);
   }
 
-  function openEditLeadForm(lead: LeadItem) {
+  async function openEditLeadForm(lead: LeadItem) {
     setEditingLead(lead);
     setYearNumber(String(lead.year_number || currentYear));
     setMonthNumber(String(lead.month_number || currentMonth));
@@ -2307,6 +2307,98 @@ export function Leads({
     setComments(lead.comments || '');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Sécurité reprise anciens leads : on recharge les frais depuis la vente liée.
+    // Certains anciens véhicules vendus ne contiennent pas forcément le marqueur "Lead #..."
+    // dans les commentaires ; on tente donc aussi l'immatriculation puis le nom du véhicule.
+    if (lead.id) {
+      const marker = `Lead #${lead.id}`;
+      const vehicleLabel = [lead.vehicle_brand, lead.vehicle_model].filter(Boolean).join(' ').trim();
+
+      async function findLinkedSalesByMarker() {
+        return await supabase
+          .from('vehicle_sales')
+          .select('sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
+          .ilike('comments', `%${marker}%`)
+          .order('id', { ascending: false })
+          .limit(1);
+      }
+
+      async function findLinkedSalesByRegistration() {
+        if (!lead.vehicle_registration) {
+          return { data: [], error: null };
+        }
+
+        return await supabase
+          .from('vehicle_sales')
+          .select('sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
+          .eq('registration', lead.vehicle_registration)
+          .order('id', { ascending: false })
+          .limit(1);
+      }
+
+      async function findLinkedSalesByVehicleName() {
+        if (!vehicleLabel) {
+          return { data: [], error: null };
+        }
+
+        return await supabase
+          .from('vehicle_sales')
+          .select('sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
+          .ilike('vehicle_name', `%${vehicleLabel}%`)
+          .order('id', { ascending: false })
+          .limit(1);
+      }
+
+      const markerResult = await findLinkedSalesByMarker();
+      let linkedSales = markerResult.data || [];
+      let linkedSaleError = markerResult.error;
+
+      if ((!linkedSales || linkedSales.length === 0) && !linkedSaleError) {
+        const registrationResult = await findLinkedSalesByRegistration();
+        linkedSales = registrationResult.data || [];
+        linkedSaleError = registrationResult.error;
+      }
+
+      if ((!linkedSales || linkedSales.length === 0) && !linkedSaleError) {
+        const vehicleNameResult = await findLinkedSalesByVehicleName();
+        linkedSales = vehicleNameResult.data || [];
+        linkedSaleError = vehicleNameResult.error;
+      }
+
+      if (linkedSaleError) {
+        console.error('Erreur rechargement frais vente liée au lead:', linkedSaleError);
+      }
+
+      const linkedSale = linkedSales && linkedSales.length > 0 ? linkedSales[0] : null;
+      const leadMiscellaneousFeesFromComments = getNumberAfterLabel(lead.comments, 'Frais divers HT');
+
+      if (linkedSale) {
+        const linkedMiscellaneousFeesHT = Number(linkedSale.miscellaneous_fees_ht || 0);
+        const linkedMiscellaneousFeesFromComments = getNumberAfterLabel(linkedSale.comments, 'Frais divers HT');
+        const resolvedMiscellaneousFeesHT = linkedMiscellaneousFeesHT > 0
+          ? String(linkedMiscellaneousFeesHT)
+          : linkedMiscellaneousFeesFromComments || leadMiscellaneousFeesFromComments || '';
+
+        setSaleToCompany(
+          Boolean(linkedSale.sale_to_company) ||
+          hasSaleToCompanyFee(linkedSale.comments) ||
+          hasSaleToCompanyFee(lead.comments)
+        );
+
+        setInstantTransfer(
+          hasInstantTransferFee(linkedSale.comments) ||
+          hasInstantTransferFee(lead.comments)
+        );
+
+        setMiscellaneousFeesHT(resolvedMiscellaneousFeesHT);
+
+        if (resolvedMiscellaneousFeesHT && !leadMiscellaneousFeesFromComments) {
+          const cleanComments = removeLeadFeeLines(lead.comments);
+          setComments([cleanComments, `Frais divers HT : ${resolvedMiscellaneousFeesHT} €`].filter(Boolean).join('\n'));
+        }
+      }
+    }
   }
 
   async function createOrUpdateSaleFromLead(savedLead: LeadItem, finalAgencyId: number | null, finalMarginAmount: number) {
