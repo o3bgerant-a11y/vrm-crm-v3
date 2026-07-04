@@ -2296,7 +2296,7 @@ export function Leads({
     setVehicleEntered(Boolean(lead.vehicle_entered));
     setSaleDone(Boolean(lead.sale_done));
     setSalePrice(String(lead.sale_price ?? ''));
-    setSaleRoadFees('');
+    setSaleRoadFees(getNumberAfterLabel(lead.comments, 'Frais de mise à la route'));
     setMarginAmount(String(lead.margin_amount ?? ''));
     setWarrantySold(Boolean(lead.warranty_sold));
     setWarrantyType(lead.warranty_sold ? 'Garantie déjà renseignée' : '');
@@ -2372,10 +2372,13 @@ export function Leads({
 
       const linkedSale = linkedSales && linkedSales.length > 0 ? linkedSales[0] : null;
       const leadMiscellaneousFeesFromComments = getNumberAfterLabel(lead.comments, 'Frais divers HT');
+      const leadRoadFeesFromComments = getNumberAfterLabel(lead.comments, 'Frais de mise à la route');
 
       if (linkedSale) {
         const linkedMiscellaneousFeesHT = Number(linkedSale.miscellaneous_fees_ht || 0);
         const linkedMiscellaneousFeesFromComments = getNumberAfterLabel(linkedSale.comments, 'Frais divers HT');
+        const linkedRoadFeesFromComments = getNumberAfterLabel(linkedSale.comments, 'Frais de mise à la route');
+        const resolvedRoadFees = linkedRoadFeesFromComments || leadRoadFeesFromComments || '';
         const resolvedMiscellaneousFeesHT = linkedMiscellaneousFeesHT > 0
           ? String(linkedMiscellaneousFeesHT)
           : linkedMiscellaneousFeesFromComments || leadMiscellaneousFeesFromComments || '';
@@ -2391,11 +2394,17 @@ export function Leads({
           hasInstantTransferFee(lead.comments)
         );
 
+        setSaleRoadFees(resolvedRoadFees);
         setMiscellaneousFeesHT(resolvedMiscellaneousFeesHT);
 
-        if (resolvedMiscellaneousFeesHT && !leadMiscellaneousFeesFromComments) {
+        const feeLinesToAdd = [
+          resolvedRoadFees && !leadRoadFeesFromComments ? `Frais de mise à la route : ${resolvedRoadFees} €` : '',
+          resolvedMiscellaneousFeesHT && !leadMiscellaneousFeesFromComments ? `Frais divers HT : ${resolvedMiscellaneousFeesHT} €` : '',
+        ].filter(Boolean);
+
+        if (feeLinesToAdd.length > 0) {
           const cleanComments = removeLeadFeeLines(lead.comments);
-          setComments([cleanComments, `Frais divers HT : ${resolvedMiscellaneousFeesHT} €`].filter(Boolean).join('\n'));
+          setComments([cleanComments, ...feeLinesToAdd].filter(Boolean).join('\n'));
         }
       }
     }
