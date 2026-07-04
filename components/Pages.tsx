@@ -256,6 +256,43 @@ function hasInstantTransferFee(value: any) {
   return text.includes('virement instantane');
 }
 
+function hasSaleToCompanyFee(value: any) {
+  const text = String(value?.comments || value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+
+  return text.includes('vente a entreprise');
+}
+
+function getNumberAfterLabel(value: any, label: string) {
+  const raw = getTextAfterLabel(value, label);
+  if (!raw) return '';
+
+  const match = raw.replace(',', '.').match(/-?\d+(?:\.\d+)?/);
+  return match ? match[0] : '';
+}
+
+function removeLeadFeeLines(value: any) {
+  return String(value || '')
+    .split('\n')
+    .filter((line) => {
+      const normalized = line
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '');
+
+      return (
+        !normalized.startsWith('vente a entreprise') &&
+        !normalized.startsWith('virement instantane') &&
+        !normalized.startsWith('frais divers ht')
+      );
+    })
+    .join('\n')
+    .trim();
+}
+
 
 function getTextAfterLabel(value: any, label: string) {
   const text = String(value || '');
@@ -1982,9 +2019,9 @@ export function Leads({
     const roadFees = Number(saleRoadFees || 0);
     const warranty = warrantySold ? Number(warrantyAmount || 0) : 0;
 
-    // La marge TTC de la vente doit rester la marge commerciale brute.
-    // Les frais de rémunération (entreprise, virement instantané, frais divers HT)
-    // sont stockés à part puis déduits une seule fois dans l'onglet Rémunération.
+    // Important : les frais de rémunération (CashSentinel entreprise, virement instantané,
+    // frais divers HT) ne doivent pas modifier la marge TTC affichée.
+    // Ils sont stockés à part puis déduits une seule fois dans l'onglet Rémunération.
     return sale + roadFees + warranty - seller;
   }, [salePrice, sellerNetPrice, saleRoadFees, warrantySold, warrantyAmount]);
 
@@ -2264,7 +2301,9 @@ export function Leads({
     setWarrantySold(Boolean(lead.warranty_sold));
     setWarrantyType(lead.warranty_sold ? 'Garantie déjà renseignée' : '');
     setWarrantyAmount(String(lead.warranty_amount ?? ''));
+    setSaleToCompany(hasSaleToCompanyFee(lead.comments));
     setInstantTransfer(hasInstantTransferFee(lead.comments));
+    setMiscellaneousFeesHT(getNumberAfterLabel(lead.comments, 'Frais divers HT'));
     setComments(lead.comments || '');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2438,7 +2477,10 @@ appointment_time: appointmentTime.trim() || null,
       warranty_sold: warrantySold,
       warranty_amount: Number(warrantyAmount || 0),
       comments: [
-        comments.trim(),
+        removeLeadFeeLines(comments),
+        saleToCompany ? `Vente à entreprise : oui (-${COMPANY_SALE_FEE_HT.toFixed(2).replace('.', ',')} € HT)` : '',
+        instantTransfer ? `Virement instantané : oui (-${INSTANT_TRANSFER_FEE_HT.toFixed(2).replace('.', ',')} € HT)` : '',
+        miscellaneousFeesHT ? `Frais divers HT : ${miscellaneousFeesHT} €` : '',
         isResponsibleLeadSeller ? `Responsable lead : ${selectedAgent?.full_name || 'Responsable'}` : '',
         isResponsibleLeadSeller && responsableProfileId ? `Responsable profile id : ${responsableProfileId}` : '',
         isResponsibleLeadSeller ? `Agence rémunération : ${agencyName(finalAgencyId || 1)}` : '',
