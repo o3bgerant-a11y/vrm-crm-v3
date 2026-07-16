@@ -1895,6 +1895,7 @@ export function Leads({
   const [sellerNetPrice, setSellerNetPrice] = useState('');
   const [vehicleEntered, setVehicleEntered] = useState(false);
   const [saleDone, setSaleDone] = useState(false);
+  const [saleDate, setSaleDate] = useState(today);
   const [salePrice, setSalePrice] = useState('');
   const [saleRoadFees, setSaleRoadFees] = useState('');
   const [marginAmount, setMarginAmount] = useState('');
@@ -2240,6 +2241,7 @@ export function Leads({
     setSellerNetPrice('');
     setVehicleEntered(false);
     setSaleDone(false);
+    setSaleDate(today);
     setSalePrice('');
     setSaleRoadFees('');
     setMarginAmount('');
@@ -2295,6 +2297,9 @@ export function Leads({
     setSellerNetPrice(String(lead.seller_net_price ?? ''));
     setVehicleEntered(Boolean(lead.vehicle_entered));
     setSaleDone(Boolean(lead.sale_done));
+    // Par défaut, anciens leads : on reprend la date du lead jusqu'au chargement de la vente liée.
+    // Pour les nouvelles ventes, la date réelle de vente est préremplie avec aujourd'hui.
+    setSaleDate(lead.sale_done ? (lead.lead_date || today) : today);
     setSalePrice(String(lead.sale_price ?? ''));
     setSaleRoadFees(getNumberAfterLabel(lead.comments, 'Frais de mise à la route'));
     setMarginAmount(String(lead.margin_amount ?? ''));
@@ -2318,7 +2323,7 @@ export function Leads({
       async function findLinkedSalesByMarker() {
         return await supabase
           .from('vehicle_sales')
-          .select('sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
+          .select('sale_date, sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
           .ilike('comments', `%${marker}%`)
           .order('id', { ascending: false })
           .limit(1);
@@ -2331,7 +2336,7 @@ export function Leads({
 
         return await supabase
           .from('vehicle_sales')
-          .select('sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
+          .select('sale_date, sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
           .eq('registration', lead.vehicle_registration)
           .order('id', { ascending: false })
           .limit(1);
@@ -2344,7 +2349,7 @@ export function Leads({
 
         return await supabase
           .from('vehicle_sales')
-          .select('sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
+          .select('sale_date, sale_to_company, miscellaneous_fees_ht, comments, registration, vehicle_name')
           .ilike('vehicle_name', `%${vehicleLabel}%`)
           .order('id', { ascending: false })
           .limit(1);
@@ -2375,6 +2380,8 @@ export function Leads({
       const leadRoadFeesFromComments = getNumberAfterLabel(lead.comments, 'Frais de mise à la route');
 
       if (linkedSale) {
+        setSaleDate(linkedSale.sale_date || lead.lead_date || today);
+
         const linkedMiscellaneousFeesHT = Number(linkedSale.miscellaneous_fees_ht || 0);
         const linkedMiscellaneousFeesFromComments = getNumberAfterLabel(linkedSale.comments, 'Frais divers HT');
         const linkedRoadFeesFromComments = getNumberAfterLabel(linkedSale.comments, 'Frais de mise à la route');
@@ -2449,7 +2456,7 @@ export function Leads({
     const salePayload = {
       agent_id: isResponsibleSeller ? null : Number(agentId),
       weekly_report_id: 1,
-      sale_date: leadDate || today,
+      sale_date: saleDate || today,
       vehicle_name: vehicleName,
       vehicle_photo_url: null,
       seller_price: sellerValue,
@@ -2534,6 +2541,11 @@ export function Leads({
 
     if (saleDone && (!sellerNetPrice || !salePrice)) {
       alert('Pour transformer le lead en vente, il faut indiquer le prix net vendeur et le prix de vente.');
+      return;
+    }
+
+    if (saleDone && !saleDate) {
+      alert('Il faut indiquer la date réelle de vente.');
       return;
     }
 
@@ -3173,7 +3185,15 @@ appointment_time: appointmentTime.trim() || null,
                   </label>
 
                   <label className="item" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input type="checkbox" checked={saleDone} onChange={(e) => setSaleDone(e.target.checked)} />
+                    <input
+                      type="checkbox"
+                      checked={saleDone}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSaleDone(checked);
+                        if (checked && !saleDate) setSaleDate(today);
+                      }}
+                    />
                     Véhicule vendu — créer / mettre à jour automatiquement la vente
                   </label>
                 </div>
@@ -3203,11 +3223,23 @@ appointment_time: appointmentTime.trim() || null,
                     Transformation automatique en vente
                   </h4>
                   <p className="muted" style={{ marginBottom: 16 }}>
-                    En enregistrant ce lead, le CRM créera ou mettra à jour une vente dans l’onglet Ventes avec le même agent, véhicule, plaque, prix, marge et garantie.
+                    En enregistrant ce lead, le CRM créera ou mettra à jour une vente dans l’onglet Ventes avec la date réelle de vente, le même agent, véhicule, plaque, prix, marge et garantie.
                   </p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 18, alignItems: 'start' }}>
                     <div style={{ display: 'grid', gap: 14 }}>
+                      <label style={{ display: 'grid', gap: 6, maxWidth: 280 }}>
+                        <span className="muted">Date réelle de vente</span>
+                        <input
+                          type="date"
+                          value={saleDate}
+                          onChange={(e) => setSaleDate(e.target.value)}
+                        />
+                        <span className="muted" style={{ fontSize: 12 }}>
+                          Cette date rattache la vente, la marge et la commission au bon mois. La date du lead reste inchangée.
+                        </span>
+                      </label>
+
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(150px, 1fr))', gap: 12 }}>
                         <label style={{ display: 'grid', gap: 6 }}>
                           <span className="muted">Prix net vendeur</span>
