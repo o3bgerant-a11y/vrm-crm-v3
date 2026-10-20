@@ -6080,7 +6080,7 @@ export function Remuneration({
   const LEAD_AGENT_PART_HT = 40;
   const LEAD_RESPONSABLE_AGENT_SHARE_HT = 29.5;
   const LEAD_RESPONSABLE_DIRECT_SHARE_HT = 49.5;
-  const LEBONCOIN_MONTHLY_AGENT_HT = 978.37;
+  const LEBONCOIN_MONTHLY_AGENT_HT = Number(selectedAgencyId) === 2 ? 412 : 978.37;
   const TVA_DIVIDER = 1.2;
   const WARRANTY_START_RESPONSABLE_COST_HT = 45;
   const WARRANTY_START_AGENT_COST_HT = 90;
@@ -7611,7 +7611,7 @@ export function Remuneration({
           <div className="card">
             <h3>Bloc Leboncoin</h3>
             <p className="muted">
-              Règle validée : chaque agent commercial est déduit automatiquement de 978,37 € HT par mois pour Leboncoin.
+              Règle validée : chaque agent commercial est déduit automatiquement de {euro(LEBONCOIN_MONTHLY_AGENT_HT)} HT par mois pour Leboncoin.
               Les responsables ne sont pas concernés par cette déduction.
             </p>
 
@@ -7681,4 +7681,3 @@ export function Remuneration({
     </div>
   );
 }
-
