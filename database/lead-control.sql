@@ -56,8 +56,18 @@ using ((select private.can_read_lead_control()));
 create policy lead_control_sync_managers_read on public.lead_control_syncs for select to authenticated
 using ((select private.can_read_lead_control()));
 
+create table private.lead_control_confirmations (
+  event_id text primary key,
+  event_date date not null,
+  outcome text not null check(outcome in ('signed','unsigned')),
+  agent_code text not null check(agent_code in ('ML','LJ','AR','EF','CP')),
+  reason text not null
+);
+alter table private.lead_control_confirmations enable row level security;
+revoke all on private.lead_control_confirmations from public,anon,authenticated;
+
 create function private.classify_blois_lead(e jsonb, cutoff timestamptz) returns jsonb
-language plpgsql immutable set search_path = '' as $$
+language plpgsql stable set search_path = '' as $$
 declare
   title text := coalesce(e->>'summary','');
   t text := translate(upper(title),'ÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ','AAAEEEEIIOOUUUC');
@@ -71,6 +81,8 @@ declare
   signed_result boolean;
   absent_result boolean;
   cancelled_result boolean;
+  sold boolean;
+  confirmation record;
   outcome text;
   errors text[] := '{}';
 begin
@@ -86,15 +98,23 @@ begin
   signed_result := regexp_replace(t,'\mNON[[:space:]-]*(M\M|SIGNEE?\M)','','g') ~ '\m(OK[[:space:]-]*M|SIGNEE?)\M';
   absent_result := t ~ '\m(NO[[:space:]-]*SHOW|NON[[:space:]-]*SHOW|PAS[[:space:]-]*VENUE?)\M';
   cancelled_result := t ~ '\mANNULE';
+  sold := t ~ '\mVENDUE?\M';
+  select cf.outcome,cf.agent_code into confirmation from private.lead_control_confirmations cf
+    where cf.event_id=e->>'id' and cf.event_date=(starts at time zone 'Europe/Paris')::date;
+  if found and c='10' then
+    code:=confirmation.agent_code;
+    signed_result:=confirmation.outcome='signed';
+    unsigned_result:=confirmation.outcome='unsigned';
+  end if;
   if ends > cutoff then
     outcome:='scheduled';
   else
-    if c='11' or e->>'status'='cancelled' then outcome:='cancelled';
+    if c='11' or sold or e->>'status'='cancelled' then outcome:='cancelled';
     elsif c='5' then outcome:='no_show';
     elsif c='10' and not absent_result and not cancelled_result and signed_result and not unsigned_result then outcome:='signed';
     elsif c='10' and not absent_result and not cancelled_result and unsigned_result and not signed_result then outcome:='unsigned';
     else outcome:='review'; end if;
-    if c='10' or outcome='review' then
+    if (c='10' and not sold) or outcome='review' then
       if cardinality(codes)>1 then errors:=array_append(errors,'Plusieurs agents indiqués : attribution ambiguë');
       elsif code is null then errors:=array_append(errors,'Initiales absentes ou non reconnues'); end if;
     end if;

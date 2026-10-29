@@ -56,7 +56,7 @@ One unique recognized code is required for assignment. No guessing.
 Yellow 5 = no show (expect pas venu/pas venue/no show/non show).
 Red 11 = cancelled client mandate, never staff absence.
 Other colors or missing/contradictory results remain review/unconfirmed.
-Orange VENDU is ambiguous, not proof a mandate was signed or billable.
+VENDU/VENDUE means cancelled and non-billable, including orange appointments.
 Appointments not yet ended at cutoff are scheduled, outside all completed totals.
 Missing/ambiguous initials and inconsistent color/results appear as errors
 with local date/time, sanitized title and a Google Calendar link.
@@ -64,6 +64,10 @@ Signed + unsigned = confirmed billable count; cost = count * 99 EUR HT.
 A confirmed result with missing initials is included in agency totals but
 appears as unassigned/error, never arbitrarily charged to an agent.
 Uncertain results are excluded from confirmed cost pending correction.
+Explicit user confirmations for individual appointments are stored in the private
+`lead_control_confirmations` table, keyed by Google event ID and local date.
+The classifier applies these confirmations to green appointments on every import;
+never generalize an individual confirmation to unrelated ambiguous titles.
 Agent rows show counts only; no per-agent monetary amounts.
 
 ## Access and maintenance
