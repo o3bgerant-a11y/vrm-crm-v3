@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Home as DashboardIcon } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import Planning from '@/components/Planning';
@@ -524,7 +525,16 @@ export default function Home() {
       <main className="main">
         <div className="top">
           <div>
-            <h2>{titles[active]}</h2>
+            <h2>
+              {active === 'dashboard' && (
+                <DashboardIcon
+                  size={24}
+                  aria-hidden="true"
+                  style={{ verticalAlign: 'middle', marginRight: 8 }}
+                />
+              )}
+              {titles[active]}
+            </h2>
             <p>
               CRM V3 Vroom Market — {currentAgent.full_name} — {isResponsable ? 'Responsable' : 'Agent commercial'}
             </p>
