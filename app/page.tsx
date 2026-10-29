@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Home as DashboardIcon } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
+import ControleLeads from '@/components/ControleLeads';
 import Planning from '@/components/Planning';
 import Parametres from '@/components/Parametres';
 import { supabase } from '@/lib/supabase';
@@ -578,7 +579,7 @@ export default function Home() {
           />
         )}
         {isResponsable && active === 'controle-leads' && (
-          <section className="card" aria-label="Contrôle leads" />
+          <ControleLeads />
         )}
         {active === 'rapport-semaine' && (
           <RapportSemaine
