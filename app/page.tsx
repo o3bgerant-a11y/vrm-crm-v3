@@ -39,6 +39,7 @@ const titles: Record<string, string> = {
   'objectifs-mensuels': 'Objectifs mensuels',
   remuneration: 'Rémunération',
   leads: 'Leads',
+  'controle-leads': 'Contrôle leads',
   'rapport-semaine': 'Rapport semaine',
   ventes: 'Ventes véhicules',
   garanties: 'Garanties',
@@ -225,7 +226,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentAgent) return;
 
-    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels'].includes(active)) {
+    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels', 'controle-leads'].includes(active)) {
       setActive('dashboard');
     }
   }, [currentAgent, isResponsable, active]);
@@ -575,6 +576,9 @@ export default function Home() {
             currentAgent={currentAgent}
             isResponsable={isResponsable}
           />
+        )}
+        {isResponsable && active === 'controle-leads' && (
+          <section className="card" aria-label="Contrôle leads" />
         )}
         {active === 'rapport-semaine' && (
           <RapportSemaine
