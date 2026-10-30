@@ -19,7 +19,7 @@ export default function CommissionsJV() {
  const [photoReady,setPhotoReady] = useState(false);
  useEffect(()=>{
   if(phase!=='photo'||!photoReady)return;
-  const timer=setTimeout(()=>setPhase('content'),3000);
+  const timer=setTimeout(()=>setPhase('content'),2000);
   return ()=>clearTimeout(timer);
  },[phase,photoReady]);
  async function unlock(event: React.FormEvent<HTMLFormElement>){
