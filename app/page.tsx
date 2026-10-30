@@ -5,6 +5,7 @@ import { Home as DashboardIcon } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import ControleLeads from '@/components/ControleLeads';
+import CommissionsJV from '@/components/CommissionsJV';
 import Planning from '@/components/Planning';
 import Parametres from '@/components/Parametres';
 import { supabase } from '@/lib/supabase';
@@ -41,6 +42,7 @@ const titles: Record<string, string> = {
   remuneration: 'Rémunération',
   leads: 'Leads',
   'controle-leads': 'Contrôle leads',
+  'commissions-jv': 'Commissions JV',
   'rapport-semaine': 'Rapport semaine',
   ventes: 'Ventes véhicules',
   garanties: 'Garanties',
@@ -227,7 +229,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentAgent) return;
 
-    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels', 'controle-leads'].includes(active)) {
+    if (!isResponsable && ['agences', 'agents', 'objectifs-mensuels', 'controle-leads', 'commissions-jv'].includes(active)) {
       setActive('dashboard');
     }
   }, [currentAgent, isResponsable, active]);
@@ -581,6 +583,7 @@ export default function Home() {
         {isResponsable && active === 'controle-leads' && (
           <ControleLeads />
         )}
+        {isResponsable && active === 'commissions-jv' && <CommissionsJV />}
         {active === 'rapport-semaine' && (
           <RapportSemaine
             currentAgent={currentAgent}

@@ -31,6 +31,7 @@ const items = [
 
   ['leads', 'Leads', PhoneCall, 'all'],
   ['controle-leads', 'Contrôle leads', ClipboardList, 'responsable'],
+  ['commissions-jv', 'Commissions JV', DollarSign, 'responsable'],
   ['rapport-semaine', 'Rapport semaine', ClipboardList, 'all'],
   ['ventes', 'Ventes', Car, 'all'],
   ['garanties', 'Garanties', ShieldCheck, 'all'],
