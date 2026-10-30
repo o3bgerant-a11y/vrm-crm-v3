@@ -1864,6 +1864,7 @@ export function Leads({
   const [search, setSearch] = useState('');
   const [historyFilter, setHistoryFilter] = useState('all');
   const [historyWeek, setHistoryWeek] = useState('all');
+  const [leadMonthFilter, setLeadMonthFilter] = useState('all');
   const [leadAgencyFilter, setLeadAgencyFilter] = useState('all');
   const [leadAgentFilter, setLeadAgentFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
@@ -2727,6 +2728,30 @@ appointment_time: appointmentTime.trim() || null,
     return `${year}-${week}`;
   }
 
+  function getLeadMonthKey(lead: LeadItem) {
+    const date = String(lead.lead_date || lead.appointment_date || lead.created_at || '');
+    const year = Number(lead.year_number || date.slice(0, 4));
+    const month = Number(lead.month_number || date.slice(5, 7));
+    if (!year || !month || month < 1 || month > 12) return '';
+    return `${year}-${String(month).padStart(2, '0')}`;
+  }
+
+  const leadMonthOptions = useMemo(() => {
+    const keys = new Set<string>();
+    for (let month = 1; month <= 12; month += 1) {
+      keys.add(`${currentYear}-${String(month).padStart(2, '0')}`);
+    }
+    leads.forEach((lead) => {
+      const key = getLeadMonthKey(lead);
+      if (key) keys.add(key);
+    });
+    return Array.from(keys).sort().map((value) => ({
+      value,
+      label: new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, 1)
+        .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+    }));
+  }, [leads, currentYear]);
+
   const historyWeekOptions = useMemo(() => {
     const map = new Map<string, { value: string; label: string; year: number; week: number }>();
 
@@ -2817,17 +2842,18 @@ appointment_time: appointmentTime.trim() || null,
 
     if (agencyToUse !== 'all' && Number(leadAgencyId) !== Number(agencyToUse)) return false;
     if (leadAgentFilter !== 'all' && Number(getLeadSellerOptionId(lead)) !== Number(leadAgentFilter)) return false;
+    if (leadMonthFilter !== 'all' && getLeadMonthKey(lead) !== leadMonthFilter) return false;
 
     if (historyFilter === 'archived') {
       if (!isArchivedLead(lead)) return false;
     } else if (historyFilter === 'sold') {
       if (!isSoldLead(lead)) return false;
-    } else {
+    } else if (historyFilter !== 'all') {
       if (isArchivedLead(lead)) return false;
       if (isSoldLead(lead)) return false;
     }
 
-    if (historyFilter === 'all' && !isMandateSignedLead(lead) && !isVehicleOnParkLead(lead)) return false;
+    if (historyFilter === 'active' && !isMandateSignedLead(lead) && !isVehicleOnParkLead(lead)) return false;
     if (historyFilter === 'signed' && !isMandateSignedLead(lead)) return false;
     if (historyFilter === 'unsigned' && !isMandateUnsignedLead(lead)) return false;
     if (historyFilter === 'park' && !isVehicleOnParkLead(lead)) return false;
@@ -2929,6 +2955,18 @@ appointment_time: appointmentTime.trim() || null,
             </button>
 
             <select
+              value={leadMonthFilter}
+              onChange={(e) => setLeadMonthFilter(e.target.value)}
+              style={{ minWidth: 190 }}
+              aria-label="Filtrer les leads par mois"
+            >
+              <option value="all">Tous les mois</option>
+              {leadMonthOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+
+            <select
               value={lockedAgencyId || leadAgencyFilter}
               onChange={(e) => {
                 setLeadAgencyFilter(e.target.value);
@@ -2963,7 +3001,8 @@ appointment_time: appointmentTime.trim() || null,
               onChange={(e) => setHistoryFilter(e.target.value)}
               style={{ minWidth: 220 }}
             >
-              <option value="all">Historique mandats actifs</option>
+              <option value="all">Tous</option>
+              <option value="active">Historique mandats actifs</option>
               <option value="signed">Mandats signés</option>
               <option value="unsigned">Mandats non signés</option>
               <option value="park">Véhicules sur parc</option>
