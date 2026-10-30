@@ -527,8 +527,8 @@ export default function Home() {
       />
 
       <main className="main">
-        <div className="top">
-          <div>
+        <div className="top crm-page-header">
+          <div className="crm-page-heading">
             <h2>
               {active === 'dashboard' && (
                 <DashboardIcon
@@ -543,6 +543,14 @@ export default function Home() {
               CRM V3 Vroom Market — {currentAgent.full_name} — {isResponsable ? 'Responsable' : 'Agent commercial'}
             </p>
           </div>
+
+          <img
+            className="crm-page-logo"
+            src="/vroom-market-logo.svg"
+            alt="Vroom Market"
+            width={156}
+            height={76}
+          />
 
           <div className="filters">
             <button onClick={signOut}>
