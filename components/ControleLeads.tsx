@@ -46,6 +46,7 @@ export default function ControleLeads() {
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(currentMonth);
   const [agencyId, setAgencyId] = useState(1);
+  const [detailAgentFilter, setDetailAgentFilter] = useState('all');
   const agency = agencies.find(item => item.id === agencyId) || agencies[0];
   const agents = agencyAgents[agency.id];
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -148,6 +149,9 @@ export default function ControleLeads() {
     return () => { cancelled = true; };
   }, [agencyId, year, month, refresh]);
 
+  useEffect(() => { setDetailAgentFilter('all'); }, [agencyId]);
+  const detailLeads = leads.filter(lead => detailAgentFilter === 'all' || (detailAgentFilter === 'unassigned' ? !lead.agent_code : lead.agent_code === detailAgentFilter));
+
   const stats = useMemo(() => {
     const count = (outcome: Lead['outcome']) => leads.filter(l => l.outcome === outcome).length;
     return { billable: leads.filter(isBillable).length, signed: count('signed'), unsigned: count('unsigned'), noShow: count('no_show'), cancelled: count('cancelled'), review: count('review'), scheduled: count('scheduled') };
@@ -246,7 +250,16 @@ export default function ControleLeads() {
             </tbody></table></div>}
           </div>
           <div className="card">
-            <details><summary style={{ cursor: 'pointer', fontWeight: 700 }}>Détail des rendez-vous ({leads.length})</summary><div style={{ overflowX: 'auto', marginTop: 12 }}><table className="table"><thead><tr><th>Date et heure</th><th>Rendez-vous</th><th>Agent</th><th>Résultat</th><th>Correction</th></tr></thead><tbody>{leads.map(l => <tr key={l.event_id}><td style={{ whiteSpace: 'nowrap' }}>{dateTime(l.start_at)}</td><td>{l.title}</td><td>{l.agent_code || '—'}</td><td>{labels[l.outcome]}{l.corrected_at && <p className="muted" style={{ marginTop: 4 }}>Corrigé le {dateTime(l.corrected_at)} par {l.corrected_by_name || 'un responsable'}</p>}</td><td><button type="button" onClick={() => editLead(l)} aria-label={`Modifier le lead du ${dateTime(l.start_at)}`}>Modifier</button></td></tr>)}</tbody></table></div></details>
+            <details><summary style={{ cursor: 'pointer', fontWeight: 700 }}>Détail des rendez-vous ({detailLeads.length} / {leads.length})</summary>
+              <label style={{ display: 'grid', gap: 6, maxWidth: 300, marginTop: 16 }}>Agent
+                <select value={detailAgentFilter} onChange={event => setDetailAgentFilter(event.target.value)}>
+                  <option value="all">Tous</option>
+                  {agents.map(([code, name]) => <option key={code} value={code}>{name} ({code})</option>)}
+                  <option value="unassigned">Non attribués</option>
+                </select>
+              </label>
+              {detailLeads.length === 0 && <p className="muted" role="status">Aucun rendez-vous pour cet agent sur la période sélectionnée.</p>}
+              <div style={{ overflowX: 'auto', marginTop: 12 }}><table className="table"><thead><tr><th>Date et heure</th><th>Rendez-vous</th><th>Agent</th><th>Résultat</th><th>Correction</th></tr></thead><tbody>{detailLeads.map(l => <tr key={l.event_id}><td style={{ whiteSpace: 'nowrap' }}>{dateTime(l.start_at)}</td><td>{l.title}</td><td>{l.agent_code || '—'}</td><td>{labels[l.outcome]}{l.corrected_at && <p className="muted" style={{ marginTop: 4 }}>Corrigé le {dateTime(l.corrected_at)} par {l.corrected_by_name || 'un responsable'}</p>}</td><td><button type="button" onClick={() => editLead(l)} aria-label={`Modifier le lead du ${dateTime(l.start_at)}`}>Modifier</button></td></tr>)}</tbody></table></div></details>
           </div>
         </>
       )}
