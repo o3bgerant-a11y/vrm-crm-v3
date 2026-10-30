@@ -1867,6 +1867,7 @@ export function Leads({
   const [leadMonthFilter, setLeadMonthFilter] = useState('all');
   const [leadAgencyFilter, setLeadAgencyFilter] = useState('all');
   const [leadAgentFilter, setLeadAgentFilter] = useState('all');
+  const initializedLeadFilterFor = useRef<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
   const [detectedCurrentAgent, setDetectedCurrentAgent] = useState<CurrentAgentForPages | null>(null);
@@ -2014,6 +2015,16 @@ export function Leads({
       setLeadAgentFilter('all');
     }
   }, [leadAgencyFilter, leadAgentFilter, agentOptions, lockedAgencyId]);
+
+  useEffect(() => {
+    if (effectiveIsResponsable || !effectiveCurrentAgent || agentOptions.length === 0) return;
+    const profileKey = String(effectiveCurrentAgent.id);
+    if (initializedLeadFilterFor.current === profileKey) return;
+    const connectedAgent = getConnectedAgentOption();
+    if (!connectedAgent) return;
+    initializedLeadFilterFor.current = profileKey;
+    setLeadAgentFilter(String(connectedAgent.id));
+  }, [effectiveIsResponsable, effectiveCurrentAgent, agentOptions]);
 
   const calculatedLeadMargin = useMemo(() => {
     const sale = Number(salePrice || 0);
@@ -2887,6 +2898,23 @@ appointment_time: appointmentTime.trim() || null,
     return content.includes(q);
   });
 
+  const monthlyLeadCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    filteredLeads.forEach((lead) => {
+      const key = getLeadMonthKey(lead) || 'unknown';
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return Array.from(counts.entries()).sort(([a], [b]) => b.localeCompare(a)).map(([key, count]) => ({
+      key,
+      count,
+      label: key === 'unknown' ? 'Mois non renseigné' : new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, 1)
+        .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+    }));
+  }, [filteredLeads]);
+  const selectedLeadAgentName = leadAgentFilter === 'all'
+    ? 'Agence complète'
+    : agentOptions.find((agent) => String(agent.id) === leadAgentFilter)?.full_name || 'Agent sélectionné';
+
   const stats = useMemo(() => {
     const total = filteredLeads.length;
     const appointments = filteredLeads.filter(lead => ['RDV pris', 'RDV effectué', 'Véhicule rentré', 'Mandat signé', 'Véhicule vendu'].includes(lead.status || '')).length;
@@ -3500,6 +3528,24 @@ appointment_time: appointmentTime.trim() || null,
         )}
 
         <input className="search" placeholder="Recherche plaque, modèle, marque, client, téléphone, agent, source..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginTop: 14 }} />
+      </div>
+
+      <div className="card">
+        <h3>Leads par mois — {selectedLeadAgentName}</h3>
+        <p className="muted">Leads saisis dans le CRM, selon les filtres et la recherche actifs. À comparer avec les rendez-vous de l’agenda dans Contrôle leads.</p>
+        {monthlyLeadCounts.length === 0 ? (
+          <p className="muted">{loading ? 'Chargement des leads…' : 'Aucun lead pour cette sélection.'}</p>
+        ) : (
+          <table className="table">
+            <thead><tr><th>Mois</th><th>Nombre de leads</th></tr></thead>
+            <tbody>
+              {monthlyLeadCounts.map((month) => (
+                <tr key={month.key}><td>{month.label}</td><td><strong>{month.count}</strong></td></tr>
+              ))}
+            </tbody>
+            <tfoot><tr><th>Total</th><td><strong>{filteredLeads.length}</strong></td></tr></tfoot>
+          </table>
+        )}
       </div>
 
       <div className="grid cards3">
