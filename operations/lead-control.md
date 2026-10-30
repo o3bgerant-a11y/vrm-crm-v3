@@ -81,3 +81,30 @@ update this private allowlist through administrative SQL after verification;
 do not grant an agent access based on a client-provided role.
 Schema source: `database/lead-control.sql`; applied via Supabase migrations.
 No Google events are changed by this feature.
+
+## Corrections by managers in the CRM
+
+Apply `database/lead-control-manual.sql` after the base schema. Managers can
+edit any displayed lead from the error list or the appointment details via
+`public.save_lead_control_correction`. The public wrapper uses SECURITY INVOKER;
+the privileged implementation is private and checks auth.uid() plus the
+existing manager allowlist and active profile before doing any work.
+
+Allowed results: signed, unsigned, cancelled, no_show, review. Billable results
+require a recognized agent. Cancelled/no_show can remain unassigned. Choosing
+review lets a manager assign an agent without inventing a result.
+
+Decisions live in `private.lead_control_manual_corrections`, keyed by calendar
+and Google event ID. A before-insert/update trigger reapplies them to snapshots,
+including when the existing monthly import deletes and recreates all rows.
+They take priority over automatic calendar classification and older individual
+confirmations. Never overwrite/delete manual decisions during scheduled imports.
+Source events excluded as blue/internal/Sunday or removed from the calendar
+stay outside the snapshot; the stored correction remains for the same event ID.
+
+Corrections update totals immediately and record the authenticated actor and
+time. `private.lead_control_correction_history` retains previous/new decisions.
+No email already sent is changed. Normal browser users cannot directly write
+snapshots or private audit tables. The RPC serializes with monthly imports and
+rejects stale edits using the previous corrected_at timestamp.
+Regression checks: `database/lead-control-manual.tests.sql` (always rolled back).
