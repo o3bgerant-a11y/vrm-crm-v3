@@ -32,7 +32,7 @@ do $test$
 declare source jsonb; n integer;
 begin
   select jsonb_agg(jsonb_build_object('id',event_id,'summary',title,'color_id',color_id,'start',start_at,'end',end_at,'url',event_url)) into source
-  from public.lead_control_events where start_at>='2026-09-01T00:00:00+02:00' and start_at<'2026-10-01T00:00:00+02:00';
+  from public.lead_control_events where calendar_id='blois@vroommarket.fr' and start_at>='2026-09-01T00:00:00+02:00' and start_at<'2026-10-01T00:00:00+02:00';
   perform private.import_blois_leads(source,'2026-09-01',now());
   select count(*) into n from public.lead_control_events where event_id='manual-correction-rollback-test' and outcome='signed' and agent_code='ML' and corrected_at is not null and cardinality(errors)=0;
   if n<>1 then raise exception 'Manual decision was lost during import'; end if;

@@ -38,11 +38,11 @@ begin
   events:='[{"id":"lead-control-transaction-test","summary":"ML OK M RDV MANDAT TEST","color_id":"10","start":"2026-10-01T09:00:00+02:00","end":"2026-10-01T10:00:00+02:00"}]';
   perform private.import_blois_leads(events,'2026-10-01',now());
   perform private.import_blois_leads(events,'2026-10-01',now());
-  select count(*) into n from public.lead_control_events where start_at>='2026-10-01T00:00:00+02:00' and start_at<'2026-11-01T00:00:00+01:00';
+  select count(*) into n from public.lead_control_events where calendar_id='blois@vroommarket.fr' and start_at>='2026-10-01T00:00:00+02:00' and start_at<'2026-11-01T00:00:00+01:00';
   if n<>1 then raise exception 'Idempotency failed'; end if;
   events:=jsonb_set(events,'{0,color_id}','"1"');
   perform private.import_blois_leads(events,'2026-10-01',now());
-  select count(*) into n from public.lead_control_events where start_at>='2026-10-01T00:00:00+02:00' and start_at<'2026-11-01T00:00:00+01:00';
+  select count(*) into n from public.lead_control_events where calendar_id='blois@vroommarket.fr' and start_at>='2026-10-01T00:00:00+02:00' and start_at<'2026-11-01T00:00:00+01:00';
   if n<>0 then raise exception 'Changed-to-blue reconciliation failed'; end if;
   perform private.import_blois_leads('[]','2026-10-01',now());
 end $tests$;

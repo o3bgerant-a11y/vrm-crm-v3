@@ -2,7 +2,8 @@
 
 Production: https://agentsco.fr — Supabase project `fsphmtpvxbjgeihephxb`.
 Source calendar: `blois@vroommarket.fr`. Time zone: `Europe/Paris`.
-Only Blois is supported. History begins 2026-09-01.
+This document describes Blois. Tours is supported with its own calendar and importer;
+see `operations/lead-control-tours.md`. History begins 2026-09-01.
 
 ## Daily import (part of the existing 19:00 Paris email task)
 
