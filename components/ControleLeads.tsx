@@ -10,7 +10,7 @@ type Lead = {
   start_at: string;
   title: string;
   agent_code: string | null;
-  outcome: 'signed' | 'unsigned' | 'no_show' | 'cancelled' | 'review' | 'scheduled';
+  outcome: 'signed' | 'unsigned' | 'no_show' | 'cancelled' | 'review' | 'scheduled' | 'other';
   errors: string[];
   event_url: string | null;
   corrected_at: string | null;
@@ -26,7 +26,7 @@ const agencyAgents: Record<number, ReadonlyArray<readonly [string, string]>> = {
   2: [['CP', 'Charles'], ['MLG', 'Maël'], ['FB', 'Florent']],
 };
 const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-const labels: Record<Lead['outcome'], string> = { signed: 'Signé', unsigned: 'Non signé', no_show: 'No show', cancelled: 'Annulé', review: 'À clarifier', scheduled: 'À venir' };
+const labels: Record<Lead['outcome'], string> = { signed: 'Signé', unsigned: 'Non signé', no_show: 'No show', cancelled: 'Annulé', review: 'À clarifier', scheduled: 'À venir', other: 'Autre' };
 const dateTime = (value: string) => new Date(value).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' });
 const isBillable = (lead: Lead) => lead.outcome === 'signed' || lead.outcome === 'unsigned';
 
@@ -154,7 +154,7 @@ export default function ControleLeads() {
 
   const stats = useMemo(() => {
     const count = (outcome: Lead['outcome']) => leads.filter(l => l.outcome === outcome).length;
-    return { billable: leads.filter(isBillable).length, signed: count('signed'), unsigned: count('unsigned'), noShow: count('no_show'), cancelled: count('cancelled'), review: count('review'), scheduled: count('scheduled') };
+    return { billable: leads.filter(isBillable).length, signed: count('signed'), unsigned: count('unsigned'), noShow: count('no_show'), cancelled: count('cancelled'), review: count('review'), scheduled: count('scheduled'), other: count('other') };
   }, [leads]);
   const issues = leads.filter(l => l.errors.length > 0);
   const unassigned = leads.filter(l => isBillable(l) && !l.agent_code).length;
@@ -210,6 +210,7 @@ export default function ControleLeads() {
                   <option value="cancelled">Annulé — non facturé</option>
                   <option value="no_show">No show — non facturé</option>
                   <option value="review">À clarifier — résultat à renseigner</option>
+                   <option value="other">Autre — non facturé</option>
                 </select>
               </label>
               <p className="muted">La correction met à jour les totaux et reste prioritaire sur les prochains contrôles de 19 h. Le mail déjà envoyé reste inchangé.</p>
@@ -230,7 +231,7 @@ export default function ControleLeads() {
           <div className="grid cards3">
             {[
               ['Leads facturables', stats.billable], ['Coût total HT', (stats.billable * 99).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })],
-              ['Leads signés', stats.signed], ['Leads non signés', stats.unsigned], ['No show · non facturés', stats.noShow], ['Annulés · non facturés', stats.cancelled],
+              ['Leads signés', stats.signed], ['Leads non signés', stats.unsigned], ['No show · non facturés', stats.noShow], ['Annulés · non facturés', stats.cancelled], ['Autres · non facturés', stats.other],
             ].map(([label, value]) => <div className="card" key={label}><h3>{label}</h3><div className="stat-value">{value}</div></div>)}
           </div>
           <div className="card">
