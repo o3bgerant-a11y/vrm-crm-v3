@@ -6472,13 +6472,16 @@ export function Remuneration({
     const responsableGrossHT = marginAfterWarrantyCostHT * 0.6;
     const vroomFeeTTC = marginTTC * VROOM_MARGIN_RATE;
     const vroomFeeHT = vroomFeeTTC / TVA_DIVIDER;
-    const cashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
+    const totalCashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
+    // Tours (agence 2) : 40 % agent / 60 % agence. Blois reste à 100 % agent.
+    const cashSentinelHT = Number(selectedAgencyId) === 2 ? totalCashSentinelHT * 0.4 : totalCashSentinelHT;
+    const agencyCashSentinelHT = totalCashSentinelHT - cashSentinelHT;
     const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
     const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
     const instantTransferFeeHT = hasInstantTransferFee(sale) ? INSTANT_TRANSFER_FEE_HT : 0;
     const startPenaltyHT = 0;
     const agentNetHT = agentGrossHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferFeeHT;
-    const responsableNetHT = responsableGrossHT - vroomFeeHT;
+    const responsableNetHT = responsableGrossHT - vroomFeeHT - agencyCashSentinelHT;
 
     return {
       marginTTC,
@@ -6490,6 +6493,7 @@ export function Remuneration({
       vroomFeeTTC,
       vroomFeeHT,
       cashSentinelHT,
+      agencyCashSentinelHT,
       companyCashSentinelHT,
       miscellaneousFeesHT,
       instantTransferFeeHT,
@@ -6777,7 +6781,7 @@ export function Remuneration({
       totalAgentNetHT += detail.agentNetHT;
       totalResponsableNetHT += detail.responsableNetHT;
       totalVroomFeeHT += detail.vroomFeeHT;
-      totalCashSentinelHT += detail.cashSentinelHT;
+      totalCashSentinelHT += detail.cashSentinelHT + detail.agencyCashSentinelHT;
       totalCompanyCashSentinelHT += detail.companyCashSentinelHT;
       totalMiscellaneousFeesHT += detail.miscellaneousFeesHT;
       totalInstantTransferFeeHT += detail.instantTransferFeeHT;
@@ -6967,7 +6971,7 @@ export function Remuneration({
             cashSentinelHT: detail.cashSentinelHT,
             companyCashSentinelHT: detail.companyCashSentinelHT,
             agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
-            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
+            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.agencyCashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
             agentNetHT: detail.agentNetHT,
             responsableGrossHT: detail.responsableGrossHT,
             vroomFeeHT: detail.vroomFeeHT,
