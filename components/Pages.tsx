@@ -6479,9 +6479,12 @@ export function Remuneration({
     const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
     const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
     const instantTransferFeeHT = hasInstantTransferFee(sale) ? INSTANT_TRANSFER_FEE_HT : 0;
-    const startPenaltyHT = 0;
+    // START vendue par un agent à Tours : 60 % du coût de 90 € HT à l'agence.
+    // Les 40 % agent sont déduits séparément dans warrantyStats.
+    const startPenaltyHT = Number(selectedAgencyId) === 2 && sale.warranty_sold && normalizeWarrantyType(sale.warranty_type) === 'start'
+      ? WARRANTY_START_AGENT_COST_HT * 0.6 : 0;
     const agentNetHT = agentGrossHT - cashSentinelHT - companyCashSentinelHT - miscellaneousFeesHT - instantTransferFeeHT;
-    const responsableNetHT = responsableGrossHT - vroomFeeHT - agencyCashSentinelHT;
+    const responsableNetHT = responsableGrossHT - vroomFeeHT - agencyCashSentinelHT - startPenaltyHT;
 
     return {
       marginTTC,
@@ -6607,14 +6610,15 @@ export function Remuneration({
       if (warrantyKey === 'start') {
         // START ne compte pas comme une garantie vendue dans les stats.
         // C'est une pénalité de rémunération.
-        // Si la vente est faite par un agent commercial : -90 € HT uniquement pour cet agent.
-        // Si la vente est faite par un responsable : -45 € HT pour chaque responsable.
+        // Blois : -90 € HT pour l'agent vendeur.
+        // Tours : -36 € HT pour l'agent (40 %) et -54 € HT pour l'agence (60 %, dans la marge responsables).
+        // Vente directe responsable : -45 € HT par responsable, règle inchangée.
         if (soldByAgent) {
           const agentRow = baseRows.find((row) => row.type === 'agent' && Number(row.id) === Number(sale.agent_id));
           if (agentRow) {
-            agentRow.warrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
+            agentRow.warrantyGainHT -= Number(selectedAgencyId) === 2 ? WARRANTY_START_AGENT_COST_HT * 0.4 : WARRANTY_START_AGENT_COST_HT;
           }
-          totalWarrantyGainHT -= WARRANTY_START_AGENT_COST_HT;
+          totalWarrantyGainHT -= Number(selectedAgencyId) === 2 ? WARRANTY_START_AGENT_COST_HT * 0.4 : WARRANTY_START_AGENT_COST_HT;
         } else {
           baseRows
             .filter((row) => row.type === 'responsable')
@@ -6887,7 +6891,7 @@ export function Remuneration({
       let selectedWarrantyShareHT = 0;
 
       if (soldByAgent && person.type === 'agent' && Number(person.id) === Number(sale.agent_id)) {
-        selectedWarrantyShareHT = -WARRANTY_START_AGENT_COST_HT;
+        selectedWarrantyShareHT = -(Number(selectedAgencyId) === 2 ? WARRANTY_START_AGENT_COST_HT * 0.4 : WARRANTY_START_AGENT_COST_HT);
       }
 
       if (!soldByAgent && person.type === 'responsable') {
@@ -6902,7 +6906,9 @@ export function Remuneration({
         warrantyProfitHT: selectedWarrantyShareHT,
         selectedWarrantyShareHT,
         warrantyDetailLabel: soldByAgent
-          ? `START : -${euro(WARRANTY_START_AGENT_COST_HT)} HT agent uniquement`
+          ? Number(selectedAgencyId) === 2
+            ? `START Tours : -${euro(WARRANTY_START_AGENT_COST_HT * 0.4)} HT agent (40 %) / -${euro(WARRANTY_START_AGENT_COST_HT * 0.6)} HT agence (60 %)`
+            : `START : -${euro(WARRANTY_START_AGENT_COST_HT)} HT agent uniquement`
           : `START : -${euro(WARRANTY_START_RESPONSABLE_COST_HT)} HT par responsable`,
       };
     }
@@ -6971,7 +6977,7 @@ export function Remuneration({
             cashSentinelHT: detail.cashSentinelHT,
             companyCashSentinelHT: detail.companyCashSentinelHT,
             agentFeesHT: detail.cashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
-            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.agencyCashSentinelHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
+            deductionsHT: detail.vroomFeeHT + detail.cashSentinelHT + detail.agencyCashSentinelHT + detail.startPenaltyHT + detail.companyCashSentinelHT + detail.miscellaneousFeesHT + detail.instantTransferFeeHT,
             agentNetHT: detail.agentNetHT,
             responsableGrossHT: detail.responsableGrossHT,
             vroomFeeHT: detail.vroomFeeHT,
