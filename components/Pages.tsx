@@ -6473,8 +6473,8 @@ export function Remuneration({
     const vroomFeeTTC = marginTTC * VROOM_MARGIN_RATE;
     const vroomFeeHT = vroomFeeTTC / TVA_DIVIDER;
     const totalCashSentinelHT = CASH_SENTINEL_TTC / TVA_DIVIDER;
-    // Tours (agence 2) : 40 % agent / 60 % agence. Blois reste à 100 % agent.
-    const cashSentinelHT = Number(selectedAgencyId) === 2 ? totalCashSentinelHT * 0.4 : totalCashSentinelHT;
+    // Tours et Blois : CashSentinel intégralement à la charge de l'agent commercial (45 € HT).
+    const cashSentinelHT = totalCashSentinelHT;
     const agencyCashSentinelHT = totalCashSentinelHT - cashSentinelHT;
     const companyCashSentinelHT = sale.sale_to_company ? CASH_SENTINEL_COMPANY_TTC / TVA_DIVIDER : 0;
     const miscellaneousFeesHT = Number(sale.miscellaneous_fees_ht || 0);
